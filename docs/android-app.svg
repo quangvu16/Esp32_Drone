@@ -1,0 +1,223 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 880" width="1280" height="880" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">ESP-Drone Android app</title>
+  <desc id="desc">Screen map of the ESP-Drone Android client: the landscape flight screen with twin joysticks and the flight-mode panel, the PID tuning screen and the GPS navigation screen.</desc>
+
+  <defs>
+    <style>
+      .bg      { fill: #f6f8fa; }
+      .h1      { font: 700 26px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .h2      { font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .sub     { font: 400 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lbl     { font: 500 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .lblm    { font: 400 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lblw    { font: 600 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #ffffff; }
+      .mono    { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .chip    { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #0969da; }
+      .bezel   { fill: #1c2128; }
+      .screen  { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+      .panel   { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .card    { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn-pri { fill: #1a7f37; stroke: #1a7f37; stroke-width: 1.5; }
+      .btn-dan { fill: #cf222e; stroke: #cf222e; stroke-width: 1.5; }
+      .btn-warn{ fill: #bc4c00; stroke: #bc4c00; stroke-width: 1.5; }
+      .stick   { fill: #eaeef2; stroke: #8c959f; stroke-width: 1.5; }
+      .knob    { fill: #ffffff; stroke: #57606a; stroke-width: 1.5; }
+      .rule    { stroke: #d0d7de; stroke-width: 1; }
+      .tag     { font: 600 11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1a7f37; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="880"/>
+
+  <!-- ============================ header ============================ -->
+  <text class="h1" x="40" y="44">Android app — ESP-Drone</text>
+  <text class="sub" x="40" y="70">Landscape only · minSdk 21 · WiFi, Bluetooth Classic SPP and BLE GATT · se.bitcraze.crazyfliecontrol2</text>
+  <line class="rule" x1="40" y1="88" x2="1240" y2="88"/>
+
+  <!-- ============================ flight screen ============================ -->
+  <text class="h2" x="40" y="118">Flight screen</text>
+  <text class="lblm" x="150" y="118">MainActivity</text>
+
+  <rect class="bezel" x="40" y="132" width="820" height="410" rx="18"/>
+  <rect class="screen" x="52" y="144" width="796" height="386" rx="8"/>
+
+  <!-- top bar 144–184 -->
+  <rect class="panel" x="52" y="144" width="796" height="40" rx="8"/>
+  <circle cx="76" cy="164" r="5" fill="#1a7f37"/>
+  <text class="lbl" x="90" y="168">Connected</text>
+  <text class="chip" x="186" y="168">UDP 192.168.43.42</text>
+  <text class="lbl" x="340" y="168">3.98 V</text>
+  <text class="lbl" x="412" y="168">Link 98%</text>
+  <rect class="btn" x="556" y="152" width="88" height="24" rx="6"/>
+  <text class="lbl" x="600" y="168" text-anchor="middle">PID Tune</text>
+  <rect class="btn" x="652" y="152" width="88" height="24" rx="6"/>
+  <text class="lbl" x="696" y="168" text-anchor="middle">GPS Nav</text>
+  <rect class="btn" x="748" y="152" width="84" height="24" rx="6"/>
+  <text class="lbl" x="790" y="168" text-anchor="middle">Settings</text>
+
+  <!-- body 184–436 -->
+  <!-- left joystick -->
+  <circle class="stick" cx="170" cy="280" r="62"/>
+  <circle class="knob" cx="170" cy="280" r="26"/>
+  <text class="lblm" x="170" y="364" text-anchor="middle">Throttle / Yaw</text>
+  <text class="chip" x="170" y="382" text-anchor="middle">joystick_left</text>
+  <rect class="btn" x="112" y="394" width="116" height="22" rx="6"/>
+  <text class="lblm" x="170" y="409" text-anchor="middle">horizontal lock</text>
+
+  <!-- flight data view -->
+  <rect class="panel" x="320" y="200" width="190" height="168" rx="8"/>
+  <text class="lblm" x="415" y="220" text-anchor="middle">FlightDataView</text>
+  <path d="M 332 296 L 498 296" stroke="#0969da" stroke-width="2"/>
+  <path d="M 332 296 L 415 252 L 498 296 Z" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <path d="M 332 296 L 415 340 L 498 296 Z" fill="#fff8c5" stroke="#bc4c00" stroke-width="1.5"/>
+  <circle cx="415" cy="296" r="5" fill="#1f2328"/>
+  <text class="lblm" x="415" y="358" text-anchor="middle">artificial horizon</text>
+
+  <!-- right joystick -->
+  <circle class="stick" cx="660" cy="280" r="62"/>
+  <circle class="knob" cx="660" cy="280" r="26"/>
+  <text class="lblm" x="660" y="364" text-anchor="middle">Roll / Pitch</text>
+  <text class="chip" x="660" y="382" text-anchor="middle">joystick_right</text>
+  <text class="lblm" x="660" y="414" text-anchor="middle">tilt-to-fly replaces roll/pitch only</text>
+
+  <!-- flight mode panel 436–530 -->
+  <rect class="panel" x="64" y="436" width="772" height="94" rx="8"/>
+  <text class="tag" x="78" y="454">FLIGHT MODE PANEL</text>
+
+  <rect class="btn" x="78" y="462" width="122" height="26" rx="6"/>
+  <text class="lbl" x="139" y="479" text-anchor="middle">Mode: Manual ▾</text>
+  <text class="lblm" x="212" y="479">disarmed</text>
+  <text class="lblm" x="286" y="479">hover thrust</text>
+  <line x1="372" y1="475" x2="470" y2="475" stroke="#8c959f" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="428" cy="475" r="7" fill="#1a7f37"/>
+  <text class="mono" x="478" y="479">1200</text>
+
+  <rect class="btn-pri" x="536" y="462" width="64" height="26" rx="6"/>
+  <text class="lblw" x="568" y="479" text-anchor="middle">ARM</text>
+  <rect class="btn" x="608" y="462" width="74" height="26" rx="6"/>
+  <text class="lbl" x="645" y="479" text-anchor="middle">DISARM</text>
+  <rect class="btn-pri" x="690" y="462" width="78" height="26" rx="6"/>
+  <text class="lblw" x="729" y="479" text-anchor="middle">TAKEOFF</text>
+  <rect class="btn" x="776" y="462" width="48" height="26" rx="6"/>
+  <text class="lbl" x="800" y="479" text-anchor="middle">LAND</text>
+
+  <rect class="btn" x="78" y="500" width="122" height="22" rx="6"/>
+  <text class="lblm" x="139" y="515" text-anchor="middle">Tilt control  ▢</text>
+  <text class="lblm" x="212" y="515">Phone tilt is inert until you switch it on.</text>
+  <rect class="btn-dan" x="608" y="498" width="216" height="26" rx="6"/>
+  <text class="lblw" x="716" y="515" text-anchor="middle">EMERGENCY · TAP TWICE</text>
+
+  <!-- ============================ right column ============================ -->
+  <rect class="card" x="890" y="132" width="350" height="214" rx="10"/>
+  <text class="h2" x="908" y="158">Transports</text>
+  <line class="rule" x1="908" y1="168" x2="1222" y2="168"/>
+  <text class="lbl" x="908" y="192">WiFi SoftAP</text>
+  <text class="lblm" x="908" y="210">ESP-Drone / 12345678 · 192.168.43.42</text>
+  <text class="lbl" x="908" y="234">WiFi Station</text>
+  <text class="lblm" x="908" y="252">joins your network · esp-drone.local</text>
+  <text class="lbl" x="908" y="276">Bluetooth Classic SPP</text>
+  <text class="lblm" x="908" y="294">pair first · WiFi off in this mode</text>
+  <text class="lbl" x="908" y="318">BLE GATT</text>
+  <text class="lblm" x="908" y="336">Bitcraze service 00000201…</text>
+
+  <rect class="card" x="890" y="360" width="350" height="182" rx="10"/>
+  <text class="h2" x="908" y="372">Flight commands</text>
+  <line class="rule" x1="908" y1="382" x2="1222" y2="382"/>
+  <text class="lblm" x="908" y="406">Mode spinner</text>
+  <text class="lbl" x="1004" y="406">Manual · Hold · Auto · Follow · RTH</text>
+  <text class="lblm" x="908" y="430">Takeoff / Land</text>
+  <text class="lbl" x="1004" y="430">port 7 flight-control extension</text>
+  <text class="lblm" x="908" y="454">Arm / Disarm</text>
+  <text class="lbl" x="1004" y="454">idle throttle required to arm</text>
+  <text class="lblm" x="908" y="478">Emergency</text>
+  <text class="lbl" x="1004" y="478">two taps within 3 s cuts motors</text>
+  <text class="lblm" x="908" y="502">Tilt control</text>
+  <text class="lbl" x="1004" y="502">phone IMU drives roll/pitch</text>
+  <text class="lblm" x="908" y="526">Thrust</text>
+  <text class="lbl" x="1004" y="526">always on the stick — never tilt</text>
+
+  <!-- ============================ tune screen ============================ -->
+  <text class="h2" x="40" y="582">PID tuning screen</text>
+  <text class="lblm" x="200" y="582">tune/TuneActivity</text>
+
+  <rect class="bezel" x="40" y="596" width="580" height="250" rx="14"/>
+  <rect class="screen" x="50" y="606" width="560" height="230" rx="6"/>
+
+  <text class="h2" x="66" y="628">PID Tuning</text>
+  <rect class="btn-dan" x="466" y="612" width="128" height="22" rx="6"/>
+  <text class="lblw" x="530" y="627" text-anchor="middle">CUT MOTORS</text>
+
+  <rect class="panel" x="66" y="640" width="330" height="110" rx="6"/>
+  <text class="lblm" x="78" y="656">live charts · 20 Hz</text>
+  <polyline points="82,720 110,700 138,712 166,682 194,694 222,668 250,684 278,660 306,676 334,652 362,666 388,648"
+            fill="none" stroke="#0969da" stroke-width="2"/>
+  <polyline points="82,730 110,724 138,732 166,718 194,726 222,712 250,722 278,708 306,718 334,704 362,714 388,700"
+            fill="none" stroke="#bc4c00" stroke-width="2"/>
+  <rect x="212" y="648" width="9" height="9" fill="#0969da"/>
+  <text class="chip" x="225" y="656">roll</text>
+  <rect x="258" y="648" width="9" height="9" fill="#bc4c00"/>
+  <text class="chip" x="271" y="656">pitch</text>
+
+  <rect class="panel" x="408" y="640" width="184" height="110" rx="6"/>
+  <text class="lblm" x="420" y="656">statistics</text>
+  <text class="mono" x="420" y="678">rms 0.42°</text>
+  <text class="mono" x="420" y="696">p95 1.10°</text>
+  <text class="mono" x="420" y="714">rate 3.1 °/s</text>
+  <text class="lblm" x="420" y="738">waiting for telemetry</text>
+
+  <rect class="panel" x="66" y="762" width="250" height="58" rx="6"/>
+  <text class="lblm" x="78" y="778">gains</text>
+  <text class="mono" x="78" y="800">Kp 1.30   Ki 0.040   Kd 18.0</text>
+  <text class="lblm" x="78" y="814">tap a value to edit the parameter</text>
+
+  <rect class="panel" x="328" y="762" width="264" height="58" rx="6"/>
+  <text class="lblm" x="340" y="778">auto-tune — one axis at a time</text>
+  <rect class="btn-warn" x="340" y="788" width="150" height="24" rx="6"/>
+  <text class="lblw" x="415" y="804" text-anchor="middle">Hold 2 s to start</text>
+  <text class="lblm" x="500" y="804">props spin</text>
+
+  <!-- ============================ gps screen ============================ -->
+  <text class="h2" x="660" y="582">GPS navigation screen</text>
+  <text class="lblm" x="850" y="582">gpsnav/GpsNavActivity</text>
+
+  <rect class="bezel" x="660" y="596" width="580" height="250" rx="14"/>
+  <rect class="screen" x="670" y="606" width="560" height="230" rx="6"/>
+
+  <rect class="panel" x="686" y="622" width="300" height="196" rx="6"/>
+  <rect x="694" y="630" width="284" height="180" rx="4" fill="#e6f2e6" stroke="#d0d7de"/>
+  <path d="M 700 780 C 760 750 800 720 860 700 S 950 660 968 640" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M 716 640 C 776 680 816 700 876 740 S 950 780 964 800" fill="none" stroke="#a8c8e8" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="742" cy="760" r="7" fill="#1a7f37"/>
+  <text class="chip" x="754" y="764" fill="#1a7f37">launch</text>
+  <circle cx="830" cy="712" r="7" fill="#0969da"/>
+  <text class="chip" x="842" y="716">WP1</text>
+  <circle cx="900" cy="668" r="7" fill="#0969da"/>
+  <text class="chip" x="912" y="672">WP2</text>
+  <circle cx="948" cy="648" r="7" fill="#cf222e"/>
+  <text class="chip" x="960" y="652" fill="#cf222e">target</text>
+  <text class="lblm" x="702" y="648">MissionMapView</text>
+
+  <rect class="panel" x="998" y="622" width="216" height="120" rx="6"/>
+  <text class="lblm" x="1010" y="640">waypoints</text>
+  <text class="lbl" x="1010" y="662">1  37.4220, −122.0841</text>
+  <text class="lbl" x="1010" y="682">2  37.4225, −122.0836</text>
+  <text class="lblm" x="1010" y="704">▲ ▼ ✕  reorder / remove</text>
+  <text class="lblm" x="1010" y="728">tap the map to add</text>
+
+  <rect class="btn-pri" x="998" y="754" width="68" height="26" rx="6"/>
+  <text class="lblw" x="1032" y="771" text-anchor="middle">Mission</text>
+  <rect class="btn" x="1074" y="754" width="56" height="26" rx="6"/>
+  <text class="lbl" x="1102" y="771" text-anchor="middle">Goto</text>
+  <rect class="btn" x="1138" y="754" width="56" height="26" rx="6"/>
+  <text class="lbl" x="1166" y="771" text-anchor="middle">RTL</text>
+
+  <rect class="btn" x="998" y="788" width="56" height="26" rx="6"/>
+  <text class="lbl" x="1026" y="805" text-anchor="middle">Pause</text>
+  <rect class="btn" x="1062" y="788" width="64" height="26" rx="6"/>
+  <text class="lbl" x="1094" y="805" text-anchor="middle">Launch</text>
+  <rect class="btn" x="1134" y="788" width="56" height="26" rx="6"/>
+  <text class="lbl" x="1162" y="805" text-anchor="middle">Land</text>
+
+  <text class="lblm" x="686" y="832">Load / Save Mission Planner .waypoints files · map type · tap mode</text>
+</svg>

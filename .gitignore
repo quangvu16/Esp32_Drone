@@ -24,3 +24,7 @@ xcuserdata/
 
 # local firmware snapshots
 Esp32_drone_backup_*.ino.txt
+
+# local UI backups / scratch
+apps_ui_backup_*.zip
+zi5dtisj

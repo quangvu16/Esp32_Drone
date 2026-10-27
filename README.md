@@ -13,12 +13,16 @@ Esp32_drone/       Arduino firmware + native regression tests
 PROTOCOL.md        the wire protocol, in full
 ESP-Drone-Android/ Android client
 ESP-Drone-iOS/     iOS client
-docs/              board schematic
+docs/              install guide, diagrams, board schematic
 ```
 
-Start with **[PROTOCOL.md](PROTOCOL.md)**. It is the authoritative reference for
-framing, the parameter and log TOCs, the flight-control and navigation
-extensions, and the phone-side GPS mission design.
+**Want to get flying?** Start with **[docs/INSTALL.md](docs/INSTALL.md)** —
+flash the firmware, install an app, connect, and get through a first flight.
+
+Start with **[PROTOCOL.md](PROTOCOL.md)** for the wire format. It is the
+authoritative reference for framing, the parameter and log TOCs, the
+flight-control and navigation extensions, and the phone-side GPS mission
+design.
 
 ---
 
@@ -34,6 +38,13 @@ rather than pretending otherwise:
 - **FOLLOW / RTH use accelerometer dead reckoning.** It drifts — metres within a
   minute. The drone's position on the map is *estimated*.
 
+## The board
+
+![ESP32 pinout](docs/esp32-pinout.svg)
+
+Full wiring notes, the quad layout and the prop directions are in
+[docs/INSTALL.md](docs/INSTALL.md#pinout).
+
 ## Features
 
 **Firmware** — attitude PID on the MPU6500, five flight modes (Manual, Hold,
@@ -46,6 +57,17 @@ a flight-mode panel with Takeoff / Land / Arm / Disarm / Emergency; a PID tuning
 screen with live charts, statistics, parameter editors and auto-tune; phone-IMU
 tilt-to-fly; and GPS mission navigation with a map, waypoints, Mission Planner
 `.waypoints` import and return-to-launch.
+
+**Android**
+
+![Android app](docs/android-app.svg)
+
+**iOS**
+
+![iOS app](docs/ios-app.svg)
+
+iOS cannot use Bluetooth Classic SPP — iOS only exposes SPP to MFi accessories.
+Use WiFi or BLE GATT there.
 
 ## Building
 

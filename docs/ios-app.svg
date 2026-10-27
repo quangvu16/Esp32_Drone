@@ -1,0 +1,223 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 880" width="1280" height="880" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">ESP-Drone iOS app</title>
+  <desc id="desc">Screen map of the ESP-Drone iOS client: the landscape stick screen, the flight-command screen, the link picker, the PID tuning screen and the GPS navigation screen. Bluetooth Classic SPP is not available on iOS.</desc>
+
+  <defs>
+    <style>
+      .bg      { fill: #f6f8fa; }
+      .h1      { font: 700 26px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .h2      { font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .sub     { font: 400 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lbl     { font: 500 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .lblm    { font: 400 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lblw    { font: 600 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #ffffff; }
+      .mono    { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .chip    { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #0969da; }
+      .bezel   { fill: #1c2128; }
+      .screen  { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+      .panel   { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .card    { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn-pri { fill: #0969da; stroke: #0969da; stroke-width: 1.5; }
+      .btn-dan { fill: #cf222e; stroke: #cf222e; stroke-width: 1.5; }
+      .btn-warn{ fill: #bc4c00; stroke: #bc4c00; stroke-width: 1.5; }
+      .seg     { fill: #eaeef2; stroke: #8c959f; stroke-width: 1.5; }
+      .seg-on  { fill: #0969da; stroke: #0969da; stroke-width: 1.5; }
+      .stick   { fill: #eaeef2; stroke: #8c959f; stroke-width: 1.5; }
+      .knob    { fill: #ffffff; stroke: #57606a; stroke-width: 1.5; }
+      .rule    { stroke: #d0d7de; stroke-width: 1; }
+      .tag     { font: 600 11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #0969da; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="880"/>
+
+  <!-- ============================ header ============================ -->
+  <text class="h1" x="40" y="44">iOS app — ESP-Drone</text>
+  <text class="sub" x="40" y="70">Landscape only · iOS 15+ · WiFi and BLE GATT · Bluetooth Classic SPP unavailable · com.espressif.espdrone</text>
+  <line class="rule" x1="40" y1="88" x2="1240" y2="88"/>
+
+  <!-- ============================ stick screen ============================ -->
+  <text class="h2" x="40" y="118">Stick screen</text>
+  <text class="lblm" x="150" y="118">ViewController</text>
+
+  <rect class="bezel" x="40" y="132" width="820" height="410" rx="18"/>
+  <rect class="screen" x="52" y="144" width="796" height="386" rx="8"/>
+
+  <!-- top bar 144–190 -->
+  <rect class="btn-pri" x="68" y="156" width="130" height="28" rx="8"/>
+  <text class="lblw" x="133" y="174" text-anchor="middle">Connect</text>
+  <rect class="panel" x="210" y="162" width="220" height="16" rx="8"/>
+  <rect x="212" y="164" width="150" height="12" rx="6" fill="#0969da"/>
+  <text class="lblm" x="442" y="174">fetching TOCs…</text>
+  <rect class="btn" x="736" y="156" width="96" height="28" rx="8"/>
+  <text class="lbl" x="784" y="174" text-anchor="middle">Settings</text>
+
+  <!-- joysticks -->
+  <circle class="stick" cx="200" cy="300" r="72"/>
+  <circle class="knob" cx="200" cy="300" r="30"/>
+  <text class="lblm" x="200" y="392" text-anchor="middle">BCJoystick · left</text>
+
+  <circle class="stick" cx="620" cy="300" r="72"/>
+  <circle class="knob" cx="620" cy="300" r="30"/>
+  <text class="lblm" x="620" y="392" text-anchor="middle">BCJoystick · right</text>
+
+  <!-- unlock hint -->
+  <rect class="panel" x="340" y="272" width="140" height="56" rx="8"/>
+  <text class="lblm" x="410" y="294" text-anchor="middle">unlockLabel</text>
+  <text class="lbl" x="410" y="314" text-anchor="middle">both thumbs on</text>
+
+  <!-- feature row -->
+  <rect class="btn" x="470" y="480" width="86" height="30" rx="8"/>
+  <text class="lbl" x="513" y="499" text-anchor="middle">Flight</text>
+  <rect class="btn" x="566" y="480" width="86" height="30" rx="8"/>
+  <text class="lbl" x="609" y="499" text-anchor="middle">Tune</text>
+  <rect class="btn" x="662" y="480" width="86" height="30" rx="8"/>
+  <text class="lbl" x="705" y="499" text-anchor="middle">Nav</text>
+  <rect class="btn" x="758" y="480" width="74" height="30" rx="8"/>
+  <text class="lbl" x="795" y="499" text-anchor="middle">Link</text>
+  <text class="lblm" x="466" y="468">feature-screen row</text>
+
+  <!-- ============================ right column ============================ -->
+  <rect class="card" x="890" y="132" width="350" height="202" rx="10"/>
+  <text class="h2" x="908" y="158">Link picker</text>
+  <text class="lblm" x="1000" y="158">ConnectionViewController</text>
+  <line class="rule" x1="908" y1="168" x2="1222" y2="168"/>
+  <rect class="seg-on" x="908" y="180" width="76" height="22" rx="6"/>
+  <text class="lblw" x="946" y="195" text-anchor="middle">SoftAP</text>
+  <rect class="seg" x="990" y="180" width="76" height="22" rx="6"/>
+  <text class="lblm" x="1028" y="195" text-anchor="middle">Station</text>
+  <rect class="seg" x="1072" y="180" width="60" height="22" rx="6"/>
+  <text class="lblm" x="1102" y="195" text-anchor="middle">SPP</text>
+  <rect class="seg" x="1138" y="180" width="60" height="22" rx="6"/>
+  <text class="lblm" x="1168" y="195" text-anchor="middle">BLE</text>
+
+  <text class="lbl" x="908" y="226">Host</text>
+  <rect class="panel" x="968" y="210" width="254" height="22" rx="5"/>
+  <text class="mono" x="978" y="225">192.168.43.42</text>
+  <text class="lbl" x="908" y="254">Ports</text>
+  <rect class="panel" x="968" y="238" width="122" height="22" rx="5"/>
+  <text class="mono" x="978" y="253">drone 2390</text>
+  <rect class="panel" x="1098" y="238" width="124" height="22" rx="5"/>
+  <text class="mono" x="1108" y="253">phone 2399</text>
+  <text class="lblm" x="908" y="284">SPP is listed but cannot open: iOS only</text>
+  <text class="lblm" x="908" y="302">exposes Bluetooth Classic to MFi accessories.</text>
+  <text class="lblm" x="908" y="318">The app says so on screen rather than failing.</text>
+
+  <rect class="card" x="890" y="348" width="350" height="194" rx="10"/>
+  <text class="h2" x="908" y="372">Flight commands</text>
+  <text class="lblm" x="1050" y="372">FlightViewController</text>
+  <line class="rule" x1="908" y1="382" x2="1222" y2="382"/>
+
+  <rect class="seg-on" x="908" y="386" width="52" height="20" rx="5"/>
+  <text class="lblw" x="934" y="400" text-anchor="middle">Manual</text>
+  <rect class="seg" x="964" y="386" width="44" height="20" rx="5"/>
+  <text class="lblm" x="986" y="400" text-anchor="middle">Hold</text>
+  <rect class="seg" x="1012" y="386" width="44" height="20" rx="5"/>
+  <text class="lblm" x="1034" y="400" text-anchor="middle">Auto</text>
+  <rect class="seg" x="1060" y="386" width="50" height="20" rx="5"/>
+  <text class="lblm" x="1085" y="400" text-anchor="middle">Follow</text>
+  <rect class="seg" x="1114" y="386" width="42" height="20" rx="5"/>
+  <text class="lblm" x="1135" y="400" text-anchor="middle">RTH</text>
+
+  <rect class="btn-pri" x="908" y="414" width="70" height="32" rx="7"/>
+  <text class="lblw" x="943" y="434" text-anchor="middle">Arm</text>
+  <rect class="btn" x="986" y="414" width="70" height="32" rx="7"/>
+  <text class="lbl" x="1021" y="434" text-anchor="middle">Disarm</text>
+  <rect class="btn-pri" x="1064" y="414" width="76" height="32" rx="7"/>
+  <text class="lblw" x="1102" y="434" text-anchor="middle">Takeoff</text>
+  <rect class="btn" x="1148" y="414" width="74" height="32" rx="7"/>
+  <text class="lbl" x="1185" y="434" text-anchor="middle">Land</text>
+  <text class="lblm" x="908" y="462">icon above the label so four fit across a phone</text>
+
+  <rect class="btn-dan" x="908" y="472" width="314" height="30" rx="8"/>
+  <text class="lblw" x="1065" y="491" text-anchor="middle">EMERGENCY · TAP TWICE</text>
+
+  <text class="lblm" x="908" y="518">hover thrust  8000 ·————————· 55000</text>
+  <text class="lblm" x="908" y="534">status: mode Manual · disarmed · auto idle</text>
+
+  <!-- ============================ tune screen ============================ -->
+  <text class="h2" x="40" y="582">PID tuning screen</text>
+  <text class="lblm" x="200" y="582">PidTuneViewController</text>
+
+  <rect class="bezel" x="40" y="596" width="580" height="250" rx="14"/>
+  <rect class="screen" x="50" y="606" width="560" height="230" rx="6"/>
+
+  <text class="h2" x="66" y="628">PID Tune</text>
+  <rect class="seg-on" x="160" y="612" width="46" height="22" rx="5"/>
+  <text class="lblw" x="183" y="627" text-anchor="middle">Roll</text>
+  <rect class="seg" x="210" y="612" width="52" height="22" rx="5"/>
+  <text class="lblm" x="236" y="627" text-anchor="middle">Pitch</text>
+  <rect class="seg" x="266" y="612" width="46" height="22" rx="5"/>
+  <text class="lblm" x="289" y="627" text-anchor="middle">Yaw</text>
+  <rect class="btn" x="322" y="612" width="36" height="22" rx="5"/>
+  <text class="lblm" x="340" y="627" text-anchor="middle">❚❚</text>
+  <rect class="btn-dan" x="466" y="612" width="128" height="22" rx="6"/>
+  <text class="lblw" x="530" y="627" text-anchor="middle">CUT MOTORS</text>
+
+  <rect class="panel" x="66" y="642" width="330" height="104" rx="6"/>
+  <text class="lblm" x="78" y="658">three charts — angle · controller · terms</text>
+  <polyline points="82,718 110,700 138,710 166,684 194,694 222,672 250,684 278,664 306,676 334,656 362,668 388,652"
+            fill="none" stroke="#0969da" stroke-width="2"/>
+  <polyline points="82,728 110,722 138,730 166,718 194,724 222,714 250,722 278,710 306,718 334,706 362,714 388,702"
+            fill="none" stroke="#bc4c00" stroke-width="2"/>
+
+  <rect class="panel" x="408" y="642" width="184" height="104" rx="6"/>
+  <text class="lblm" x="420" y="658">gain editors</text>
+  <text class="mono" x="420" y="680">Kp 1.30</text>
+  <text class="mono" x="420" y="698">Ki 0.040</text>
+  <text class="mono" x="420" y="716">Kd 18.0</text>
+  <text class="lblm" x="420" y="736">live parameter writes</text>
+
+  <rect class="btn" x="66" y="758" width="128" height="26" rx="6"/>
+  <text class="lbl" x="130" y="775" text-anchor="middle">Save gains</text>
+  <rect class="btn" x="202" y="758" width="128" height="26" rx="6"/>
+  <text class="lbl" x="266" y="775" text-anchor="middle">Load gains</text>
+  <rect class="btn" x="338" y="758" width="140" height="26" rx="6"/>
+  <text class="lbl" x="408" y="775" text-anchor="middle">Restore defaults</text>
+
+  <rect class="btn-warn" x="66" y="792" width="160" height="28" rx="6"/>
+  <text class="lblw" x="146" y="810" text-anchor="middle">Start auto-tune</text>
+  <rect class="btn" x="234" y="792" width="160" height="28" rx="6"/>
+  <text class="lbl" x="314" y="810" text-anchor="middle">Stop tuner</text>
+  <text class="lblm" x="404" y="810">props spin — secure the drone</text>
+
+  <!-- ============================ gps screen ============================ -->
+  <text class="h2" x="660" y="582">GPS navigation screen</text>
+  <text class="lblm" x="850" y="582">GpsNavViewController</text>
+
+  <rect class="bezel" x="660" y="596" width="580" height="250" rx="14"/>
+  <rect class="screen" x="670" y="606" width="560" height="230" rx="6"/>
+
+  <!-- map -->
+  <rect x="686" y="620" width="528" height="140" rx="6" fill="#e6f2e6" stroke="#d0d7de"/>
+  <path d="M 694 740 C 760 712 820 690 900 672 S 1060 648 1204 636" fill="none" stroke="#8c959f" stroke-width="3"/>
+  <path d="M 700 632 C 780 670 860 690 960 720 S 1120 744 1204 748" fill="none" stroke="#a8c8e8" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="736" cy="736" r="7" fill="#1a7f37"/>
+  <text class="chip" x="748" y="740" fill="#1a7f37">launch</text>
+  <circle cx="860" cy="688" r="7" fill="#0969da"/>
+  <text class="chip" x="872" y="692">WP1</text>
+  <circle cx="980" cy="664" r="7" fill="#0969da"/>
+  <text class="chip" x="992" y="668">WP2</text>
+  <circle cx="1120" cy="648" r="7" fill="#cf222e"/>
+  <text class="chip" x="1132" y="652" fill="#cf222e">target</text>
+  <text class="lblm" x="700" y="638">MKMapView · shows user location</text>
+
+  <!-- buttons -->
+  <rect class="btn-pri" x="686" y="772" width="112" height="28" rx="7"/>
+  <text class="lblw" x="742" y="790" text-anchor="middle">Arm + ALIGN</text>
+  <rect class="btn-pri" x="806" y="772" width="112" height="28" rx="7"/>
+  <text class="lblw" x="862" y="790" text-anchor="middle">Start mission</text>
+  <rect class="btn" x="926" y="772" width="70" height="28" rx="7"/>
+  <text class="lbl" x="961" y="790" text-anchor="middle">Pause</text>
+  <rect class="btn" x="1004" y="772" width="64" height="28" rx="7"/>
+  <text class="lbl" x="1036" y="790" text-anchor="middle">Stop</text>
+  <rect class="btn" x="1076" y="772" width="70" height="28" rx="7"/>
+  <text class="lbl" x="1111" y="790" text-anchor="middle">Clear</text>
+
+  <rect class="btn" x="686" y="808" width="112" height="28" rx="7"/>
+  <text class="lbl" x="742" y="826" text-anchor="middle">Load .waypoints</text>
+  <rect class="btn-dan" x="806" y="808" width="112" height="28" rx="7"/>
+  <text class="lblw" x="862" y="826" text-anchor="middle">Cut motors</text>
+  <text class="lblm" x="930" y="826">phone GPS sets launch point + ALIGN at arming</text>
+</svg>
