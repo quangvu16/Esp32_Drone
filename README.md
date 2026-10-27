@@ -22,7 +22,7 @@ docs/              install guide, pilot's guide, diagrams, board schematic
    app, connect.
 2. **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** — the pilot's guide: every
    screen, CUT MOTORS, arming, failsafe, low battery, and a first-flight
-   checklist.
+   checklist. **Tiếng Việt:** [docs/USER_GUIDE.vi.md](docs/USER_GUIDE.vi.md).
 
 Start with **[PROTOCOL.md](PROTOCOL.md)** for the wire format. It is the
 authoritative reference for framing, the parameter and log TOCs, the

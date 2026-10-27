@@ -1,5 +1,7 @@
 # Pilot's guide
 
+*[Tiếng Việt](USER_GUIDE.vi.md)*
+
 How to fly the XW_Z1 ESP32 drone with the Android and iOS apps: what every
 screen does, how the safety features behave, and a checklist for the first
 flight.
