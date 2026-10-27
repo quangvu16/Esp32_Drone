@@ -1,168 +1,281 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Flight-mode controls (PROTOCOL.md section 5). Kept in one row of groups so the
-     panel fits above the joysticks without covering them. -->
+<!-- Fly-screen centre column (redesign stage 2). Connected: mode, one main action,
+     four live numbers, More. Not connected: what to do next. FlightModePanel
+     switches between the two. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
+    android:gravity="center_vertical"
     android:orientation="vertical"
-    android:paddingLeft="6dp"
-    android:paddingRight="6dp">
+    android:paddingStart="8dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="8dp"
+    android:paddingBottom="8dp">
 
     <LinearLayout
+        android:id="@+id/fly_controls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/button_open_tune"
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="PID Tune" />
-
-        <Button
-            android:id="@+id/button_open_gps"
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="GPS Nav" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="vertical"
+        android:visibility="gone">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Mode"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:text="Flight mode"
+            android:textColor="@color/fly_muted"
+            android:textSize="12sp" />
 
-        <Spinner
-            android:id="@+id/spinner_flight_mode"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
-
-        <TextView
-            android:id="@+id/text_flight_state"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="8dp"
-            android:text="—"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/button_takeoff"
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Takeoff" />
-
-        <Button
-            android:id="@+id/button_land"
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Land" />
-
-        <Button
-            android:id="@+id/button_arm"
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Arm" />
-
-        <Button
-            android:id="@+id/button_disarm"
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Disarm" />
-
-        <Button
-            android:id="@+id/button_emergency"
-            style="?android:attr/buttonStyleSmall"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="EMERGENCY"
-            android:textColor="#FFFFFF"
-            android:background="#B71C1C" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Hover thrust"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
-
-        <SeekBar
-            android:id="@+id/seek_hover_thrust"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:max="47000" />
-
-        <TextView
-            android:id="@+id/text_hover_thrust"
-            android:layout_width="70dp"
-            android:layout_height="wrap_content"
-            android:gravity="end"
-            android:text="30000"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
-    </LinearLayout>
-
-    <!-- Stated plainly because the board has only an MPU6500. The UI must not
-         imply altitude hold or GPS tracking that the hardware cannot deliver. -->
-    <TextView
-        android:id="@+id/text_hardware_limits"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Hold keeps a thrust level, not an altitude (no barometer). AUTO is takeoff-hover-land, not waypoints. Follow/RTH use accelerometer dead reckoning and drift."
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="#8D6E63" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ToggleButton
-            android:id="@+id/toggle_tilt_control"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textOff="Tilt control: OFF"
-            android:textOn="TILT CONTROL ACTIVE" />
-
-        <TextView
-            android:id="@+id/text_tilt_status"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="8dp"
-            android:text="Phone tilt is inert until you switch it on."
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_fly_track"
+            android:orientation="horizontal"
+            android:padding="2dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/fly_mode_manual"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="Manual" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/fly_mode_hold"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="Hold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/fly_mode_auto"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="Auto" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_primary"
+            style="@style/Fly.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:text="Takeoff"
+            app:icon="@drawable/ic_btn_takeoff" />
+
+        <TextView
+            android:id="@+id/text_primary_caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:textColor="@color/fly_muted"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/fly_cell_roll"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_fly_cell"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ROLL"
+                    android:textColor="@color/fly_muted"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/fly_value_roll"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:maxLines="1"
+                    android:text="—"
+                    android:textColor="@color/fly_ink"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/fly_cell_pitch"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_fly_cell"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PITCH"
+                    android:textColor="@color/fly_muted"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/fly_value_pitch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:maxLines="1"
+                    android:text="—"
+                    android:textColor="@color/fly_ink"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/fly_cell_sequence"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1.2"
+                android:background="@drawable/bg_fly_cell"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SEQUENCE"
+                    android:textColor="@color/fly_muted"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/fly_value_sequence"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:maxLines="1"
+                    android:text="—"
+                    android:textColor="@color/fly_ink"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/fly_cell_time"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_fly_cell"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="FLIGHT"
+                    android:textColor="@color/fly_muted"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/fly_value_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:maxLines="1"
+                    android:text="00:00"
+                    android:textColor="@color/fly_ink"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_more"
+            style="@style/Fly.Button.Outline"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="10dp"
+            android:text="More — hover thrust, tilt, log"
+            app:icon="@drawable/ic_btn_tune" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/fly_disconnected"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_fly_card"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:accessibilityHeading="true"
+            android:text="Not connected to the drone"
+            android:textColor="@color/fly_ink"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_connect_steps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:lineSpacingExtra="3dp"
+            android:textColor="@color/fly_ink"
+            android:textSize="14sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_connect_now"
+            style="@style/Fly.Button.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:text="Connect"
+            app:icon="@drawable/ic_btn_wifi" />
+
+        <TextView
+            android:id="@+id/text_link_caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:textColor="@color/fly_muted"
+            android:textSize="13sp" />
     </LinearLayout>
 </LinearLayout>

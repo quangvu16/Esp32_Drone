@@ -30,6 +30,9 @@ final class GpsNavViewController: UIViewController {
     private let stopButton = UIButton(type: .system)
     private let loadFileButton = UIButton(type: .system)
     private let clearButton = UIButton(type: .system)
+    /// Set by the Fly screen: opens another section after this screen closes.
+    var onSwitchSection: ((AppSection) -> Void)?
+    private var sectionHeader: SectionHeader?
 
     private let locationManager = CLLocationManager()
     private let navigator = Navigator()
@@ -68,9 +71,24 @@ final class GpsNavViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        title = "GPS Nav"
+        title = "Mission"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .done, target: self, action: #selector(close))
+        // Shared header; CUT MOTORS moved up here from the bottom row (same place on
+        // every screen). One tap on this screen, as on Android's Mission screen.
+        let header = SectionHeader(host: self, selected: .mission, telemetry: telemetry, twoTapCut: false) { [weak self] in
+            self?.cutMotors()
+        }
+        header.leaveGuard = { [weak self] in
+            guard let self = self, self.navigator.mode != .idle else { return nil }
+            return "A mission is flying. End it, land, or use CUT MOTORS before switching."
+        }
+        header.prepareToLeave = { [weak self] in
+            self?.stopForLeaving()
+        }
+        header.onSwitch = onSwitchSection
+        header.install()
+        sectionHeader = header
 
         mapView.translatesAutoresizingMaskIntoConstraints = false
         mapView.delegate = self
@@ -101,31 +119,41 @@ final class GpsNavViewController: UIViewController {
 
         modeControl.selectedSegmentIndex = 0
 
-        armAlignButton.setTitle("Arm + ALIGN", for: .normal)
+        // Flight commands: icon above text so four fit across a phone.
+        let rowFont = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        armAlignButton.applyLabel("Arm + ALIGN", symbol: "airplane.departure", font: rowFont, imageOnTop: true)
         armAlignButton.addTarget(self, action: #selector(armAndAlign), for: .touchUpInside)
 
-        startButton.setTitle("Start mission", for: .normal)
+        startButton.applyLabel("Start mission", symbol: "point.topleft.down.curvedto.point.bottomright.up",
+                               font: rowFont, imageOnTop: true)
         startButton.addTarget(self, action: #selector(startNav), for: .touchUpInside)
 
-        pauseButton.setTitle("Pause", for: .normal)
+        setPauseLabel(paused: false)
         pauseButton.addTarget(self, action: #selector(togglePause), for: .touchUpInside)
 
-        stopButton.setTitle("Stop", for: .normal)
-        stopButton.setTitleColor(.systemRed, for: .normal)
+        // Was a red "Stop", which looked like the motor cut. It ends the mission and
+        // hands control back to the sticks; red is kept for CUT MOTORS only.
+        stopButton.applyLabel("End mission", symbol: "stop.fill", font: rowFont, imageOnTop: true)
         stopButton.addTarget(self, action: #selector(stopNav), for: .touchUpInside)
 
-        loadFileButton.setTitle("Load .waypoints", for: .normal)
+        // Routine tools: icon-only, words in the VoiceOver label.
+        loadFileButton.applyLabel(nil, symbol: "folder", accessibilityText: "Load waypoints file")
         loadFileButton.addTarget(self, action: #selector(loadFile), for: .touchUpInside)
 
-        clearButton.setTitle("Clear plan", for: .normal)
+        clearButton.applyLabel(nil, symbol: "trash", accessibilityText: "Clear plan")
         clearButton.addTarget(self, action: #selector(clearPlan), for: .touchUpInside)
 
         let row1 = UIStackView(arrangedSubviews: [armAlignButton, startButton, pauseButton, stopButton])
         row1.axis = .horizontal
         row1.distribution = .fillEqually
-        let row2 = UIStackView(arrangedSubviews: [loadFileButton, clearButton])
+        for b in [loadFileButton, clearButton] {
+            b.widthAnchor.constraint(equalToConstant: 52).isActive = true
+        }
+        let row2 = UIStackView(arrangedSubviews: [loadFileButton, clearButton, UIView()])
         row2.axis = .horizontal
-        row2.distribution = .fillEqually
+        row2.distribution = .fill
+        row2.spacing = 8
+        row2.heightAnchor.constraint(equalToConstant: 52).isActive = true
 
         stack.addArrangedSubview(accuracyLabel)
         stack.addArrangedSubview(modeControl)
@@ -168,11 +196,15 @@ final class GpsNavViewController: UIViewController {
     // MARK: - Actions
 
     @objc private func close() {
+        stopForLeaving()
+        dismiss(animated: true)
+    }
+
+    private func stopForLeaving() {
         sendTimer?.invalidate()
         sendTimer = nil
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
-        dismiss(animated: true)
     }
 
     @objc private func armAndAlign() {
@@ -236,11 +268,11 @@ final class GpsNavViewController: UIViewController {
     @objc private func togglePause() {
         if navigator.isPaused {
             navigator.resume()
-            pauseButton.setTitle("Pause", for: .normal)
+            setPauseLabel(paused: false)
             flash("Resumed.")
         } else {
             navigator.pause()
-            pauseButton.setTitle("Resume", for: .normal)
+            setPauseLabel(paused: true)
             flash("Paused — drone holds after 3 s.")
         }
     }
@@ -248,8 +280,22 @@ final class GpsNavViewController: UIViewController {
     @objc private func stopNav() {
         navigator.stop()
         client.setFlightMode(.manual)
-        flash("Stopped.")
+        flash("Mission ended — back to manual sticks.")
         refreshOverlays()
+    }
+
+    @objc private func cutMotors() {
+        navigator.stop()
+        client.emergency()
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        flash("CUT MOTORS — motors off.")
+        refreshOverlays()
+    }
+
+    /// The icon shows what a tap will do, like the text.
+    private func setPauseLabel(paused: Bool) {
+        pauseButton.applyLabel(paused ? "Resume" : "Pause", symbol: paused ? "play.fill" : "pause.fill",
+                               font: .systemFont(ofSize: 13, weight: .semibold), imageOnTop: true)
     }
 
     @objc private func loadFile() {

@@ -29,6 +29,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.button.MaterialButton;
+
 import com.espressif.espdrone.android.R;
 
 import org.osmdroid.config.Configuration;
@@ -51,6 +53,7 @@ import se.bitcraze.crazyflie.lib.log.LogAdapter;
 import se.bitcraze.crazyflie.lib.log.LogConfig;
 import se.bitcraze.crazyflie.lib.log.Logg;
 import se.bitcraze.crazyfliecontrol2.DroneSession;
+import se.bitcraze.crazyfliecontrol2.FlyHeader;
 
 /**
  * GPS mission navigation screen (PROTOCOL.md section 10).
@@ -122,6 +125,7 @@ public class GpsNavActivity extends AppCompatActivity
     private final Navigator mNavigator = new Navigator();
     private volatile boolean mEngaged;
     private boolean mLanding;
+    private se.bitcraze.crazyfliecontrol2.FlyHeader mHeader;
     private boolean mTapAddsWaypoint = true;
     private double mGuidedLat = Double.NaN;
     private double mGuidedLon = Double.NaN;
@@ -244,10 +248,21 @@ public class GpsNavActivity extends AppCompatActivity
                 onTapMode();
             }
         });
-        findViewById(R.id.gpsnav_panic).setOnClickListener(new View.OnClickListener() {
+        // Shared header: sections, status, CUT MOTORS (redesign stage 3).
+        mHeader = new FlyHeader(this, findViewById(R.id.gpsnav_header), FlyHeader.MISSION,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        onPanic();
+                    }
+                });
+        mHeader.setLeaveGuard(new FlyHeader.LeaveGuard() {
             @Override
-            public void onClick(View v) {
-                onPanic();
+            public String blockReason() {
+                // Leaving finishes this screen and its 5 Hz send loop with it.
+                return (mLaunched || mEngaged)
+                        ? "Mission screen is flying the drone - land it or use CUT MOTORS before switching"
+                        : null;
             }
         });
         findViewById(R.id.gpsnav_wp_up).setOnClickListener(new View.OnClickListener() {
@@ -296,11 +311,13 @@ public class GpsNavActivity extends AppCompatActivity
         registerSensors();
         attachLink();
         updateStatusUi(null);
+        mHeader.start();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        mHeader.stop();
         if (mLocationManager != null) {
             mLocationManager.removeUpdates(this);
         }
@@ -505,7 +522,7 @@ public class GpsNavActivity extends AppCompatActivity
             return;
         }
         if (mLaunched) {
-            toast("Already launched - Stop/Panic first to re-ALIGN");
+            toast("Already launched - after landing, press CUT MOTORS to reset and re-ALIGN");
             return;
         }
         if (Double.isNaN(mPhoneLat)) {
@@ -571,7 +588,7 @@ public class GpsNavActivity extends AppCompatActivity
         mLanding = false;
         mLaunched = false;
         disengage();
-        toast("EMERGENCY - motors cut");
+        toast("CUT MOTORS - motors off");
         updateStatusUi(null);
     }
 
@@ -1012,6 +1029,11 @@ public class GpsNavActivity extends AppCompatActivity
         mReadoutText.setText(readout.toString());
 
         mPauseButton.setText(isPaused() ? "Resume" : "Pause");
+        // The icon follows the label: it shows what a tap will DO, like the text.
+        if (mPauseButton instanceof MaterialButton) {
+            ((MaterialButton) mPauseButton).setIconResource(
+                    isPaused() ? R.drawable.ic_btn_play : R.drawable.ic_btn_pause);
+        }
     }
 
     private boolean isPaused() {

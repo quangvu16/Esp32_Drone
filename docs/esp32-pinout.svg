@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 940" width="1120" height="940" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">XW_Z1_V2.0 ESP32 pinout map</title>
+  <desc id="desc">Wiring map for the XW_Z1_V2.0 drone board: four AO3416 motor drivers on GPIO 15, 13, 12 and 14; MPU6500 on the VSPI bus (SCK 18, MISO 19, MOSI 23, CS 5); SBUS receiver on GPIO 4; battery sense on GPIO 36.</desc>
+
+  <defs>
+    <style>
+      .bg      { fill: #f6f8fa; }
+      .h1      { font: 700 26px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .h2      { font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .sub     { font: 400 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lbl     { font: 500 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .lblm    { font: 400 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lblw    { font: 600 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #ffffff; }
+      .mono    { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .monow   { font: 700 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #ffffff; }
+      .box     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .board   { fill: #24292f; stroke: #0d1117; stroke-width: 2; }
+      .chip    { fill: #0d1117; stroke: #484f58; stroke-width: 1.5; }
+      .pad     { fill: #f6f8fa; stroke-width: 2; }
+      .wire    { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+      .c-spi   { stroke: #0969da; }
+      .c-radio { stroke: #8250df; }
+      .c-motor { stroke: #bc4c00; }
+      .c-batt  { stroke: #1a7f37; }
+      .t-spi   { fill: #0969da; }
+      .t-radio { fill: #8250df; }
+      .t-motor { fill: #bc4c00; }
+      .t-batt  { fill: #1a7f37; }
+      .badge   { stroke-width: 1.5; }
+      .b-spi   { fill: #ffffff; stroke: #0969da; }
+      .b-radio { fill: #ffffff; stroke: #8250df; }
+      .b-motor { fill: #ffffff; stroke: #bc4c00; }
+      .b-batt  { fill: #ffffff; stroke: #1a7f37; }
+      .rule    { stroke: #d0d7de; stroke-width: 1; }
+      .motor   { fill: #fff7ed; stroke: #bc4c00; stroke-width: 2.5; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1120" height="940"/>
+
+  <text class="h1" x="40" y="44">XW_Z1_V2.0 · ESP32 pinout map</text>
+  <text class="sub" x="40" y="70">欣薇_无人机 — verified against the board schematic. All signals are 3.3 V logic.</text>
+  <line class="rule" x1="40" y1="88" x2="1080" y2="88"/>
+
+  <!-- ESP32 board -->
+  <rect class="board" x="455" y="125" width="210" height="410" rx="10"/>
+  <text class="lblw" x="560" y="152" text-anchor="middle">ESP32 Dev Module</text>
+  <rect class="chip" x="510" y="172" width="100" height="104" rx="6"/>
+  <text class="monow" x="560" y="216" text-anchor="middle">ESP32</text>
+  <text class="monow" x="560" y="236" text-anchor="middle">WROOM</text>
+  <text class="lblm" x="560" y="300" text-anchor="middle" fill="#8c959f">VSPI + UART2 + ADC1</text>
+  <text class="lblm" x="560" y="520" text-anchor="middle" fill="#8c959f">3V3 · GND · VIN</text>
+
+  <!-- left: sensors, radio, battery -->
+
+  <line class="wire c-batt" x1="455" y1="195" x2="300" y2="195"/>
+  <circle class="pad c-batt" cx="455" cy="195" r="5"/>
+  <rect class="badge b-batt" x="336" y="184" width="104" height="22" rx="6"/>
+  <text class="mono t-batt" x="388" y="199" text-anchor="middle">GPIO 36</text>
+  <rect class="box" x="60" y="167" width="240" height="56" rx="8" stroke="#1a7f37"/>
+  <text class="h2 t-batt" x="76" y="190">Battery sense</text>
+  <text class="lblm" x="76" y="210">R11 10K / R10 33K · Vadc × 43/33</text>
+
+  <line class="wire c-radio" x1="455" y1="255" x2="300" y2="255"/>
+  <circle class="pad c-radio" cx="455" cy="255" r="5"/>
+  <rect class="badge b-radio" x="336" y="244" width="104" height="22" rx="6"/>
+  <text class="mono t-radio" x="388" y="259" text-anchor="middle">GPIO 4</text>
+  <rect class="box" x="60" y="227" width="240" height="56" rx="8" stroke="#8250df"/>
+  <text class="h2 t-radio" x="76" y="250">SBUS receiver</text>
+  <text class="lblm" x="76" y="270">UART2 · 100000 8E2 · inverted</text>
+
+  <line class="wire c-spi" x1="455" y1="335" x2="300" y2="335"/>
+  <circle class="pad c-spi" cx="455" cy="335" r="5"/>
+  <rect class="badge b-spi" x="336" y="324" width="104" height="22" rx="6"/>
+  <text class="mono t-spi" x="388" y="339" text-anchor="middle">GPIO 5</text>
+
+  <line class="wire c-spi" x1="455" y1="385" x2="300" y2="385"/>
+  <circle class="pad c-spi" cx="455" cy="385" r="5"/>
+  <rect class="badge b-spi" x="336" y="374" width="104" height="22" rx="6"/>
+  <text class="mono t-spi" x="388" y="389" text-anchor="middle">GPIO 18</text>
+
+  <line class="wire c-spi" x1="455" y1="435" x2="300" y2="435"/>
+  <circle class="pad c-spi" cx="455" cy="435" r="5"/>
+  <rect class="badge b-spi" x="336" y="424" width="104" height="22" rx="6"/>
+  <text class="mono t-spi" x="388" y="439" text-anchor="middle">GPIO 19</text>
+
+  <line class="wire c-spi" x1="455" y1="485" x2="300" y2="485"/>
+  <circle class="pad c-spi" cx="455" cy="485" r="5"/>
+  <rect class="badge b-spi" x="336" y="474" width="104" height="22" rx="6"/>
+  <text class="mono t-spi" x="388" y="489" text-anchor="middle">GPIO 23</text>
+
+  <rect class="box" x="60" y="310" width="240" height="200" rx="8" stroke="#0969da"/>
+  <text class="h2 t-spi" x="76" y="334">MPU6500</text>
+  <text class="lblm" x="76" y="352">gyro + accel · SPI on VSPI</text>
+  <line class="rule" x1="76" y1="362" x2="284" y2="362"/>
+  <text class="lbl" x="76" y="388" xml:space="preserve">NCS<tspan class="lblm">   chip select</tspan></text>
+  <text class="lbl" x="76" y="414" xml:space="preserve">SCK<tspan class="lblm">    MPU pin 8</tspan></text>
+  <text class="lbl" x="76" y="440" xml:space="preserve">MISO<tspan class="lblm">   MPU pin 7 ADO</tspan></text>
+  <text class="lbl" x="76" y="466" xml:space="preserve">MOSI<tspan class="lblm">   MPU pin 4 SDA</tspan></text>
+  <text class="lblm" x="76" y="494">±500 dps full scale</text>
+
+  <!-- right: motors -->
+
+  <line class="wire c-motor" x1="665" y1="205" x2="820" y2="205"/>
+  <circle class="pad c-motor" cx="665" cy="205" r="5"/>
+  <rect class="badge b-motor" x="696" y="194" width="104" height="22" rx="6"/>
+  <text class="mono t-motor" x="748" y="209" text-anchor="middle">GPIO 15</text>
+
+  <line class="wire c-motor" x1="665" y1="285" x2="820" y2="285"/>
+  <circle class="pad c-motor" cx="665" cy="285" r="5"/>
+  <rect class="badge b-motor" x="696" y="274" width="104" height="22" rx="6"/>
+  <text class="mono t-motor" x="748" y="289" text-anchor="middle">GPIO 13</text>
+
+  <line class="wire c-motor" x1="665" y1="365" x2="820" y2="365"/>
+  <circle class="pad c-motor" cx="665" cy="365" r="5"/>
+  <rect class="badge b-motor" x="696" y="354" width="104" height="22" rx="6"/>
+  <text class="mono t-motor" x="748" y="369" text-anchor="middle">GPIO 12</text>
+
+  <line class="wire c-motor" x1="665" y1="445" x2="820" y2="445"/>
+  <circle class="pad c-motor" cx="665" cy="445" r="5"/>
+  <rect class="badge b-motor" x="696" y="434" width="104" height="22" rx="6"/>
+  <text class="mono t-motor" x="748" y="449" text-anchor="middle">GPIO 14</text>
+
+  <rect class="box" x="820" y="170" width="240" height="310" rx="8" stroke="#bc4c00"/>
+  <text class="h2 t-motor" x="836" y="194">AO3416 motor drivers</text>
+  <text class="lblm" x="836" y="212">8520 coreless · direct MOSFET PWM</text>
+  <text class="lblm" x="836" y="228">not ESC, not servo pulses</text>
+  <line class="rule" x1="836" y1="240" x2="1044" y2="240"/>
+
+  <text class="lbl" x="836" y="268" xml:space="preserve">PWM1<tspan class="lblm">  front-right  Q1</tspan></text>
+  <text class="lbl" x="836" y="318" xml:space="preserve">PWM2<tspan class="lblm">  rear-right   Q2</tspan></text>
+  <text class="lbl" x="836" y="368" xml:space="preserve">PWM3<tspan class="lblm">  rear-left    Q3</tspan></text>
+  <text class="lbl" x="836" y="418" xml:space="preserve">PWM4<tspan class="lblm">  front-left   Q4</tspan></text>
+  <text class="lblm" x="836" y="458">PWM frequency set in the sketch</text>
+
+  <line class="rule" x1="40" y1="580" x2="1080" y2="580"/>
+
+  <!-- quad layout -->
+  <text class="h2" x="60" y="618">Quad layout — top view</text>
+  <text class="lblm" x="60" y="638">motor numbers match the schematic labels</text>
+
+  <line x1="155" y1="740" x2="345" y2="850" stroke="#d0d7de" stroke-width="1.5"/>
+  <line x1="345" y1="740" x2="155" y2="850" stroke="#d0d7de" stroke-width="1.5"/>
+  <line x1="250" y1="682" x2="250" y2="908" stroke="#d0d7de" stroke-width="1.5" stroke-dasharray="4 4"/>
+
+  <path d="M 250 672 l 9 14 l -18 0 z" fill="#57606a"/>
+  <text class="lblm" x="250" y="666" text-anchor="middle">FRONT</text>
+  <text class="lblm" x="250" y="928" text-anchor="middle">REAR</text>
+
+  <circle class="motor" cx="155" cy="740" r="42"/>
+  <text class="mono t-motor" x="155" y="736" text-anchor="middle">LF</text>
+  <text class="mono t-motor" x="155" y="756" text-anchor="middle">CCW</text>
+  <text class="lblm" x="155" y="806" text-anchor="middle">Q4 · GPIO 14</text>
+
+  <circle class="motor" cx="345" cy="740" r="42"/>
+  <text class="mono t-motor" x="345" y="736" text-anchor="middle">RF</text>
+  <text class="mono t-motor" x="345" y="756" text-anchor="middle">CW</text>
+  <text class="lblm" x="345" y="806" text-anchor="middle">Q1 · GPIO 15</text>
+
+  <circle class="motor" cx="155" cy="850" r="42"/>
+  <text class="mono t-motor" x="155" y="846" text-anchor="middle">LR</text>
+  <text class="mono t-motor" x="155" y="866" text-anchor="middle">CW</text>
+  <text class="lblm" x="155" y="910" text-anchor="middle">Q3 · GPIO 12</text>
+
+  <circle class="motor" cx="345" cy="850" r="42"/>
+  <text class="mono t-motor" x="345" y="846" text-anchor="middle">RR</text>
+  <text class="mono t-motor" x="345" y="866" text-anchor="middle">CCW</text>
+  <text class="lblm" x="345" y="910" text-anchor="middle">Q2 · GPIO 13</text>
+
+  <!-- wiring notes -->
+  <text class="h2" x="520" y="618">Wiring notes</text>
+
+  <rect x="520" y="642" width="10" height="10" fill="#bc4c00"/>
+  <text class="lbl" x="540" y="652" xml:space="preserve">RF and LR props are <tspan class="t-motor">CW</tspan>; RR and LF are <tspan class="t-motor">CCW</tspan>.</text>
+  <text class="lblm" x="540" y="674" xml:space="preserve">If yaw is inverted in flight, flip <tspan class="mono t-motor">YAW_DIRECTION</tspan> in the sketch.</text>
+
+  <rect x="520" y="702" width="10" height="10" fill="#1a7f37"/>
+  <text class="lbl" x="540" y="712" xml:space="preserve">VBAT divider is scaled for a <tspan class="t-batt">1S LiPo</tspan>.</text>
+  <text class="lblm" x="540" y="734">Arm is refused below the critical cell voltage.</text>
+
+  <rect x="520" y="762" width="10" height="10" fill="#8250df"/>
+  <text class="lbl" x="540" y="772">GPIO 4 is SBUS signal only — VBAT and GND come from H3.</text>
+  <text class="lblm" x="540" y="794">CH1 roll · CH2 pitch · CH3 throttle · CH4 yaw · CH5 arm.</text>
+
+  <rect x="520" y="822" width="10" height="10" fill="#0969da"/>
+  <text class="lbl" x="540" y="832">MPU6500 is the only sensor on this board.</text>
+  <text class="lblm" x="540" y="854">No barometer, no ToF, no GPS, no magnetometer.</text>
+</svg>

@@ -6,6 +6,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -19,6 +20,7 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -26,6 +28,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.TooltipCompat;
+import androidx.core.content.ContextCompat;
+
+import com.espressif.espdrone.android.R;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +48,7 @@ import se.bitcraze.crazyflie.lib.param.Param;
 import se.bitcraze.crazyflie.lib.param.ParamListener;
 import se.bitcraze.crazyflie.lib.toc.VariableType;
 import se.bitcraze.crazyfliecontrol2.DroneSession;
+import se.bitcraze.crazyfliecontrol2.FlyHeader;
 
 /**
  * PID tuning screen: six strip charts (angle/controller and P/I/D terms per axis), live
@@ -93,6 +100,7 @@ public class TuneActivity extends AppCompatActivity {
     private final List<ParamListener> mParamListeners = new ArrayList<>();
 
     private TextView mStatusLine;
+    private FlyHeader mHeader;
     private TextView mStatsView;
     private TextView mTunerStatus;
     private TextView mMethodHint;
@@ -102,7 +110,7 @@ public class TuneActivity extends AppCompatActivity {
     private EditText mTrialSecondsEdit;
     private Button mStartBtn;
     private Button mStopBtn;
-    private Button mPauseBtn;
+    private ImageButton mPauseBtn;
 
     private String mAxis = "roll";
     private boolean mPaused;
@@ -182,45 +190,35 @@ public class TuneActivity extends AppCompatActivity {
         return root;
     }
 
+    /** Shared header (sections, status, CUT MOTORS) with the tuner's status line under it. */
     private View buildTopBar() {
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setBackgroundColor(Color.WHITE);
-        bar.setPadding(dp(10), dp(6), dp(10), dp(6));
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.VERTICAL);
 
-        TextView title = new TextView(this);
-        title.setText("PID Tuning");
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(0xFF202428);
-        bar.addView(title, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        View header = getLayoutInflater().inflate(R.layout.view_fly_header, top, false);
+        top.addView(header);
+        mHeader = new FlyHeader(this, header, FlyHeader.TUNE, new Runnable() {
+            @Override
+            public void run() {
+                panic();
+            }
+        });
+        mHeader.setLeaveGuard(new FlyHeader.LeaveGuard() {
+            @Override
+            public String blockReason() {
+                return (mTuner != null && mTuner.isRunning())
+                        ? "Auto-tune is running - stop it or use CUT MOTORS before switching"
+                        : null;
+            }
+        });
 
         mStatusLine = new TextView(this);
         mStatusLine.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         mStatusLine.setTextColor(0xFF3A4048);
-        mStatusLine.setGravity(Gravity.END);
-        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        statusLp.leftMargin = dp(12);
-        bar.addView(mStatusLine, statusLp);
-
-        Button panic = new Button(this);
-        panic.setText("PANIC STOP");
-        panic.setTextColor(Color.WHITE);
-        panic.setBackgroundColor(0xFFD32F2F);
-        panic.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        panic.setAllCaps(false);
-        panic.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                panic();
-            }
-        });
-        bar.addView(panic, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        return bar;
+        mStatusLine.setPadding(dp(12), dp(2), dp(12), dp(2));
+        top.addView(mStatusLine, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        return top;
     }
 
     private View buildChartsColumn() {
@@ -271,9 +269,9 @@ public class TuneActivity extends AppCompatActivity {
         // Pause / clear
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        mPauseBtn = new Button(this);
-        mPauseBtn.setText("Pause charts");
-        mPauseBtn.setAllCaps(false);
+        // Chart tools are routine and reversible, so they are icon-only (with a
+        // content description + long-press tooltip). Flight commands keep their text.
+        mPauseBtn = iconButton(R.drawable.ic_btn_pause, "Pause charts");
         mPauseBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -284,13 +282,14 @@ public class TuneActivity extends AppCompatActivity {
                 for (ChartView c : mPidCharts) {
                     c.setPaused(mPaused);
                 }
-                mPauseBtn.setText(mPaused ? "Resume charts" : "Pause charts");
+                String label = mPaused ? "Resume charts" : "Pause charts";
+                mPauseBtn.setImageResource(mPaused ? R.drawable.ic_btn_play : R.drawable.ic_btn_pause);
+                mPauseBtn.setContentDescription(label);
+                TooltipCompat.setTooltipText(mPauseBtn, label);
             }
         });
-        row.addView(mPauseBtn, matchWrap());
-        Button clear = new Button(this);
-        clear.setText("Clear");
-        clear.setAllCaps(false);
+        row.addView(mPauseBtn, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        ImageButton clear = iconButton(R.drawable.ic_btn_clear, "Clear charts");
         clear.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -306,7 +305,7 @@ public class TuneActivity extends AppCompatActivity {
                 mControlRing.clear();
             }
         });
-        LinearLayout.LayoutParams clearLp = matchWrap();
+        LinearLayout.LayoutParams clearLp = new LinearLayout.LayoutParams(0, dp(48), 1f);
         clearLp.leftMargin = dp(6);
         row.addView(clear, clearLp);
         panel.addView(row, matchWrap());
@@ -405,6 +404,7 @@ public class TuneActivity extends AppCompatActivity {
         mStartBtn.setTextColor(Color.WHITE);
         mStartBtn.setBackgroundColor(0xFF2E7D32);
         mStartBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        setButtonIcon(mStartBtn, R.drawable.ic_btn_play, Color.WHITE);
         resetStartButton();
         mStartBtn.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -435,8 +435,9 @@ public class TuneActivity extends AppCompatActivity {
         panel.addView(mStartBtn, matchWrap());
 
         mStopBtn = new Button(this);
-        mStopBtn.setText("Stop (after current trial)");
+        mStopBtn.setText("Stop tuner (after current trial)");
         mStopBtn.setAllCaps(false);
+        setButtonIcon(mStopBtn, R.drawable.ic_btn_end, 0xFF212121);
         mStopBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -491,6 +492,11 @@ public class TuneActivity extends AppCompatActivity {
         Button b = new Button(this);
         b.setText(label);
         b.setAllCaps(false);
+        if (cmd == FlightControlPacket.CMD_SAVE) {
+            setButtonIcon(b, R.drawable.ic_btn_save, 0xFF212121);
+        } else if (cmd == FlightControlPacket.CMD_LOAD) {
+            setButtonIcon(b, R.drawable.ic_btn_open, 0xFF212121);
+        }
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -634,7 +640,7 @@ public class TuneActivity extends AppCompatActivity {
         }
         // Halting the tuner is not enough: cut the motors now. EMERGENCY is always honoured.
         sendFlightControl(FlightControlPacket.emergency());
-        setTunerStatus("PANIC STOP - EMERGENCY sent, tuner halted.");
+        setTunerStatus("CUT MOTORS sent - motors off, tuner halted.");
     }
 
     private void sendFlightControl(CrtpPacket packet) {
@@ -970,6 +976,29 @@ public class TuneActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
     }
 
+    /** Put an icon at the start of a text button, tinted to match its text. */
+    private void setButtonIcon(Button b, int resId, int tint) {
+        Drawable d = ContextCompat.getDrawable(this, resId);
+        if (d == null) {
+            return;
+        }
+        d = d.mutate();
+        d.setTint(tint);
+        int px = dp(18);
+        d.setBounds(0, 0, px, px);
+        b.setCompoundDrawablesRelative(d, null, null, null);
+        b.setCompoundDrawablePadding(dp(6));
+    }
+
+    /** Icon-only button: the label lives in the content description and a long-press tooltip. */
+    private ImageButton iconButton(int resId, String label) {
+        ImageButton b = new ImageButton(this);
+        b.setImageResource(resId);
+        b.setContentDescription(label);
+        TooltipCompat.setTooltipText(b, label);
+        return b;
+    }
+
     private int dp(int v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
@@ -993,6 +1022,22 @@ public class TuneActivity extends AppCompatActivity {
     }
 
     // ------------------------------------------------------------- lifecycle
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mHeader != null) {
+            mHeader.start();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mHeader != null) {
+            mHeader.stop();
+        }
+    }
 
     @Override
     protected void onDestroy() {

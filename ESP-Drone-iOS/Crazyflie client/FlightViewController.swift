@@ -36,6 +36,10 @@ final class FlightViewController: UIViewController {
 
     private var listener: ((LogSample) -> Void)?
 
+    /// Set by the Fly screen: opens another section after this screen closes.
+    var onSwitchSection: ((AppSection) -> Void)?
+    private var sectionHeader: SectionHeader?
+
     init(client: CrtpClient, telemetry: TelemetryStore) {
         self.client = client
         self.telemetry = telemetry
@@ -52,6 +56,12 @@ final class FlightViewController: UIViewController {
         title = "Flight"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .done, target: self, action: #selector(close))
+        let header = SectionHeader(host: self, selected: .fly, telemetry: telemetry, twoTapCut: true) { [weak self] in
+            self?.client.emergency()
+        }
+        header.onSwitch = onSwitchSection
+        header.install()
+        sectionHeader = header
 
         let stack = UIStackView()
         stack.axis = .vertical
@@ -71,11 +81,15 @@ final class FlightViewController: UIViewController {
         actions.axis = .horizontal
         actions.distribution = .fillEqually
         actions.spacing = 8
-        for (button, title) in [(armButton, "Arm"), (disarmButton, "Disarm"),
-                                (takeoffButton, "Takeoff"), (landButton, "Land")] {
-            button.setTitle(title, for: .normal)
-            button.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-            button.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        // Flight commands: icon AND text. A wrong guess here arms or drops the drone.
+        // Icon above the text so four of them fit across a phone.
+        for (button, title, symbol) in [(armButton, "Arm", "lock.open.fill"),
+                                        (disarmButton, "Disarm", "lock.fill"),
+                                        (takeoffButton, "Takeoff", "airplane.departure"),
+                                        (landButton, "Land", "airplane.arrival")] {
+            button.applyLabel(title, symbol: symbol,
+                              font: .systemFont(ofSize: 15, weight: .semibold), imageOnTop: true)
+            button.heightAnchor.constraint(equalToConstant: 60).isActive = true
         }
         armButton.addTarget(self, action: #selector(arm), for: .touchUpInside)
         disarmButton.addTarget(self, action: #selector(disarm), for: .touchUpInside)
@@ -83,10 +97,9 @@ final class FlightViewController: UIViewController {
         landButton.addTarget(self, action: #selector(land), for: .touchUpInside)
         stack.addArrangedSubview(actions)
 
-        emergencyButton.setTitle("EMERGENCY — hold to confirm", for: .normal)
-        emergencyButton.setTitleColor(.white, for: .normal)
-        emergencyButton.backgroundColor = .systemRed
-        emergencyButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .bold)
+        // Same name, colour and icon as CUT MOTORS on the GPS and tuning screens.
+        // The old label said "hold to confirm", but the button has always been tap-twice.
+        setEmergencyLabel(primed: false)
         emergencyButton.layer.cornerRadius = 10
         emergencyButton.heightAnchor.constraint(equalToConstant: 64).isActive = true
         emergencyButton.addTarget(self, action: #selector(emergencyTapped), for: .touchUpInside)
@@ -188,21 +201,18 @@ final class FlightViewController: UIViewController {
     @objc private func emergencyTapped() {
         if emergencyPrimed {
             emergencyPrimed = false
-            emergencyButton.setTitle("EMERGENCY — hold to confirm", for: .normal)
-            emergencyButton.backgroundColor = .systemRed
+            setEmergencyLabel(primed: false)
             // Props off now — this is the panic path, so no confirm dialog.
             client.emergency()
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.error)
         } else {
             emergencyPrimed = true
-            emergencyButton.setTitle("TAP AGAIN — cut motors NOW", for: .normal)
-            emergencyButton.backgroundColor = .systemOrange
+            setEmergencyLabel(primed: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
                 guard let self = self, self.emergencyPrimed else { return }
                 self.emergencyPrimed = false
-                self.emergencyButton.setTitle("EMERGENCY — hold to confirm", for: .normal)
-                self.emergencyButton.backgroundColor = .systemRed
+                self.setEmergencyLabel(primed: false)
             }
         }
     }
@@ -212,7 +222,203 @@ final class FlightViewController: UIViewController {
         client.setHoverThrust(UInt16(hoverSlider.value))
     }
 
+    private func setEmergencyLabel(primed: Bool) {
+        emergencyButton.applyLabel(primed ? "TAP AGAIN — CUT MOTORS NOW" : "CUT MOTORS — tap twice",
+                                   symbol: "exclamationmark.triangle.fill",
+                                   accessibilityText: primed ? "Tap again to cut motors now" : "Cut motors, tap twice",
+                                   font: .systemFont(ofSize: 18, weight: .bold),
+                                   color: .white)
+        emergencyButton.backgroundColor = primed ? .systemOrange : .systemRed
+    }
+
     private func updateHoverLabel() {
         hoverLabel.text = String(format: "hover thrust %d  (8000…55000, feeds Takeoff)", Int(hoverSlider.value))
     }
 }
+
+// MARK: - Button labels with SF Symbols
+
+extension UIButton {
+    /// Sets a button's text and SF Symbol in one place, for every screen.
+    ///
+    /// Flight commands pass a title AND a symbol. Routine, reversible tools pass
+    /// `title: nil` to go icon-only; their words then live in `accessibilityText`,
+    /// which VoiceOver reads and which must always be given for an icon-only button.
+    ///
+    /// Every later title change on a button set up this way must also go through here:
+    /// this uses UIButton.Configuration, and mixing it with the older
+    /// setTitle/titleLabel API gives unpredictable results.
+    func applyLabel(_ title: String?,
+                    symbol: String?,
+                    accessibilityText: String? = nil,
+                    font: UIFont = .systemFont(ofSize: 17, weight: .semibold),
+                    color: UIColor? = nil,
+                    imageOnTop: Bool = false) {
+        var config = configuration ?? UIButton.Configuration.plain()
+        if let title = title {
+            var attributes = AttributeContainer()
+            attributes.font = font
+            config.attributedTitle = AttributedString(title, attributes: attributes)
+        } else {
+            config.attributedTitle = nil
+        }
+        if let symbol = symbol {
+            // Returns nil for a symbol this iOS lacks; the button then keeps its text.
+            config.image = UIImage(systemName: symbol,
+                                   withConfiguration: UIImage.SymbolConfiguration(font: font))
+        } else {
+            config.image = nil
+        }
+        config.imagePadding = 6
+        config.imagePlacement = imageOnTop ? .top : .leading
+        config.titleLineBreakMode = .byTruncatingTail
+        if let color = color {
+            config.baseForegroundColor = color
+        }
+        configuration = config
+        accessibilityLabel = accessibilityText ?? title
+    }
+}
+
+// MARK: - Shared screen header (redesign stage 3)
+
+/// The four sections every screen's header offers.
+enum AppSection: Int {
+    case fly = 0, mission, tune, setup
+}
+
+/// Puts the shared header into a pop-up screen's navigation bar: status on the left
+/// (after Done), the sections in the middle, CUT MOTORS on the right — the same
+/// places as on the Fly screen.
+///
+/// Picking another section closes this screen and asks the Fly screen to open that
+/// one (`onSwitch`), so there is only ever one pop-up and Done always returns to Fly.
+final class SectionHeader: NSObject {
+    private weak var host: UIViewController?
+    private let selected: AppSection
+    private let twoTapCut: Bool
+    private let onCut: () -> Void
+    private weak var telemetry: TelemetryStore?
+
+    /// A reason this screen must stay open (e.g. a mission is flying), or nil.
+    var leaveGuard: (() -> String?)?
+    /// Stops this screen's timers before it closes for another section.
+    var prepareToLeave: (() -> Void)?
+    /// Called after this screen has closed, with the section to open.
+    var onSwitch: ((AppSection) -> Void)?
+
+    private let sections = UISegmentedControl(items: ["Fly", "Mission", "Tune", "Setup"])
+    private let statusLabel = UILabel()
+    private let cutButton = UIButton(type: .system)
+    private var cutPrimed = false
+    private var listener: ((LogSample) -> Void)?
+
+    private static let danger = UIColor(red: 0xB3 / 255.0, green: 0x26 / 255.0, blue: 0x1E / 255.0, alpha: 1)
+    private static let armedText = UIColor(red: 0xB2 / 255.0, green: 0x6A / 255.0, blue: 0x00 / 255.0, alpha: 1)
+
+    /// - Parameter twoTapCut: true on the Fly family (thumbs are on the sticks, so a
+    ///   stray tap must not cut); false on Mission and Tune, as on Android.
+    init(host: UIViewController, selected: AppSection, telemetry: TelemetryStore?,
+         twoTapCut: Bool, onCut: @escaping () -> Void) {
+        self.host = host
+        self.selected = selected
+        self.telemetry = telemetry
+        self.twoTapCut = twoTapCut
+        self.onCut = onCut
+        super.init()
+    }
+
+    deinit {
+        if let listener = listener {
+            telemetry?.listeners.removeAll { $0 as AnyObject === listener as AnyObject }
+        }
+    }
+
+    func install() {
+        guard let host = host else { return }
+        sections.selectedSegmentIndex = selected.rawValue
+        sections.addTarget(self, action: #selector(sectionChanged), for: .valueChanged)
+        host.navigationItem.titleView = sections
+
+        statusLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+        statusLabel.textColor = .secondaryLabel
+        var left = host.navigationItem.leftBarButtonItems ?? []
+        left.append(UIBarButtonItem(customView: statusLabel))
+        host.navigationItem.leftBarButtonItems = left
+
+        var config = UIButton.Configuration.plain()
+        config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12)
+        cutButton.configuration = config
+        cutButton.layer.cornerRadius = 8
+        cutButton.addTarget(self, action: #selector(cutTapped), for: .touchUpInside)
+        setCutLabel(primed: false)
+        host.navigationItem.rightBarButtonItem = UIBarButtonItem(customView: cutButton)
+
+        if let telemetry = telemetry {
+            let listener: (LogSample) -> Void = { [weak self] _ in self?.refreshStatus() }
+            self.listener = listener
+            telemetry.listeners.append(listener)
+        }
+        refreshStatus()
+    }
+
+    private func refreshStatus() {
+        var parts: [String] = []
+        if let v = telemetry?.value("pm.vbat") {
+            parts.append(String(format: "%.2f V", v))
+        }
+        let armed = (telemetry?.value("flight.armed") ?? 0) > 0.5
+        if telemetry?.value("flight.armed") != nil {
+            parts.append(armed ? "● ARMED" : "disarmed")
+        }
+        statusLabel.text = parts.joined(separator: "  ")
+        statusLabel.textColor = armed ? SectionHeader.armedText : .secondaryLabel
+        statusLabel.accessibilityLabel = parts.isEmpty ? nil : parts.joined(separator: ", ")
+        statusLabel.sizeToFit()
+    }
+
+    private func setCutLabel(primed: Bool) {
+        let spoken = twoTapCut
+            ? (primed ? "Tap again to cut motors now" : "Cut motors, tap twice")
+            : "Cut motors now"
+        cutButton.applyLabel(primed ? "TAP AGAIN" : "CUT MOTORS", symbol: "exclamationmark.triangle.fill",
+                             accessibilityText: spoken,
+                             font: .systemFont(ofSize: 13, weight: .bold), color: .white)
+        cutButton.backgroundColor = primed ? .systemOrange : SectionHeader.danger
+        cutButton.sizeToFit()
+    }
+
+    @objc private func cutTapped() {
+        if !twoTapCut || cutPrimed {
+            cutPrimed = false
+            setCutLabel(primed: false)
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            onCut()
+            return
+        }
+        cutPrimed = true
+        setCutLabel(primed: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self = self, self.cutPrimed else { return }
+            self.cutPrimed = false
+            self.setCutLabel(primed: false)
+        }
+    }
+
+    @objc private func sectionChanged() {
+        guard let target = AppSection(rawValue: sections.selectedSegmentIndex), target != selected else { return }
+        if let reason = leaveGuard?() {
+            sections.selectedSegmentIndex = selected.rawValue
+            let alert = UIAlertController(title: "Can't switch yet", message: reason, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            host?.present(alert, animated: true)
+            return
+        }
+        prepareToLeave?()
+        let onSwitch = self.onSwitch
+        host?.dismiss(animated: true) {
+            onSwitch?(target)
+        }
+    }
+}
+

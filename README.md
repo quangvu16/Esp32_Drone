@@ -13,12 +13,21 @@ Esp32_drone/       Arduino firmware + native regression tests
 PROTOCOL.md        the wire protocol, in full
 ESP-Drone-Android/ Android client
 ESP-Drone-iOS/     iOS client
-docs/              board schematic
+docs/              install guide, pilot's guide, diagrams, board schematic
 ```
 
-Start with **[PROTOCOL.md](PROTOCOL.md)**. It is the authoritative reference for
-framing, the parameter and log TOCs, the flight-control and navigation
-extensions, and the phone-side GPS mission design.
+**Want to get flying?**
+
+1. **[docs/INSTALL.md](docs/INSTALL.md)** — flash the firmware, install an
+   app, connect.
+2. **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** — the pilot's guide: every
+   screen, CUT MOTORS, arming, failsafe, low battery, and a first-flight
+   checklist.
+
+Start with **[PROTOCOL.md](PROTOCOL.md)** for the wire format. It is the
+authoritative reference for framing, the parameter and log TOCs, the
+flight-control and navigation extensions, and the phone-side GPS mission
+design.
 
 ---
 
@@ -34,18 +43,39 @@ rather than pretending otherwise:
 - **FOLLOW / RTH use accelerometer dead reckoning.** It drifts — metres within a
   minute. The drone's position on the map is *estimated*.
 
+## The board
+
+![ESP32 pinout](docs/esp32-pinout.svg)
+
+Full wiring notes, the quad layout and the prop directions are in
+[docs/INSTALL.md](docs/INSTALL.md#pinout).
+
 ## Features
 
 **Firmware** — attitude PID on the MPU6500, five flight modes (Manual, Hold,
-Auto, Follow, Return-to-home), SBUS and CRTP command input, a 500 ms command
-failsafe, and the full CRTP parameter and log TOCs so the stock apps' Settings
-and telemetry screens work unmodified.
+Auto, Follow, Return-to-home), SBUS and CRTP command input, and the full CRTP
+parameter and log TOCs so the stock apps' Settings and telemetry screens work
+unmodified. Safety: a 500 ms link failsafe (it also honours the SBUS
+receiver's own failsafe flag), arming only from idle and above 3.30 V,
+auto-land on a sustained low battery, range-checked parameter writes, and no
+flash writes or reboots while armed.
 
-**Both apps** — WiFi (soft-AP and station), Bluetooth Classic SPP and BLE GATT;
-a flight-mode panel with Takeoff / Land / Arm / Disarm / Emergency; a PID tuning
-screen with live charts, statistics, parameter editors and auto-tune; phone-IMU
-tilt-to-fly; and GPS mission navigation with a map, waypoints, Mission Planner
-`.waypoints` import and return-to-launch.
+**Both apps** — the same four sections, **Fly · Mission · Tune · Setup**, under
+one header that always shows link, battery voltage, mode, **ARMED** and a red
+**CUT MOTORS** button in the same place. The Fly screen has one main button
+that follows the situation (Takeoff / Land), live roll, pitch, sequence and
+flight time, and a More panel for the rest. Also: WiFi (soft-AP and station),
+Bluetooth Classic SPP and BLE GATT; PID tuning with live charts and auto-tune;
+phone-IMU tilt-to-fly (Android); and GPS mission navigation with waypoints,
+Mission Planner `.waypoints` import and return-to-launch.
+
+![Fly screen](docs/images/fly-connected.png)
+
+*Design mockup of the Fly screen; both apps follow this layout. More screens
+in the [pilot's guide](docs/USER_GUIDE.md).*
+
+iOS cannot use Bluetooth Classic SPP — iOS only exposes SPP to MFi accessories.
+Use WiFi or BLE GATT there.
 
 ## Building
 
@@ -61,7 +91,7 @@ in the Arduino IDE. Board *ESP32 Dev Module*, partition scheme **Huge APP**.
 
 | Suite | Run | Covers |
 |---|---|---|
-| `Esp32_drone/test/` | `./run.sh` | 80 assertions: the launch-frame rotation, body↔world yaw rotation, and log-config parsing including the client's wire padding |
+| `Esp32_drone/test/` | `./run.sh` | 83 checks in five suites: the launch-frame rotation, body↔world yaw rotation, log-config parsing including the client's wire padding, the self-level sign, and SBUS failsafe/lost-frame rejection. `run.sh` also checks the accelerometer scale matches the configured range |
 | `Crazyflie clientTests` | *Product → Test* | 24 tests: great-circle geo math, `.waypoints` codec, mission edits, waypoint sequencing, launch frame |
 
 The firmware suite is deliberately self-guarding: it greps the sketch for the

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared screen header (redesign stage 3), used by Mission and Tune.
+     Sections · link · battery · mode · ARMED · CUT MOTORS, in the same place as on
+     the Fly screen. FlyHeader.java binds it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="60dp"
+    android:background="@color/fly_surface"
+    android:elevation="1dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_fly_track"
+        android:orientation="horizontal"
+        android:padding="2dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/hdr_tab_fly"
+            style="@style/Fly.Button.Segment"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:text="Fly" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/hdr_tab_mission"
+            style="@style/Fly.Button.Segment"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:text="Mission" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/hdr_tab_tune"
+            style="@style/Fly.Button.Segment"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:text="Tune" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/hdr_tab_setup"
+            style="@style/Fly.Button.Segment"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:text="Setup" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/linkQualityIconContentDescription"
+            android:src="@drawable/ic_wifi_tethering_black_18dp" />
+
+        <TextView
+            android:id="@+id/hdr_link_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:maxLines="1"
+            android:text="Not connected"
+            android:textColor="@color/fly_muted"
+            android:textSize="13sp" />
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:contentDescription="@string/batteryIconContentDescription"
+            android:src="@drawable/ic_battery_std_black_18dp" />
+
+        <TextView
+            android:id="@+id/hdr_battery_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:fontFamily="monospace"
+            android:maxLines="1"
+            android:text="— V"
+            android:textColor="@color/fly_muted"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/hdr_mode_chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_fly_chip_mode"
+            android:paddingStart="10dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="4dp"
+            android:textColor="@color/fly_ink"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/hdr_armed_chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_fly_chip_disarmed"
+            android:paddingStart="10dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="4dp"
+            android:textColor="@color/fly_muted"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/hdr_cut_motors"
+        style="@style/Fly.Button.Danger"
+        android:layout_width="wrap_content"
+        android:layout_height="44dp"
+        android:layout_marginStart="12dp"
+        android:contentDescription="Cut motors now"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:text="CUT MOTORS"
+        app:icon="@drawable/ic_btn_cut_motors" />
+</LinearLayout>

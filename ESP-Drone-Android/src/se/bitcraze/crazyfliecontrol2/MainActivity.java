@@ -52,6 +52,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.res.ColorStateList;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.usb.UsbDevice;
@@ -70,6 +71,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.util.Log;
 import android.view.ContextMenu;
+import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -79,8 +81,12 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ImageButton;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
+
+import com.google.android.material.button.MaterialButton;
 
 import com.MobileAnarchy.Android.Widgets.Joystick.JoystickView;
 import com.espressif.espdrone.android.R;
@@ -124,6 +130,26 @@ public class MainActivity extends EspActivity {
     private MainPresenter mPresenter;
 
     private FlightModePanel mFlightModePanel;
+
+    // Fly screen (redesign stage 2): header status, CUT MOTORS, More panel.
+    private static final String[] MODE_NAMES = {"MANUAL", "HOLD", "AUTO", "FOLLOW", "RTH"};
+    /** Window in which the second CUT MOTORS press counts, ms. */
+    private static final long CUT_CONFIRM_WINDOW_MS = 3000;
+    private MaterialButton mCutMotorsButton;
+    private long mCutPrimedAtMs;
+    private TextView mModeChip;
+    private TextView mArmedChip;
+    private View mMorePanel;
+    private SeekBar mHoverSeek;
+    private TextView mHoverText;
+    private TextView mTiltStatus;
+    private boolean mIsConnected;
+    private final Runnable mCutExpire = new Runnable() {
+        @Override
+        public void run() {
+            resetCutMotors();
+        }
+    };
     private TiltController mTiltController;
     /** Set just before starting a child screen so onPause() leaves the link up. */
     private boolean mSuppressDisconnect;
@@ -172,9 +198,17 @@ public class MainActivity extends EspActivity {
 
         mFlightDataView = (FlightDataView) findViewById(R.id.flightdataview);
 
-        // Flight-mode controls (port 7) and phone-IMU tilt-to-fly
+        // Fly screen (redesign stage 2): header, centre panel, More panel.
         mTiltController = new TiltController(this);
         mFlightModePanel = (FlightModePanel) findViewById(R.id.flightmodepanel);
+        mMorePanel = findViewById(R.id.fly_more_panel);
+        mModeChip = (TextView) findViewById(R.id.fly_mode_chip);
+        mArmedChip = (TextView) findViewById(R.id.fly_armed_chip);
+        mCutMotorsButton = (MaterialButton) findViewById(R.id.button_emergency);
+        mHoverSeek = (SeekBar) findViewById(R.id.seek_hover_thrust);
+        mHoverText = (TextView) findViewById(R.id.text_hover_thrust);
+        mTiltStatus = (TextView) findViewById(R.id.text_tilt_status);
+
         mFlightModePanel.setListener(new FlightModePanel.Listener() {
             @Override
             public void onSetMode(int mode) {
@@ -192,46 +226,107 @@ public class MainActivity extends EspActivity {
             }
 
             @Override
-            public void onArm() {
-                mPresenter.sendFlightControl(FlightControlPacket.arm());
+            public void onMore() {
+                mMorePanel.setVisibility(mMorePanel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
             }
 
             @Override
-            public void onDisarm() {
-                mPresenter.sendFlightControl(FlightControlPacket.disarm());
-            }
-
-            @Override
-            public void onEmergency() {
-                mPresenter.sendFlightControl(FlightControlPacket.emergency());
-            }
-
-            @Override
-            public void onSetHoverThrust(int hoverThrust) {
-                mPresenter.sendFlightControl(FlightControlPacket.setHover(hoverThrust));
-            }
-        });
-        mFlightModePanel.setTiltToggleListener(new FlightModePanel.TiltToggleListener() {
-            @Override
-            public void onTiltControlToggled(boolean enabled) {
-                mTiltController.setEnabled(enabled);
-                mFlightModePanel.setTiltStatus(mTiltController.describe());
+            public void onConnect() {
+                // Same path as the old header button, so every link type keeps its checks.
+                mToggleConnectButton.performClick();
             }
         });
 
-        findViewById(R.id.button_open_tune).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                launchChild(se.bitcraze.crazyfliecontrol2.tune.TuneActivity.newIntent(MainActivity.this));
-            }
-        });
-        findViewById(R.id.button_open_gps).setOnClickListener(new View.OnClickListener() {
+        // Header sections. Fly is this screen.
+        findViewById(R.id.tab_mission).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 launchChild(new Intent(MainActivity.this,
                         se.bitcraze.crazyfliecontrol2.gpsnav.GpsNavActivity.class));
             }
         });
+        findViewById(R.id.tab_tune).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                launchChild(se.bitcraze.crazyfliecontrol2.tune.TuneActivity.newIntent(MainActivity.this));
+            }
+        });
+        findViewById(R.id.tab_setup).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, PreferencesActivity.class));
+            }
+        });
+
+        // CUT MOTORS: header, every screen, tap twice within 3 s.
+        mCutMotorsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onCutMotorsTapped();
+            }
+        });
+
+        // More panel
+        findViewById(R.id.fly_more_close).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mMorePanel.setVisibility(View.GONE);
+            }
+        });
+        findViewById(R.id.fly_disconnect).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mMorePanel.setVisibility(View.GONE);
+                if (mIsConnected) {
+                    mToggleConnectButton.performClick();
+                }
+            }
+        });
+        findViewById(R.id.button_arm).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mPresenter.sendFlightControl(FlightControlPacket.arm());
+            }
+        });
+        findViewById(R.id.button_disarm).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mPresenter.sendFlightControl(FlightControlPacket.disarm());
+            }
+        });
+        // SeekBar is 0..47000 mapped onto the firmware's 8000..55000 range.
+        mHoverSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                mHoverText.setText(String.valueOf(FlightControlPacket.HOVER_THRUST_MIN + progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                int hover = FlightControlPacket.HOVER_THRUST_MIN + seekBar.getProgress();
+                mFlightModePanel.setHoverThrust(hover);
+                mPresenter.sendFlightControl(FlightControlPacket.setHover(hover));
+            }
+        });
+        mHoverSeek.setProgress(mFlightModePanel.getHoverThrust() - FlightControlPacket.HOVER_THRUST_MIN);
+        ToggleButton tiltToggle = (ToggleButton) findViewById(R.id.toggle_tilt_control);
+        tiltToggle.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(android.widget.CompoundButton buttonView, boolean isChecked) {
+                // The toggle itself is the loud affordance: tilt-to-fly can only be
+                // engaged by a deliberate press on the labelled switch.
+                mTiltController.setEnabled(isChecked);
+                mTiltStatus.setText(isChecked
+                        ? "TILT CONTROL ACTIVE — phone attitude is driving the drone"
+                        : mTiltController.describe());
+            }
+        });
+
+        onLinkStateChanged(false);
 
         mConsoleScrollView = (ScrollView) findViewById(R.id.console_scrollView);
         mConsoleTextView = (TextView) findViewById(R.id.console_textView);
@@ -310,7 +405,7 @@ public class MainActivity extends EspActivity {
         if (showConsole) {
             mConsoleScrollView.setVisibility(View.VISIBLE);
         } else {
-            mConsoleScrollView.setVisibility(View.INVISIBLE);
+            mConsoleScrollView.setVisibility(View.GONE);
         }
     }
 
@@ -510,8 +605,8 @@ public class MainActivity extends EspActivity {
         // Returning from a child screen: drop the guard and refresh the tilt readout
         // so a stale "TILT CONTROL ACTIVE" cannot outlive the sensor registration.
         mSuppressDisconnect = false;
-        if (mFlightModePanel != null && mTiltController != null) {
-            mFlightModePanel.setTiltStatus(mTiltController.describe());
+        if (mTiltStatus != null && mTiltController != null) {
+            mTiltStatus.setText(mTiltController.describe());
         }
     }
 
@@ -524,9 +619,9 @@ public class MainActivity extends EspActivity {
     protected void onPause() {
         super.onPause();
         Log.d(LOG_TAG, "onPause()");
-        if (mFlightModePanel != null) {
-            // A half-armed "Confirm EMERGENCY" must not survive a pause.
-            mFlightModePanel.disarmEmergencyConfirm();
+        if (mCutMotorsButton != null) {
+            // A half-armed "TAP AGAIN: CUT" must not survive a pause.
+            resetCutMotors();
         }
         if (mControls != null) {
             mControls.resetAxisValues();
@@ -814,22 +909,22 @@ public class MainActivity extends EspActivity {
         return !usbDeviceList.isEmpty();
     }
 
-    public void setBatteryLevel(float battery) {
-        float normalizedBattery = battery - 3.0f;
-        int batteryPercentage = (int) (normalizedBattery * 100);
-        if (battery == -1f) {
-            batteryPercentage = 0;
-        } else if (normalizedBattery < 0f && normalizedBattery > -1f) {
-            batteryPercentage = 0;
-        } else if (normalizedBattery > 1f) {
-            batteryPercentage = 100;
-        }
-        //TODO: FIXME
-        final int fBatteryPercentage = batteryPercentage;
+    /**
+     * Battery as volts. The old (V - 3.0) x 100 "percentage" was not a charge level and
+     * read 92% on a 1S pack that was nearly flat under load.
+     */
+    public void setBatteryLevel(final float battery) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                mTextView_battery.setText(format(R.string.battery_text, fBatteryPercentage));
+                if (battery < 0f) {
+                    mTextView_battery.setText("— V");
+                    mTextView_battery.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.fly_muted));
+                    return;
+                }
+                mTextView_battery.setText(String.format(Locale.US, "%.2f V", battery));
+                int color = battery < 3.3f ? R.color.fly_danger : (battery < 3.5f ? R.color.fly_warn : R.color.fly_ink);
+                mTextView_battery.setTextColor(ContextCompat.getColor(MainActivity.this, color));
             }
         });
     }
@@ -873,6 +968,7 @@ public class MainActivity extends EspActivity {
             @Override
             public void run() {
                 mToggleConnectButton.setBackgroundDrawable(getResources().getDrawable(drawable));
+                onLinkStateChanged(drawable != R.drawable.custom_button);
             }
         });
     }
@@ -882,6 +978,8 @@ public class MainActivity extends EspActivity {
             @Override
             public void run() {
                 mBuzzerSoundButton.setEnabled(enabled);
+                // Only shown when the drone reports the hardware (this board has none).
+                mBuzzerSoundButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
             }
         });
     }
@@ -891,6 +989,8 @@ public class MainActivity extends EspActivity {
             @Override
             public void run() {
                 mRingEffectButton.setEnabled(enabled);
+                // Only shown when the drone reports the hardware (this board has none).
+                mRingEffectButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
             }
         });
     }
@@ -900,6 +1000,8 @@ public class MainActivity extends EspActivity {
             @Override
             public void run() {
                 mHeadlightButton.setEnabled(enabled);
+                // Only shown when the drone reports the hardware (this board has none).
+                mHeadlightButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
             }
         });
     }
@@ -909,6 +1011,99 @@ public class MainActivity extends EspActivity {
             @Override
             public void run() {
                 mHeadlightButton.setColorFilter(toggle ? Color.parseColor("#00FF00") : Color.BLACK);
+            }
+        });
+    }
+
+    // ---- Fly screen (redesign stage 2) ---------------------------------------------
+
+    private String linkName() {
+        String method = mPreferences == null ? PreferencesActivity.LINK_METHOD_SOFTAP
+                : mPreferences.getString(PreferencesActivity.KEY_PREF_LINK_METHOD,
+                        PreferencesActivity.LINK_METHOD_SOFTAP);
+        if (PreferencesActivity.LINK_METHOD_STATION.equals(method)) {
+            return "Wi-Fi network";
+        } else if (PreferencesActivity.LINK_METHOD_BT_SPP.equals(method)) {
+            return "Bluetooth Classic";
+        } else if (PreferencesActivity.LINK_METHOD_BLE.equals(method)) {
+            return "Bluetooth LE";
+        }
+        return "Wi-Fi hotspot";
+    }
+
+    /** Must run on the UI thread. */
+    private void onLinkStateChanged(boolean connected) {
+        mIsConnected = connected;
+        mFlightModePanel.setConnected(connected, linkName());
+        mCutMotorsButton.setEnabled(connected);
+        resetCutMotors();
+        if (!connected) {
+            mModeChip.setVisibility(View.GONE);
+            mArmedChip.setVisibility(View.GONE);
+            mMorePanel.setVisibility(View.GONE);
+            mJoystickViewLeft.setAlpha(1f);
+            mJoystickViewRight.setAlpha(1f);
+        }
+    }
+
+    private void onCutMotorsTapped() {
+        if (!mIsConnected) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (mCutPrimedAtMs != 0 && now - mCutPrimedAtMs < CUT_CONFIRM_WINDOW_MS) {
+            resetCutMotors();
+            mPresenter.sendFlightControl(FlightControlPacket.emergency());
+            mCutMotorsButton.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        } else {
+            mCutPrimedAtMs = now;
+            mCutMotorsButton.setText("TAP AGAIN: CUT");
+            mCutMotorsButton.setBackgroundTintList(ColorStateList.valueOf(0xFFE65100));
+            mCutMotorsButton.removeCallbacks(mCutExpire);
+            mCutMotorsButton.postDelayed(mCutExpire, CUT_CONFIRM_WINDOW_MS);
+        }
+    }
+
+    private void resetCutMotors() {
+        mCutPrimedAtMs = 0;
+        mCutMotorsButton.removeCallbacks(mCutExpire);
+        mCutMotorsButton.setText("CUT MOTORS");
+        boolean enabled = mCutMotorsButton.isEnabled();
+        int fill = ContextCompat.getColor(this, enabled ? R.color.fly_danger : R.color.fly_line);
+        int text = ContextCompat.getColor(this, enabled ? R.color.fly_surface : R.color.fly_muted);
+        mCutMotorsButton.setBackgroundTintList(ColorStateList.valueOf(fill));
+        mCutMotorsButton.setTextColor(text);
+        mCutMotorsButton.setIconTint(ColorStateList.valueOf(text));
+    }
+
+    /** One status report from the drone (MainPresenter's "Standard" log block). */
+    public void setFlightStatus(final int mode, final boolean armed, final int autoState,
+                                final float roll, final float pitch) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (!mIsConnected) {
+                    return;
+                }
+                mModeChip.setText(MODE_NAMES[Math.max(0, Math.min(MODE_NAMES.length - 1, mode))]);
+                mModeChip.setVisibility(View.VISIBLE);
+                if (armed) {
+                    mArmedChip.setText("\u25CF ARMED");
+                    mArmedChip.setBackgroundResource(R.drawable.bg_fly_chip_armed);
+                    mArmedChip.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.fly_ink));
+                    mArmedChip.setContentDescription("Armed");
+                } else {
+                    mArmedChip.setText("DISARMED");
+                    mArmedChip.setBackgroundResource(R.drawable.bg_fly_chip_disarmed);
+                    mArmedChip.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.fly_muted));
+                    mArmedChip.setContentDescription("Disarmed");
+                }
+                mArmedChip.setVisibility(View.VISIBLE);
+                mFlightModePanel.setFlightStatus(mode, armed, autoState, roll, pitch);
+                // The sticks only steer in Manual; dim them otherwise so that is visible.
+                float alpha = mode == 0 ? 1f : 0.45f;
+                mJoystickViewLeft.setAlpha(alpha);
+                mJoystickViewRight.setAlpha(alpha);
             }
         });
     }

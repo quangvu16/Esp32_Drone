@@ -47,6 +47,10 @@ final class PidTuneViewController: UIViewController {
     private var tunerHoldStart: Date?
     private var listener: ((LogSample) -> Void)?
 
+    /// Set by the Fly screen: opens another section after this screen closes.
+    var onSwitchSection: ((AppSection) -> Void)?
+    private var sectionHeader: SectionHeader?
+
     /// Param TOC ids we drive (PROTOCOL.md §3): 9 PID gains + 3 flight + nav.kp.
     private struct TuneParam {
         let id: UInt8
@@ -109,9 +113,23 @@ final class PidTuneViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        title = "PID Tune"
+        title = "Tune"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .done, target: self, action: #selector(close))
+        let header = SectionHeader(host: self, selected: .tune, telemetry: telemetry, twoTapCut: false) { [weak self] in
+            self?.panicStop()
+        }
+        header.leaveGuard = { [weak self] in
+            (self?.tuner?.isRunning ?? false)
+                ? "Auto-tune is running. Stop it or use CUT MOTORS before switching."
+                : nil
+        }
+        header.prepareToLeave = { [weak self] in
+            self?.tuner?.stop()
+        }
+        header.onSwitch = onSwitchSection
+        header.install()
+        sectionHeader = header
 
         let scroll = UIScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
@@ -136,7 +154,8 @@ final class PidTuneViewController: UIViewController {
         // Axis picker + pause
         axisControl.selectedSegmentIndex = 0
         axisControl.addTarget(self, action: #selector(axisChanged), for: .valueChanged)
-        pauseButton.setTitle("Pause", for: .normal)
+        // Chart pause is routine and reversible: icon-only, words in the VoiceOver label.
+        pauseButton.applyLabel(nil, symbol: "pause.fill", accessibilityText: "Pause charts")
         pauseButton.addTarget(self, action: #selector(togglePause), for: .touchUpInside)
         let topRow = UIStackView(arrangedSubviews: [axisControl, pauseButton])
         topRow.axis = .horizontal
@@ -166,9 +185,10 @@ final class PidTuneViewController: UIViewController {
         rebuildEditors()
 
         // Save / Load / Defaults
-        saveButton.setTitle("Save gains", for: .normal)
-        loadButton.setTitle("Load gains", for: .normal)
-        defaultsButton.setTitle("Restore defaults", for: .normal)
+        // These write to / read from the drone's flash, not a phone file, so they keep text.
+        saveButton.applyLabel("Save gains", symbol: "tray.and.arrow.down", font: .systemFont(ofSize: 15))
+        loadButton.applyLabel("Load gains", symbol: "tray.and.arrow.up", font: .systemFont(ofSize: 15))
+        defaultsButton.applyLabel("Restore defaults", symbol: nil, font: .systemFont(ofSize: 15))
         saveButton.addTarget(self, action: #selector(saveGains), for: .touchUpInside)
         loadButton.addTarget(self, action: #selector(loadGains), for: .touchUpInside)
         defaultsButton.addTarget(self, action: #selector(restoreDefaults), for: .touchUpInside)
@@ -201,24 +221,23 @@ final class PidTuneViewController: UIViewController {
         safetyLabel.text = """
         SAFETY — read before starting.
         The props WILL spin during a trial. Secure the drone on a stand or hold it tethered.
-        One axis at a time. Stop halts the tuner AND cuts the motors.
+        One axis at a time. CUT MOTORS halts the tuner AND cuts the motors.
         """
         stack.addArrangedSubview(safetyLabel)
 
-        startTuneButton.setTitle("Hold to confirm — start auto-tune", for: .normal)
-        startTuneButton.setTitleColor(.white, for: .normal)
+        setStartTuneLabel("Hold to confirm — start auto-tune")
         startTuneButton.backgroundColor = .systemOrange
-        startTuneButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
         startTuneButton.layer.cornerRadius = 10
         startTuneButton.heightAnchor.constraint(equalToConstant: 52).isActive = true
         startTuneButton.addTarget(self, action: #selector(startTuneDown), for: .touchDown)
         startTuneButton.addTarget(self, action: #selector(startTuneUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         stack.addArrangedSubview(startTuneButton)
 
-        stopTuneButton.setTitle("STOP — halt tuner + cut motors", for: .normal)
-        stopTuneButton.setTitleColor(.white, for: .normal)
+        // Same name, colour and icon as CUT MOTORS on the flight and GPS screens.
+        stopTuneButton.applyLabel("CUT MOTORS — stop tuner", symbol: "exclamationmark.triangle.fill",
+                                  accessibilityText: "Cut motors and stop the tuner",
+                                  font: .systemFont(ofSize: 16, weight: .bold), color: .white)
         stopTuneButton.backgroundColor = .systemRed
-        stopTuneButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
         stopTuneButton.layer.cornerRadius = 10
         stopTuneButton.heightAnchor.constraint(equalToConstant: 52).isActive = true
         stopTuneButton.addTarget(self, action: #selector(panicStop), for: .touchUpInside)
@@ -385,7 +404,8 @@ final class PidTuneViewController: UIViewController {
         angleChart.paused = paused
         controllerChart.paused = paused
         termsChart.paused = paused
-        pauseButton.setTitle(paused ? "Resume" : "Pause", for: .normal)
+        pauseButton.applyLabel(nil, symbol: paused ? "play.fill" : "pause.fill",
+                               accessibilityText: paused ? "Resume charts" : "Pause charts")
     }
 
     @objc private func methodChanged() {
@@ -450,7 +470,7 @@ final class PidTuneViewController: UIViewController {
 
     @objc private func startTuneDown() {
         tunerHoldStart = Date()
-        startTuneButton.setTitle("KEEP HOLDING…", for: .normal)
+        setStartTuneLabel("KEEP HOLDING…")
         // A 1.5 s hold is the two-step against accidental taps.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self = self, let t0 = self.tunerHoldStart else { return }
@@ -462,12 +482,17 @@ final class PidTuneViewController: UIViewController {
 
     @objc private func startTuneUp() {
         tunerHoldStart = nil
-        startTuneButton.setTitle("Hold to confirm — start auto-tune", for: .normal)
+        setStartTuneLabel("Hold to confirm — start auto-tune")
+    }
+
+    private func setStartTuneLabel(_ text: String) {
+        startTuneButton.applyLabel(text, symbol: "play.fill",
+                                   font: .systemFont(ofSize: 16, weight: .bold), color: .white)
     }
 
     private func confirmStart() {
         tunerHoldStart = nil
-        startTuneButton.setTitle("Hold to confirm — start auto-tune", for: .normal)
+        setStartTuneLabel("Hold to confirm — start auto-tune")
 
         // Never start while disarmed without asking.
         let armed = (telemetry.value("flight.armed") ?? 0) > 0.5
@@ -532,7 +557,7 @@ final class PidTuneViewController: UIViewController {
         generator.notificationOccurred(.error)
         startTuneButton.isEnabled = true
         stopTuneButton.isEnabled = false
-        tuneStatusLabel.text = "STOPPED — emergency sent, motors cut."
+        tuneStatusLabel.text = "CUT MOTORS sent — motors off, tuner halted."
     }
 }
 

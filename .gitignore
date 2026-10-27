@@ -24,3 +24,10 @@ xcuserdata/
 
 # local firmware snapshots
 Esp32_drone_backup_*.ino.txt
+
+# local working folders and UI backups
+.research/
+.research-tmp/
+.research_tmp/
+.research_scripts/
+apps_ui_backup_*.zip
