@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+*.iml
+.idea/
+
+# Android build output (58 MB of it)
+ESP-Drone-Android/build/
+ESP-Drone-Android/.gradle/
+ESP-Drone-Android/local.properties
+ESP-Drone-Android/captures/
+ESP-Drone-Android/.externalNativeBuild/
+ESP-Drone-Android/.cxx/
+ESP-Drone-Android/.settings/
+
+# iOS / Xcode — Pods is regenerated from Podfile + Podfile.lock by `pod install`
+ESP-Drone-iOS/Pods/
+ESP-Drone-iOS/DerivedData/
+ESP-Drone-iOS/build/
+*.xcuserstate
+xcuserdata/
+
+# local firmware snapshots
+Esp32_drone_backup_*.ino.txt

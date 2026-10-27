@@ -1,0 +1,2638 @@
+/* =============================================================================
+ *  XW_Z1_V2.0  欣薇_无人机 — ESP32 Flight Controller Firmware
+ * =============================================================================
+ *  Board : ESP32 DevKit + MPU6500 (SPI) + SBUS RX + 4x AO3416 brushed drivers
+ *  Motors: 8520 coreless, direct MOSFET PWM (NOT ESC / servo pulse)
+ *
+ *  VERIFIED PIN MAP (from schematic Screenshot 2026-10-26):
+ *  ┌──────────────┬────────────┬────────────────────────────────────────┐
+ *  │ Function     │ ESP32 GPIO │ Notes                                  │
+ *  ├──────────────┼────────────┼────────────────────────────────────────┤
+ *  │ PWM1  RF/Q1  │ 15         │ front-right  motor (AO3416 low-side)   │
+ *  │ PWM2  RR/Q2  │ 13         │ rear-right   motor                     │
+ *  │ PWM3  LR/Q3  │ 12         │ rear-left    motor                     │
+ *  │ PWM4  LF/Q4  │ 14         │ front-left   motor                     │
+ *  │ SBUS RX      │  4         │ UART2, 100000 8E2, inverted            │
+ *  │ MPU SCK      │ 18         │ VSPI SCK                               │
+ *  │ MPU MISO     │ 19         │ VSPI MISO (MPU pin 7 ADO)              │
+ *  │ MPU MOSI     │ 23         │ VSPI MOSI (MPU pin 4 SDA)              │
+ *  │ MPU NCS      │  5         │ VSPI CS                                │
+ *  │ VBAT sense   │ 36 (VP)    │ R11 10K / R10 33K → VBAT = Vad*43/33   │
+ *  └──────────────┴────────────┴────────────────────────────────────────┘
+ *
+ *  Quad layout & motor numbering (top view, matches schematic labels):
+ *
+ *         FRONT
+ *     LF(4)   RF(1)
+ *        \   /
+ *         \ /
+ *         / \
+ *        /   \
+ *     LR(3)   RR(2)
+ *         REAR
+ *
+ *  Prop direction (viewed from above) — MATCH YOUR PROPS TO THIS:
+ *     RF & LR = CW      RR & LF = CCW
+ *  (If yaw is inverted in flight, flip YAW_DIRECTION below.)
+ *
+ *  SBUS channel map (default, adjust to your radio):
+ *     CH1 = roll, CH2 = pitch, CH3 = throttle, CH4 = yaw, CH5 = arm switch
+ *
+ *  ┌──────────────────────────────────────────────────────────────────────┐
+ *  │ BUILD: select the "Huge APP" partition scheme.                       │
+ *  │   Arduino IDE  -> Tools -> Partition Scheme -> Huge APP              │
+ *  │   arduino-cli  -> --fqbn esp32:esp32:esp32:PartitionScheme=huge_app  │
+ *  │                                                                      │
+ *  │ WiFi + Bluetooth Classic + BLE all compile in, which is ~1.7 MB and  │
+ *  │ does not fit the default 1.25 MB app partition. Huge APP gives 3 MB  │
+ *  │ and drops OTA, which a drone does not need.                          │
+ *  └──────────────────────────────────────────────────────────────────────┘
+ *
+ *  Protocol reference for the phone apps: ../PROTOCOL.md
+ * ==========================================================================*/
+
+#include <SPI.h>
+#include <math.h>
+#include <WiFi.h>
+#include <WiFiUdp.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
+
+// Optional transports. Turning one off saves flash; the link profile that needs
+// it is then reported as unavailable at boot instead of being offered.
+#define LINK_USE_BT_SPP  1
+#define LINK_USE_BLE     1
+
+#if LINK_USE_BT_SPP
+#include <BluetoothSerial.h>
+#endif
+#if LINK_USE_BLE
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+#endif
+
+// ============================ PIN DEFINITIONS ==============================
+#define PIN_MOSI       23
+#define PIN_MISO       19
+#define PIN_SCK        18
+#define PIN_MPU_CS      5
+
+#define PIN_SBUS_RX     4          // UART2 RX (signal only; VBAT/GND on H3)
+
+#define PIN_MOTOR_RF   15          // PWM1 -> Q1  front-right
+#define PIN_MOTOR_RR   13          // PWM2 -> Q2  rear-right
+#define PIN_MOTOR_LR   12          // PWM3 -> Q3  rear-left
+#define PIN_MOTOR_LF   14          // PWM4 -> Q4  front-left
+
+#define PIN_VBAT       36          // VP = ADC1_CH0
+
+// ============================ TIMING / LOOP ================================
+#define LOOP_TIME_US   4000        // 250 Hz
+#define GYRO_SCALE     0.0000611f  // 1/65.5 LSB/(deg/s) * 0.004 s  (±500 dps)
+#define RAD_TO_DEG     57.2958f
+
+// ============================ RC / SBUS ====================================
+#define SBUS_FRAME_LEN       25
+#define SBUS_MIN           172     // FrSky/standard SBUS low
+#define SBUS_MAX          1811
+#define SBUS_CENTER        992
+#define RC_MIN            1000     // mapped µs range
+#define RC_MAX            2000
+#define RC_CENTER         1500
+#define THROTTLE_ARM_MAX  1050     // stick must be below this to arm
+#define THROTTLE_HOVER    1200     // informational only
+#define YAW_ARM_THRESHOLD 1700     // hold right to arm
+#define YAW_DISARM_THR    1300     // hold left to disarm
+#define ARM_HOLD_MS       1000
+#define FAILSAFE_MS        500
+
+// channel index (0-based) — change to match your radio trainer map
+#define CH_ROLL           0
+#define CH_PITCH          1
+#define CH_THROTTLE       2
+#define CH_YAW            3
+#define CH_ARM            4        // optional switch; if unused, stick-arm works
+
+// ============================ BATTERY ======================================
+#define VBAT_DIVIDER      (43.0f / 33.0f)   // R11=10K top, R10=33K bottom
+#define VBAT_CELLS        1                 // 1S LiPo typical for 8520 whoop
+#define VBAT_CELL_WARN    3.50f
+#define VBAT_CELL_CRIT    3.30f
+// Low-battery protection. The ADC reading is smoothed and only a SUSTAINED drop
+// counts, so a throttle punch that sags the cell for a moment does not trigger
+// it. Set VBAT_ARM_CHECK to 0 to allow arming on USB power with no battery.
+#define VBAT_ARM_CHECK    1
+#define VBAT_FILTER_ALPHA 0.02f    // per 4 ms loop, ~0.2 s time constant
+#define VBAT_CRIT_HOLD_MS 3000
+
+// ============================ PID GAINS (tune in flight!) ==================
+//  Untested placeholders — tune these with the phone's tuning screen or the
+//  tuning screen's auto-tune before trusting a hover. Defaults live in macros
+//  so cfgLoad()'s "restore defaults" and these declarations cannot drift apart.
+#define PID_ROLL_KP   1.3f
+#define PID_ROLL_KI   0.04f
+#define PID_ROLL_KD   18.0f
+#define PID_PITCH_KP  1.3f
+#define PID_PITCH_KI  0.04f
+#define PID_PITCH_KD  18.0f
+#define PID_YAW_KP    4.0f
+#define PID_YAW_KI    0.02f
+#define PID_YAW_KD    0.0f
+
+float pid_p_gain_roll  = PID_ROLL_KP;   float pid_i_gain_roll  = PID_ROLL_KI;  float pid_d_gain_roll  = PID_ROLL_KD;
+float pid_p_gain_pitch = PID_PITCH_KP;  float pid_i_gain_pitch = PID_PITCH_KI; float pid_d_gain_pitch = PID_PITCH_KD;
+float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   float pid_d_gain_yaw   = PID_YAW_KD;
+
+#define PID_LIMIT        400.0f   // ± output clamp
+#define I_TERM_LIMIT     400.0f
+#define LEVEL_SENSITIVITY 15.0f   // angle(deg) -> rate-setpoint scaling
+#define SETPOINT_DIVISOR   3.0f   // stick deflection -> rate setpoint
+#define THROTTLE_MAX      1800    // leave headroom for PID at full stick
+
+// CRTP commander safety clamps
+#define MAX_TILT_DEG       25.0f  // max commanded roll/pitch angle (deg)
+#define MAX_YAW_RATE      200.0f  // max commanded yaw rate (deg/s)
+
+// Axis / sign config — flip these if a rotation is inverted after first hover
+#define GYRO_X_SIGN       1       // pitch rate
+#define GYRO_Y_SIGN       1       // roll  rate
+#define GYRO_Z_SIGN       1       // yaw   rate
+#define ACC_X_SIGN        1
+#define ACC_Y_SIGN        1
+#define YAW_DIRECTION     1       // +1 = RF/LR are CW props (default above)
+
+// ============================ WIFI / CRTP / UDP ============================
+//  Matches the Espressif ESP-Drone apps (Android EspUdpDriver / iOS ESPUDPLink).
+//  Every UDP datagram is:  [CRTP bytes ...][uint8 checksum = 8-bit sum of CRTP bytes]
+//  Phone -> drone : udp://192.168.43.42:2390
+//  Drone  -> phone: udp://<phone ip>:2399
+#define WIFI_AP_SSID      "ESP-Drone"
+#define WIFI_AP_PASS      "12345678"      // WPA2, >=8 chars
+#define WIFI_AP_CHANNEL   6
+#define WIFI_AP_IP        IPAddress(192, 168, 43, 42)
+#define WIFI_AP_GW        IPAddress(192, 168, 43, 42)
+#define WIFI_AP_MASK      IPAddress(255, 255, 255, 0)
+#define UDP_DEVICE_PORT   2390            // drone listens here
+#define UDP_APP_PORT      2399            // drone sends replies here
+#define CRTP_MAX_SIZE     30              // largest CRTP packet we handle
+
+// CRTP header:  bits 7..4 = port, bits 3..2 reserved, bits 1..0 = channel
+#define CRTP_PORT_CONSOLE     0
+#define CRTP_PORT_PARAMS      2
+#define CRTP_PORT_COMMANDER   3
+#define CRTP_PORT_MEMORY      4
+#define CRTP_PORT_LOGGING     5
+#define CRTP_PORT_GENERIC     7
+#define CRTP_PORT_LINK        15
+
+// CommanderPacket (CRTP port 3, channel 0), little-endian:
+//   [0] header 0x30
+//   [1..4]  float roll  (deg)
+//   [5..8]  float pitch (deg, NOTE: app sends -pitch)
+//   [9..12] float yaw   (deg/s)
+//   [13..14] uint16 thrust (0..65535)
+#define CMD_PACKET_SIZE   16              // 1 header + 14 payload + 1 checksum
+
+// ==================== CRTP TOC / PARAM / LOG CONSTANTS =====================
+// Command and type codes plus the TocEntry/LogBlock structs. These sit up here
+// with the other #defines because the Arduino preprocessor auto-generates a
+// prototype for every function in the sketch and injects them before the first
+// function definition — so any type named in a function signature must already
+// be complete by that point. The protocol itself is documented in the
+// "CRTP TOC / PARAMETERS / LOGGING" section further down.
+// ===========================================================================
+
+// --- TOC request commands (identical on the params and logging ports) ---
+#define TOC_CMD_GET_ELEMENT  0
+#define TOC_CMD_GET_INFO     1
+
+// --- CRTP port 2 (params) channels ---
+#define PARAM_CHAN_TOC       0
+#define PARAM_CHAN_READ      1
+#define PARAM_CHAN_WRITE     2
+
+// --- CRTP port 5 (logging) channels ---
+#define LOG_CHAN_TOC         0
+#define LOG_CHAN_SETTINGS    1
+#define LOG_CHAN_LOGDATA     2
+
+// --- logging control commands (log/Logg.java) ---
+#define LOG_CMD_CREATE       0
+#define LOG_CMD_APPEND       1
+#define LOG_CMD_DELETE       2
+#define LOG_CMD_START        3
+#define LOG_CMD_STOP         4
+#define LOG_CMD_RESET        5
+
+// --- error codes Logg.java turns into user-visible strings ---
+#define LOG_ERR_OK           0
+#define LOG_ERR_NO_ID        2
+#define LOG_ERR_TOO_LARGE    7
+#define LOG_ERR_NO_CMD       8
+#define LOG_ERR_NO_MEMORY   12
+#define LOG_ERR_EXISTS      17
+
+// Parameter type codes — low nibble of the TOC type byte (toc/Toc.java).
+#define PT_INT8    0x00
+#define PT_INT16   0x01
+#define PT_FLOAT   0x06
+#define PT_UINT8   0x08
+#define PT_UINT16  0x09
+#define PT_UINT32  0x0A
+
+// Log type codes — a DIFFERENT numbering from the parameter codes above.
+#define LT_UINT8   0x01
+#define LT_UINT16  0x02
+#define LT_FLOAT   0x07
+
+// TocElement.java reads read-only from bit 6 of the type byte.
+#define TOC_ACCESS_RO  0x40
+#define TOC_ACCESS_RW  0x00
+
+// Log data budget: <header><id><ts24><values...> must fit in CRTP_MAX_SIZE.
+#define LOG_DATA_OVERHEAD  5                 // header + id + 24-bit timestamp
+#define LOG_MAX_PAYLOAD    (CRTP_MAX_SIZE - LOG_DATA_OVERHEAD)
+#define LOG_MAX_BLOCKS     3
+#define LOG_MAX_VARS       12
+
+// ==================== TRANSPORT / LINK PROFILES ============================
+//  The same CRTP framing ([CRTP ...][uint8 checksum]) runs over four
+//  transports. Which one is live is chosen at boot from NVS (key "link"), so a
+//  radio change always starts from a known state.
+//
+//    0  WIFI_AP     drone hosts "ESP-Drone", phone joins it (default)
+//    1  WIFI_STA    drone joins an existing network, mDNS esp-drone.local
+//    2  BT_SPP      Bluetooth Classic serial — no WiFi involved
+//    3  BLE         BLE GATT, the Bitcraze Crazyflie service (works on iOS)
+//    4  WIFI_AP_BLE WiFi softAP plus BLE, sharing the radio
+//    5  WIFI_STA_BLE WiFi station plus BLE
+//
+//  ESP32 WiFi and Bluetooth Classic share one 2.4 GHz radio, so BT_SPP is an
+//  alternative to WiFi rather than something that runs alongside it. BLE has a
+//  coexistence mode and can share with WiFi, which is what the *_BLE profiles
+//  use. Pick one with "link <n>" on the serial console or FC_CMD_LINK over
+//  CRTP; the board reboots to apply it.
+#define LINK_MODE_WIFI_AP      0
+#define LINK_MODE_WIFI_STA     1
+#define LINK_MODE_BT_SPP       2
+#define LINK_MODE_BLE          3
+#define LINK_MODE_WIFI_AP_BLE  4
+#define LINK_MODE_WIFI_STA_BLE 5
+#define LINK_MODE_COUNT        6
+
+// Station-mode credentials, used by LINK_MODE_WIFI_STA*. Empty SSID falls back
+// to the softAP profile so a board with no config still comes up reachable.
+#define WIFI_STA_SSID          ""            // <-- set yours, or via serial "sta <ssid> <pass>"
+#define WIFI_STA_PASS          ""
+#define WIFI_STA_TIMEOUT_MS    15000
+#define MDNS_HOSTNAME          "esp-drone"
+
+// ---- BLE GATT framing ------------------------------------------------
+//  Matches the Bitcraze service the Android BleLink talks to, so that client
+//  works unmodified:
+//    00000201-1C7F-4F9E-947B-43B7C00A9A08  service
+//      00000202  CRTP      write   phone -> drone, raw CRTP when <= 20 bytes
+//      00000203  CRTPUP    write   phone -> drone, segmented with control byte
+//      00000204  CRTPDOWN  notify  drone -> phone, always control-byte framed
+//
+//  Control byte:  bit7 start | bits6..5 pid (0..3) | bits4..0 (totalLen-1)
+//  A datagram of N CRTP bytes goes out in ceil(N/19) segments of 20 bytes:
+//     [ctrl start, len=N-1]  crtp[0 .. 18]
+//     [ctrl cont , pid    ]  crtp[19 .. 37]   ... and so on
+//  The receiver keys single- vs multi-segment on whether the announced length
+//  fits in the segment, not on the length field alone — see BLE_SEG_BYTES.
+#define BLE_SEG_BYTES        19             // CRTP bytes per 20-byte BLE segment
+#define BLE_MAX_SEGMENTS     2              // CRTP_MAX_SIZE 30 -> 2 segments
+
+// ---- CRTP port 7, channel 0: flight control (this firmware's own extension)
+//  [0] 0x70 | [1] cmd | [2..] args        reply: [0x70][cmd][status u8]
+//
+//  0x01 SET_MODE      u8 mode     0 manual | 1 hold | 2 auto
+//  0x02 TAKEOFF       u16 thrust  target hover thrust 0..65535 -> AUTO
+//  0x03 LAND          —           ramp to idle then disarm       -> AUTO
+//  0x04 SET_HOVER     u16 thrust  change the hover thrust
+//  0x05 EMERGENCY     —           motors off + disarm, always honoured
+//  0x06 SET_HEADING   f32 deg     heading locked in hold/auto
+//  0x07 ARM           —
+//  0x08 DISARM        —
+//  0x09 SAVE          —           persist gains + flight config to NVS
+//  0x0A DEFAULTS      —           restore default gains (not saved)
+//  0x0B LOAD          —           reload gains + flight config from NVS
+//  0x10 LINK          u8 mode     store transport profile, then reboot
+//
+//  Modes:
+//    MANUAL  pilot commands attitude / rate / thrust directly (CommanderPacket)
+//    HOLD    attitude level, heading locked, thrust = hover_thrust
+//    AUTO    TAKEOFF ramp -> HOLD -> LAND ramp -> disarm
+//
+//  There is no barometer, ToF or GPS on this board, so HOLD holds a thrust
+//  level rather than an altitude, and AUTO is a takeoff/hover/land sequence
+//  rather than waypoint flight. Hover altitude is approximate and drifts —
+//  the app says so rather than pretending otherwise.
+#define FC_HDR               (CRTP_PORT_GENERIC << 4)   // 0x70
+#define FC_CMD_SET_MODE      0x01
+#define FC_CMD_TAKEOFF       0x02
+#define FC_CMD_LAND          0x03
+#define FC_CMD_SET_HOVER     0x04
+#define FC_CMD_EMERGENCY     0x05
+#define FC_CMD_SET_HEADING   0x06
+#define FC_CMD_ARM           0x07
+#define FC_CMD_DISARM        0x08
+#define FC_CMD_SAVE          0x09
+#define FC_CMD_DEFAULTS      0x0A
+#define FC_CMD_LOAD          0x0B
+#define FC_CMD_LINK          0x10
+
+// Flight modes and auto sequence states, as reported in the log TOC.
+#define MODE_MANUAL          0
+#define MODE_HOLD            1
+#define MODE_AUTO            2
+#define MODE_FOLLOW          3              // fly toward the phone's GPS offset
+#define MODE_RTH             4              // return to launch
+
+#define AUTO_IDLE            0
+#define AUTO_TAKEOFF         1
+#define AUTO_HOLD            2
+#define AUTO_LAND            3
+
+// Flight-control tuning. Hover thrust lives in the CommanderPacket domain
+// (0..65535) so the app can reuse its existing thrust mapping.
+#define HOVER_THRUST_DEFAULT 30000         // ~46% — a starting guess, trim it
+#define HOVER_THRUST_MIN     8000
+#define HOVER_THRUST_MAX     55000
+#define TAKEOFF_MS_DEFAULT   2000
+#define LAND_MS_DEFAULT      2500
+#define HEADING_KP           2.0f           // deg/s of yaw rate per deg of error
+
+// ---- CRTP port 7, channel 1: navigation / phone reference ----------------
+//  The phone reads its OWN GPS and compass (no SensorServer needed) and sends
+//  the target as an offset from the launch point, already rotated into the
+//  drone's launch heading frame. The drone then estimates where it is by
+//  integrating its own accelerometer, and flies toward that offset.
+//
+//  [0] 0x71 | [1] cmd | [2..] args        reply: [0x71][cmd][status u8]
+//
+//  0x20 TARGET   f32 x_m  f32 y_m   target offset from launch, launch frame
+//                                    (+x = where the nose pointed at launch,
+//                                     +y = 90 deg left of that)
+//  0x21 RESET    —                   zero the dead-reckoned position
+//  0x22 ALIGN    f32 alpha_deg       compass bearing of the nose at launch;
+//                                    the phone sends this so its GPS offsets
+//                                    can be rotated into the drone's frame
+//
+//  HONEST LIMIT: the position below is accelerometer double integration on
+//  MEMS hardware. Bias makes it drift — metres within a minute. It is good
+//  enough to fly a rough "toward the pilot" and nothing more. Both apps label
+//  it approximate rather than implying GPS-grade tracking.
+#define NAV_HDR              0x71
+#define NAV_CMD_TARGET       0x20
+#define NAV_CMD_RESET        0x21
+#define NAV_CMD_ALIGN        0x22
+
+// Dead-reckoning tuning.
+#define NAV_ACC_LSB_PER_G    4096.0f       // MPU6500 at +-8 g -- must match MPU_REG_ACCEL_CFG in mpuInit()
+#define NAV_GRAVITY          9.80665f
+// Velocity leak per second. Bounds the velocity error that accelerometer bias
+// would otherwise grow without limit; costs a little of any sustained move.
+#define NAV_VEL_LEAK_PER_S   0.60f
+#define NAV_TARGET_TIMEOUT_MS 3000         // stale phone reference -> hold
+#define NAV_STOP_BAND_M      0.6f          // within this of the target, stop
+#define NAV_MAX_TILT_DEG     12.0f
+// Sensor axis signs for the horizontal plane. Flip here if "follow" flies
+// away from you instead of toward you — the same trick as GYRO_*_SIGN.
+#define NAV_FWD_SIGN         1             // +1 if sensor +Y is nose-forward
+#define NAV_LEFT_SIGN        1             // +1 if sensor +X is to the left
+// Sign of the yaw that rotates body axes into the launch frame. This is a
+// separate question from the two above: not the accelerometer, but which way
+// heading_deg turns.
+//
+// heading_deg is a compass bearing: it wraps to 0..360 and hold_heading_deg is
+// assigned straight from the phone's FC_CMD_SET_HEADING, which is a compass
+// bearing. A compass bearing rises as the nose turns RIGHT.
+//
+// The body->launch rotation needs the opposite sign: +y is the drone's LEFT, so
+// turning right must rotate the nose toward -y. With +1 the two disagree and
+// navSetpoints() rolls toward the target's cross-axis instead of pitching at
+// it -- up to 8.66 deg of spurious roll at 30 deg of yaw, and a spiral away
+// from anything not dead ahead. test/yawrot_test.cpp pins both directions.
+//
+// This feeds BOTH navUpdate() and navSetpoints(), so they stay an exact
+// inverse pair whichever way it is set.
+#define NAV_HEADING_SIGN     -1
+
+typedef struct {
+  const char *group;
+  const char *name;
+  uint8_t     ctype;    // PT_* for params, LT_* for logs
+  uint8_t     size;     // value width in bytes
+  uint8_t     access;   // params only: TOC_ACCESS_*
+  void       *value;    // live variable the entry exposes
+  float       lo, hi;   // RW params only: phone writes are clamped into [lo, hi]
+                        // and NaN/inf is refused (see paramStore)
+} TocEntry;
+
+typedef struct {
+  bool     used;
+  bool     started;
+  uint8_t  id;
+  uint8_t  period;      // 10 ms units, exactly as the client sends it
+  uint8_t  nvars;
+  uint8_t  var_id[LOG_MAX_VARS];   // indices into LOG_TOC
+  uint32_t start_ms;    // timestamp origin
+  uint32_t last_ms;     // next-send pacing
+} LogBlock;
+
+// ============================ MPU6500 REGISTERS ============================
+#define MPU_REG_SMPLRT_DIV  0x19
+#define MPU_REG_CONFIG      0x1A
+#define MPU_REG_GYRO_CFG    0x1B
+#define MPU_REG_ACCEL_CFG   0x1C
+#define MPU_REG_ACCEL_XOUT  0x3B
+#define MPU_REG_PWR_MGMT_1  0x6B
+#define MPU_REG_PWR_MGMT_2  0x6C
+#define MPU_REG_WHO_AM_I    0x75
+#define MPU_WHO_AM_I_6500   0x70
+#define MPU_WHO_AM_I_9250   0x71
+
+// ============================ GLOBAL STATE =================================
+// --- sensor ---
+int16_t  raw_ax, raw_ay, raw_az, raw_gx, raw_gy, raw_gz;
+int32_t  gyro_x_cal, gyro_y_cal, gyro_z_cal;
+float    gyro_pitch, gyro_roll, gyro_yaw;       // body rates, deg/s (for PID)
+float    angle_pitch_acc, angle_roll_acc;       // raw accel tilt, deg (filter input)
+float    angle_pitch_deg = 0.0f;                // filtered attitude angles, deg
+float    angle_roll_deg  = 0.0f;
+bool     gyro_angles_set = false;
+
+// --- receiver ---
+int16_t  sbus_raw[16];                            // 0..2047
+int16_t  rc[5];                                   // mapped 1000..2000
+bool     sbus_frame_ok = false;
+uint32_t sbus_last_frame_ms = 0;
+uint8_t  sbus_buf[SBUS_FRAME_LEN];
+uint8_t  sbus_idx = 0;
+
+// --- control ---
+float    pid_i_mem_roll, pid_i_mem_pitch, pid_i_mem_yaw;
+float    pid_output_roll, pid_output_pitch, pid_output_yaw;
+float    pid_last_roll_err, pid_last_pitch_err, pid_last_yaw_err;
+float    roll_setpoint, pitch_setpoint, yaw_setpoint;
+float    roll_level_adjust, pitch_level_adjust;
+
+// Per-term breakdown of the last pidCompute(), kept only so the phone's tuning
+// screen can chart which term is doing the work (P fighting D, I windup, ...).
+// Same sign convention as the corresponding pid_output_*.
+float    pid_p_roll,  pid_i_roll,  pid_d_roll;
+float    pid_p_pitch, pid_i_pitch, pid_d_pitch;
+float    pid_p_yaw,   pid_i_yaw,   pid_d_yaw;
+
+int16_t  motor_rf, motor_rr, motor_lr, motor_lf;  // 1000..2000 µs convention
+
+// --- status ---
+bool     armed = false;
+bool     arm_switch_seen = false;   // becomes true once CH5 reads high
+uint32_t arm_stick_ms = 0;
+uint32_t disarm_stick_ms = 0;
+
+// --- WiFi / CRTP link ---
+WiFiUDP   Udp;
+IPAddress app_ip;                    // learned from first inbound datagram
+bool      app_ip_known = false;
+uint32_t  crtp_last_rx_ms = 0;
+uint8_t   crtp_rx_buf[64];
+
+// commander setpoints (from CRTP CommanderPacket)
+float    cmd_roll_deg = 0.0f;
+float    cmd_pitch_deg = 0.0f;
+float    cmd_yaw_dps = 0.0f;
+uint16_t cmd_thrust = 0;             // 0..65535
+bool     cmd_valid = false;          // a commander packet has been parsed
+uint32_t cmd_last_ms = 0;
+uint32_t loop_timer;
+uint32_t last_telemetry_ms = 0;
+float    vbat = 0.0f;
+bool     vbat_warn = false;
+bool     vbat_crit = false;            // filtered vbat below critical for VBAT_CRIT_HOLD_MS
+uint32_t vbat_low_since_ms = 0;
+bool     crtp_thrust_was_low = false;  // CRTP manual arming needs thrust seen at zero first
+
+// --- transport ---
+uint8_t  link_mode   = LINK_MODE_WIFI_AP;   // live profile, from NVS at boot
+bool     link_ready  = false;               // a transport is up and carrying CRTP
+uint8_t  pending_link_mode = 0xFF;          // set by FC_CMD_LINK, reboot follows
+uint32_t reboot_at_ms = 0;
+char     sta_ssid[33] = WIFI_STA_SSID;
+char     sta_pass[65] = WIFI_STA_PASS;
+
+// --- flight mode ---
+uint8_t  flight_mode = MODE_MANUAL;
+uint8_t  auto_state  = AUTO_IDLE;
+uint32_t auto_phase_start_ms = 0;
+uint16_t hover_thrust = HOVER_THRUST_DEFAULT;   // 0..65535, latched by SET_HOVER
+uint16_t takeoff_ms   = TAKEOFF_MS_DEFAULT;
+uint16_t land_ms      = LAND_MS_DEFAULT;
+float    heading_deg  = 0.0f;               // integrated from gyro-z, 0..360
+float    hold_heading_deg = 0.0f;           // heading locked when hold/auto engaged
+
+// --- navigation (launch frame: +x = nose at launch, +y = 90 deg left) ---
+float    pos_x = 0.0f, pos_y = 0.0f;        // dead-reckoned offset from launch, m
+float    vel_x = 0.0f, vel_y = 0.0f;        // m/s
+float    heading_ref_deg = 0.0f;            // heading_deg at launch
+float    align_alpha_deg = 0.0f;            // compass bearing of nose at launch
+float    tgt_x = 0.0f, tgt_y = 0.0f;        // target offset from launch, m
+bool     tgt_valid = false;                 // the phone has sent a recent target
+uint32_t tgt_last_ms = 0;
+float    nav_kp = 1.2f;                     // deg of tilt per m of position error
+
+// Setpoints the flight-mode stage hands to the PID. loop() writes these and
+// never touches the PID inputs directly.
+//
+// Roll/pitch carry BOTH an attitude target and a rate feed-forward, because
+// the two control sources speak different languages: CRTP CommanderPackets
+// command a tilt ANGLE, while SBUS sticks command a body RATE. Holding mode
+// wants angle 0 with no rate; manual wants whatever the pilot asked for.
+float    sp_roll_deg    = 0.0f;             // attitude target, deg
+float    sp_pitch_deg   = 0.0f;
+float    sp_roll_rate   = 0.0f;             // rate feed-forward, deg/s
+float    sp_pitch_rate  = 0.0f;
+float    sp_yaw_rate    = 0.0f;             // yaw rate setpoint, deg/s
+int16_t  sp_throttle_us = 1000;             // 1000..2000
+
+// =============================================================================
+//  MPU6500 SPI low-level
+// =============================================================================
+inline void mpuSelect()   { digitalWrite(PIN_MPU_CS, LOW);  }
+inline void mpuDeselect() { digitalWrite(PIN_MPU_CS, HIGH); }
+
+void mpuWrite(uint8_t reg, uint8_t val) {
+  mpuSelect();
+  SPI.transfer(reg & 0x7F);       // bit7 = 0 -> write
+  SPI.transfer(val);
+  mpuDeselect();
+  delayMicroseconds(10);
+}
+
+uint8_t mpuRead(uint8_t reg) {
+  mpuSelect();
+  SPI.transfer(reg | 0x80);       // bit7 = 1 -> read
+  uint8_t v = SPI.transfer(0x00);
+  mpuDeselect();
+  return v;
+}
+
+void mpuReadBurst(uint8_t reg, uint8_t *buf, uint8_t n) {
+  mpuSelect();
+  SPI.transfer(reg | 0x80);
+  for (uint8_t i = 0; i < n; i++) buf[i] = SPI.transfer(0x00);
+  mpuDeselect();
+}
+
+// =============================================================================
+//  MPU6500 init & read
+// =============================================================================
+bool mpuInit() {
+  pinMode(PIN_MPU_CS, OUTPUT);
+  mpuDeselect();
+  SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_MPU_CS);
+  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+
+  delay(50);
+  mpuWrite(MPU_REG_PWR_MGMT_1, 0x80);   // device reset
+  delay(100);
+  mpuWrite(MPU_REG_PWR_MGMT_1, 0x01);   // clock = PLL with X-axis gyro
+  delay(10);
+  mpuWrite(MPU_REG_PWR_MGMT_2, 0x00);   // all axes on
+  mpuWrite(MPU_REG_SMPLRT_DIV, 0x03);   // 1kHz/(1+3) = 250 Hz sample rate
+  mpuWrite(MPU_REG_CONFIG,     0x02);   // DLPF 92 Hz gyro BW — good for 250 Hz loop
+  mpuWrite(MPU_REG_GYRO_CFG,   0x08);   // ±500 dps  (65.5 LSB/(deg/s))
+  mpuWrite(MPU_REG_ACCEL_CFG,  0x10);   // ±8 g      (4096 LSB/g)
+  delay(10);
+
+  uint8_t who = mpuRead(MPU_REG_WHO_AM_I);
+  return (who == MPU_WHO_AM_I_6500 || who == MPU_WHO_AM_I_9250);
+}
+
+void mpuReadRaw() {
+  uint8_t buf[14];
+  mpuReadBurst(MPU_REG_ACCEL_XOUT, buf, 14);
+  raw_ax = (int16_t)(buf[0]  << 8 | buf[1]);
+  raw_ay = (int16_t)(buf[2]  << 8 | buf[3]);
+  raw_az = (int16_t)(buf[4]  << 8 | buf[5]);
+  /* buf[6..7] = temperature (skip) */
+  raw_gx = (int16_t)(buf[8]  << 8 | buf[9]);
+  raw_gy = (int16_t)(buf[10] << 8 | buf[11]);
+  raw_gz = (int16_t)(buf[12] << 8 | buf[13]);
+}
+
+void mpuCalibrateGyro() {
+  Serial.println(F("[MPU] Calibrating gyro — keep the drone FLAT and STILL..."));
+  int32_t sx = 0, sy = 0, sz = 0;
+  for (int i = 0; i < 2000; i++) {
+    mpuReadRaw();
+    sx += raw_gx; sy += raw_gy; sz += raw_gz;
+    delay(3);
+  }
+  gyro_x_cal = sx / 2000;
+  gyro_y_cal = sy / 2000;
+  gyro_z_cal = sz / 2000;
+  Serial.printf("[MPU] Gyro bias  X:%ld  Y:%ld  Z:%ld\n",
+                (long)gyro_x_cal, (long)gyro_y_cal, (long)gyro_z_cal);
+}
+
+// =============================================================================
+//  SBUS  (UART2, 100000 baud, 8E2, inverted)
+// =============================================================================
+void sbusInit() {
+  // 5th arg `true` = invert RX — required for standard SBUS levels
+  Serial2.begin(100000, SERIAL_8E2, PIN_SBUS_RX, -1, true);
+}
+
+// Decode 16 x 11-bit channels out of a 25-byte SBUS frame
+void sbusDecode(const uint8_t *b) {
+  sbus_raw[0]  = (b[1]        | b[2]  << 8)                 & 0x7FF;
+  sbus_raw[1]  = (b[2]  >> 3  | b[3]  << 5)                 & 0x7FF;
+  sbus_raw[2]  = (b[3]  >> 6  | b[4]  << 2 | b[5] << 10)    & 0x7FF;
+  sbus_raw[3]  = (b[5]  >> 1  | b[6]  << 7)                 & 0x7FF;
+  sbus_raw[4]  = (b[6]  >> 4  | b[7]  << 4)                 & 0x7FF;
+  sbus_raw[5]  = (b[7]  >> 7  | b[8]  << 1 | b[9]  << 9)    & 0x7FF;
+  sbus_raw[6]  = (b[9]  >> 2  | b[10] << 6)                 & 0x7FF;
+  sbus_raw[7]  = (b[10] >> 5  | b[11] << 3)                 & 0x7FF;
+  sbus_raw[8]  = (b[12]       | b[13] << 8)                 & 0x7FF;
+  sbus_raw[9]  = (b[13] >> 3  | b[14] << 5)                 & 0x7FF;
+  sbus_raw[10] = (b[14] >> 6  | b[15] << 2 | b[16] << 10)   & 0x7FF;
+  sbus_raw[11] = (b[16] >> 1  | b[17] << 7)                 & 0x7FF;
+  sbus_raw[12] = (b[17] >> 4  | b[18] << 4)                 & 0x7FF;
+  sbus_raw[13] = (b[18] >> 7  | b[19] << 1 | b[20] << 9)    & 0x7FF;
+  sbus_raw[14] = (b[20] >> 2  | b[21] << 6)                 & 0x7FF;
+  sbus_raw[15] = (b[21] >> 5  | b[22] << 3)                 & 0x7FF;
+
+  for (int i = 0; i < 4; i++) {
+    int32_t v = map(sbus_raw[i], SBUS_MIN, SBUS_MAX, RC_MIN, RC_MAX);
+    rc[i] = constrain(v, RC_MIN, RC_MAX);
+  }
+  // CH5 as a simple high/low arm channel -> map to 1000/2000
+  rc[CH_ARM] = (sbus_raw[CH_ARM] > 1024) ? 2000 : 1000;
+
+  sbus_frame_ok = true;
+  sbus_last_frame_ms = millis();
+}
+
+// A frame is used only when it is well-formed AND the receiver still hears the
+// transmitter. Layout: [0] 0x0F header | [1..22] channels |
+// [23] flags (bit2 = frame lost, bit3 = failsafe) | [24] footer.
+// The footer is 0x00 on plain SBUS; SBUS2 receivers cycle 0x04/0x14/0x24/0x34.
+// A receiver in failsafe often keeps sending frames carrying the LAST stick
+// positions, so a failsafe frame must NOT refresh sbus_last_frame_ms: letting
+// the FAILSAFE_MS timeout run out is what stops the motors.
+// (The old check read the flags from byte 24, the footer, so it never saw them.)
+bool sbusFrameUsable(const uint8_t *f) {
+  if (f[0] != 0x0F) return false;
+  const uint8_t footer = f[24];
+  if (footer != 0x00 && (footer & 0x0F) != 0x04) return false;
+  if (f[23] & 0x08) return false;      // receiver failsafe
+  if (f[23] & 0x04) return false;      // this frame was lost
+  return true;
+}
+
+// Pull any pending bytes; parse frames as they complete
+void sbusPoll() {
+  while (Serial2.available()) {
+    uint8_t c = (uint8_t)Serial2.read();
+    if (sbus_idx == 0 && c != 0x0F) continue;        // wait for header
+    sbus_buf[sbus_idx++] = c;
+    if (sbus_idx >= SBUS_FRAME_LEN) {
+      sbus_idx = 0;
+      if (sbusFrameUsable(sbus_buf)) sbusDecode(sbus_buf);
+    }
+  }
+}
+
+// =============================================================================
+//  CRTP / UDP link  (Espressif ESP-Drone app protocol)
+//  Framing on the wire:  [CRTP ...][uint8 checksum]  where checksum is the
+//  8-bit sum of the CRTP bytes INCLUDING the header byte.
+// =============================================================================
+uint8_t crtpChecksum(const uint8_t *data, size_t len) {
+  uint32_t sum = 0;
+  for (size_t i = 0; i < len; i++) sum += data[i];
+  return (uint8_t)(sum & 0xFF);
+}
+
+// =============================================================================
+//  TRANSPORT  — WiFi UDP / Bluetooth Classic SPP / BLE GATT
+//
+//  The CRTP layer only ever calls linkSend() and hands inbound bytes to
+//  crtpReceiveFramed()/crtpReceiveRaw(). Everything below picks the active
+//  transport from link_mode, which is read back from NVS at boot.
+//
+//  Framing differs by transport because the clients differ:
+//    UDP / SPP : [CRTP ...][uint8 checksum]   checksum over the CRTP bytes
+//    BLE       : raw CRTP wrapped in control-byte segments (see bleSend)
+// =============================================================================
+void crtpDispatch(const uint8_t *p, size_t len);
+
+// The flight-mode stage is defined further down but called from the CRTP
+// handlers above it. Declaring them here keeps the sketch order-independent
+// for a real C++ pass as well as the Arduino preprocessor.
+void flightSetMode(uint8_t mode);
+bool flightTakeoff(uint16_t thrust);
+bool armChecksOk(const char *who);
+void flightLand();
+void flightEmergency();
+void flightConfigDefaults();
+void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok);
+void navReset();
+void navUpdate(float dt, bool holding);
+void navSetpoints();
+void cfgSave();
+void cfgLoad();
+void armUpdate(uint32_t now, bool use_crtp);
+void logUpdate();
+void motorStop();
+void pidReset();
+
+Preferences nvs;
+
+bool linkUsesUdp(uint8_t mode) {
+  return mode == LINK_MODE_WIFI_AP     || mode == LINK_MODE_WIFI_STA ||
+         mode == LINK_MODE_WIFI_AP_BLE || mode == LINK_MODE_WIFI_STA_BLE;
+}
+bool linkUsesBle(uint8_t mode) {
+  return mode == LINK_MODE_BLE || mode == LINK_MODE_WIFI_AP_BLE ||
+         mode == LINK_MODE_WIFI_STA_BLE;
+}
+
+// Inbound UDP/SPP: `data` is [CRTP ...][checksum].
+void crtpReceiveFramed(const uint8_t *data, size_t len) {
+  if (len < 2 || len > CRTP_MAX_SIZE + 1) return;
+  if (crtpChecksum(data, len - 1) != data[len - 1]) return;
+  crtpDispatch(data, len - 1);
+  crtp_last_rx_ms = millis();
+}
+
+// Inbound BLE: the transport already framed it, so no checksum is present.
+void crtpReceiveRaw(const uint8_t *data, size_t len) {
+  if (len < 1 || len > CRTP_MAX_SIZE) return;
+  crtpDispatch(data, len);
+  crtp_last_rx_ms = millis();
+}
+
+// ---------------------------------------------------------------------------
+//  Bluetooth Classic SPP
+// ---------------------------------------------------------------------------
+#if LINK_USE_BT_SPP
+BluetoothSerial *btSpp = nullptr;
+// SPP is a byte stream: the phone's writes can arrive split or merged, so packet
+// boundaries are recovered the way BtSppLink.java's reader does it -- the
+// shortest length whose trailing checksum validates. CommanderPackets are only
+// accepted at their real length (16), so a chance checksum match can never turn
+// part of one into a different command.
+// Everything here is non-blocking. The old Stream::readBytes() waited up to its
+// 1 s default timeout for a full buffer, freezing the flight loop.
+#define BT_FRAME_MAX  (CRTP_MAX_SIZE + 1)
+uint8_t bt_acc[2 * BT_FRAME_MAX];
+size_t  bt_acc_len = 0;
+
+// >0: a whole frame of that length is at the head of bt_acc
+//  0: need more bytes
+// -1: the head byte cannot start a frame -- drop it and resync
+int btFrameLen() {
+  if (bt_acc_len < 2) return 0;
+  if (((bt_acc[0] >> 4) & 0x0F) == CRTP_PORT_COMMANDER) {
+    if (bt_acc_len < CMD_PACKET_SIZE) return 0;
+    return crtpChecksum(bt_acc, CMD_PACKET_SIZE - 1) == bt_acc[CMD_PACKET_SIZE - 1]
+               ? CMD_PACKET_SIZE : -1;
+  }
+  size_t maxl = bt_acc_len < BT_FRAME_MAX ? bt_acc_len : BT_FRAME_MAX;
+  for (size_t l = 2; l <= maxl; l++)
+    if (crtpChecksum(bt_acc, l - 1) == bt_acc[l - 1]) return (int)l;
+  return bt_acc_len >= BT_FRAME_MAX ? -1 : 0;
+}
+
+void btPoll() {
+  if (!btSpp) return;
+  while (bt_acc_len < sizeof(bt_acc)) {
+    int c = btSpp->read();               // returns -1 at once when empty
+    if (c < 0) break;
+    bt_acc[bt_acc_len++] = (uint8_t)c;
+  }
+  for (;;) {
+    int l = btFrameLen();
+    if (l == 0) break;
+    if (l > 0) crtpReceiveFramed(bt_acc, (size_t)l);
+    size_t drop = (l < 0) ? 1 : (size_t)l;
+    memmove(bt_acc, bt_acc + drop, bt_acc_len - drop);
+    bt_acc_len -= drop;
+  }
+}
+
+bool btInit(const char *name) {
+  btSpp = new BluetoothSerial();
+  if (!btSpp->begin(name)) {
+    Serial.println(F("[BT] BluetoothSerial.begin failed (BT not compiled in?)"));
+    return false;
+  }
+  Serial.printf("[BT] SPP '%s' ready\n", name);
+  return true;
+}
+#endif
+
+// ---------------------------------------------------------------------------
+//  BLE GATT — Bitcraze Crazyflie service, so the Android BleLink works as-is.
+// ---------------------------------------------------------------------------
+#if LINK_USE_BLE
+static const char *BLE_UUID_SERVICE  = "00000201-1C7F-4F9E-947B-43B7C00A9A08";
+static const char *BLE_UUID_CRTP     = "00000202-1C7F-4F9E-947B-43B7C00A9A08";
+static const char *BLE_UUID_CRTPUP   = "00000203-1C7F-4F9E-947B-43B7C00A9A08";
+static const char *BLE_UUID_CRTPDOWN = "00000204-1C7F-4F9E-947B-43B7C00A9A08";
+
+BLECharacteristic *bleCrtpDown = nullptr;   // notify, drone -> phone
+bool     ble_connected = false;
+uint8_t  ble_seg_pid   = 0;
+uint8_t  ble_rx_buf[CRTP_MAX_SIZE];
+size_t   ble_rx_len    = 0;
+uint8_t  ble_rx_pid    = 0xFF;
+
+// Split a CRTP datagram into 20-byte control-byte-framed notifications.
+//   seg[0] = bit7 start | bits6..5 pid | bits4..0 (totalLen-1)
+//   seg[1..] = CRTP bytes
+bool bleSend(const uint8_t *data, size_t len) {
+  if (!bleCrtpDown || !ble_connected || len == 0 || len > CRTP_MAX_SIZE) return false;
+  uint8_t seg[BLE_SEG_BYTES + 1];
+  size_t off = 0;
+  while (off < len) {
+    size_t n = len - off;
+    if (n > BLE_SEG_BYTES) n = BLE_SEG_BYTES;
+    uint8_t ctrl = (uint8_t)((ble_seg_pid & 0x03) << 5) | (uint8_t)((len - 1) & 0x1F);
+    if (off == 0) ctrl |= 0x80;
+    seg[0] = ctrl;
+    memcpy(seg + 1, data + off, n);
+    bleCrtpDown->setValue(seg, (uint8_t)(n + 1));
+    bleCrtpDown->notify();
+    off += n;
+  }
+  ble_seg_pid = (uint8_t)((ble_seg_pid + 1) & 0x03);
+  return true;
+}
+
+// Copy the characteristic value out, whichever core version we are on.
+static size_t bleReadValue(BLECharacteristic *ch, uint8_t *out, size_t cap) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  String v = ch->getValue();
+  size_t n = (size_t)v.length();
+  if (n > cap) n = cap;
+  memcpy(out, v.c_str(), n);
+#else
+  std::string v = ch->getValue();
+  size_t n = v.length();
+  if (n > cap) n = cap;
+  memcpy(out, v.data(), n);
+#endif
+  return n;
+}
+
+// 0x202: the client sends short packets raw, with no control byte.
+class BleRawCb : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *ch) {
+    uint8_t buf[CRTP_MAX_SIZE];
+    size_t n = bleReadValue(ch, buf, sizeof(buf));
+    if (n >= 1) crtpReceiveRaw(buf, n);
+  }
+};
+
+// 0x203: long packets arrive here segmented with a control byte.
+class BleSegCb : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *ch) {
+    uint8_t buf[BLE_SEG_BYTES + 1];
+    size_t n = bleReadValue(ch, buf, sizeof(buf));
+    if (n < 2) return;
+
+    uint8_t ctrl = buf[0];
+    bool    start = (ctrl & 0x80) != 0;
+    uint8_t pid   = (uint8_t)((ctrl >> 5) & 0x03);
+    // The length field is (total CRTP length - 1). A packet is single-segment
+    // when the whole thing fits here, NOT merely when that field reads < 20:
+    // the field saturates at 32 and a 20-byte datagram would otherwise be
+    // mistaken for a single segment it cannot fit into.
+    size_t total = (size_t)((ctrl & 0x1F) + 1);
+    size_t body  = n - 1;
+
+    if (start) {
+      ble_rx_len = 0;
+      ble_rx_pid = pid;
+      if (body > sizeof(ble_rx_buf)) return;
+      memcpy(ble_rx_buf, buf + 1, body);
+      ble_rx_len = body;
+      if (total <= body) {
+        // The length field is authoritative. A well-behaved client sends
+        // exactly `total` bytes here, but dispatch what was announced rather
+        // than what happened to arrive, so padding cannot reach the parser.
+        crtpReceiveRaw(ble_rx_buf, total);
+        ble_rx_len = 0;
+      }
+    } else {
+      if (pid != ble_rx_pid || ble_rx_len == 0) { ble_rx_len = 0; return; }
+      if (ble_rx_len + body > sizeof(ble_rx_buf)) { ble_rx_len = 0; return; }
+      memcpy(ble_rx_buf + ble_rx_len, buf + 1, body);
+      ble_rx_len += body;
+      if (ble_rx_len >= total) {
+        crtpReceiveRaw(ble_rx_buf, total);
+        ble_rx_len = 0;
+      }
+    }
+  }
+};
+
+class BleServerCb : public BLEServerCallbacks {
+  void onConnect(BLEServer *s) {
+    ble_connected = true;
+    Serial.println(F("[BLE] phone connected"));
+  }
+  void onDisconnect(BLEServer *s) {
+    ble_connected = false;
+    ble_rx_len = 0;
+    Serial.println(F("[BLE] phone disconnected"));
+    s->startAdvertising();              // ready for the next phone
+  }
+};
+
+bool bleInit(const char *name) {
+  BLEDevice::init(name);
+  BLEDevice::setMTU(64);
+  BLEServer  *srv = BLEDevice::createServer();
+  BLEService *svc = srv->createService(BLE_UUID_SERVICE);
+  srv->setCallbacks(new BleServerCb());
+
+  BLECharacteristic *c;
+  c = svc->createCharacteristic(BLE_UUID_CRTP,   BLECharacteristic::PROPERTY_WRITE);
+  c->setCallbacks(new BleRawCb());
+  c = svc->createCharacteristic(BLE_UUID_CRTPUP, BLECharacteristic::PROPERTY_WRITE);
+  c->setCallbacks(new BleSegCb());
+  bleCrtpDown = svc->createCharacteristic(BLE_UUID_CRTPDOWN, BLECharacteristic::PROPERTY_NOTIFY);
+  bleCrtpDown->addDescriptor(new BLE2902());
+
+  svc->start();
+  BLEAdvertising *adv = BLEDevice::getAdvertising();
+  adv->addServiceUUID(BLE_UUID_SERVICE);
+  adv->setScanResponse(true);
+  BLEDevice::startAdvertising();
+  Serial.printf("[BLE] advertising as '%s'\n", name);
+  return true;
+}
+#endif
+
+// ---------------------------------------------------------------------------
+//  WiFi
+// ---------------------------------------------------------------------------
+bool wifiApInit() {
+  if (!WiFi.softAPConfig(WIFI_AP_IP, WIFI_AP_GW, WIFI_AP_MASK)) {
+    Serial.println(F("[WIFI] softAPConfig failed — apps expect 192.168.43.42"));
+  }
+  if (!WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS, WIFI_AP_CHANNEL, 0, 4)) {
+    Serial.println(F("[WIFI] softAP failed"));
+    return false;
+  }
+  Udp.begin(UDP_DEVICE_PORT);
+  Serial.printf("[WIFI] SoftAP '%s' at %s, UDP %d\n",
+                WIFI_AP_SSID, WiFi.softAPIP().toString().c_str(), UDP_DEVICE_PORT);
+  return true;
+}
+
+bool wifiStaInit() {
+  if (sta_ssid[0] == '\0') {
+    Serial.println(F("[WIFI] no station SSID configured — use \"sta <ssid> <pass>\""));
+    return false;
+  }
+  WiFi.begin(sta_ssid, sta_pass);
+  Serial.printf("[WIFI] joining '%s'", sta_ssid);
+  uint32_t t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < WIFI_STA_TIMEOUT_MS) {
+    delay(100); Serial.print('.');
+  }
+  Serial.println();
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println(F("[WIFI] join timed out"));
+    return false;
+  }
+  if (MDNS.begin(MDNS_HOSTNAME)) {
+    MDNS.addService("esp-drone", "udp", UDP_DEVICE_PORT);
+  }
+  Udp.begin(UDP_DEVICE_PORT);
+  Serial.printf("[WIFI] joined '%s' at %s (try %s.local), UDP %d\n",
+                sta_ssid, WiFi.localIP().toString().c_str(), MDNS_HOSTNAME, UDP_DEVICE_PORT);
+  return true;
+}
+
+void udpPoll() {
+  int packetSize = Udp.parsePacket();
+  if (packetSize <= 0) return;
+
+  int n = Udp.read(crtp_rx_buf, sizeof(crtp_rx_buf));
+  if (n < 2) return;
+
+  // Learn the phone address — this is also where replies go (apps bind 2399).
+  IPAddress src = Udp.remoteIP();
+  if (!app_ip_known || src != app_ip) {
+    app_ip = src;
+    app_ip_known = true;
+    Serial.printf("[CRTP] App at %s\n", app_ip.toString().c_str());
+  }
+  crtpReceiveFramed(crtp_rx_buf, (size_t)n);
+}
+
+// ---------------------------------------------------------------------------
+//  Send / poll / init
+// ---------------------------------------------------------------------------
+// `payload` is a complete CRTP packet, header included, no checksum.
+bool linkSend(const uint8_t *payload, size_t len) {
+  if (len == 0 || len > CRTP_MAX_SIZE) return false;
+
+#if LINK_USE_BT_SPP
+  if (link_mode == LINK_MODE_BT_SPP) {
+    if (!btSpp || !btSpp->connected()) return false;
+    uint8_t out[CRTP_MAX_SIZE + 1];
+    memcpy(out, payload, len);
+    out[len] = crtpChecksum(payload, len);
+    return btSpp->write(out, len + 1) == (size_t)(len + 1);
+  }
+#endif
+
+#if LINK_USE_BLE
+  if (linkUsesBle(link_mode) && !linkUsesUdp(link_mode)) return bleSend(payload, len);
+#endif
+
+  // UDP (including the WiFi+BLE profiles, which carry CRTP over UDP)
+  if (!app_ip_known) return false;
+  uint8_t out[CRTP_MAX_SIZE + 1];
+  memcpy(out, payload, len);
+  out[len] = crtpChecksum(payload, len);
+  Udp.beginPacket(app_ip, UDP_APP_PORT);
+  Udp.write(out, len + 1);
+  return Udp.endPacket() == 1;
+}
+
+void linkPoll() {
+  if (linkUsesUdp(link_mode)) udpPoll();
+#if LINK_USE_BT_SPP
+  if (link_mode == LINK_MODE_BT_SPP) btPoll();
+#endif
+  // BLE RX arrives in callbacks; nothing to poll.
+}
+
+void linkInit() {
+  link_mode = nvs.getUChar("link", LINK_MODE_WIFI_AP);
+  if (link_mode >= LINK_MODE_COUNT) link_mode = LINK_MODE_WIFI_AP;
+
+  bool wifi = linkUsesUdp(link_mode);
+  bool ble  = linkUsesBle(link_mode);
+
+  // BLE coexists with WiFi, so the *_BLE profiles just enable both stacks.
+  if (wifi)      WiFi.mode(link_mode == LINK_MODE_WIFI_STA || link_mode == LINK_MODE_WIFI_STA_BLE
+                            ? WIFI_STA : WIFI_AP);
+  else if (ble)  WiFi.mode(WIFI_OFF);
+
+  bool ok = true;
+  switch (link_mode) {
+    case LINK_MODE_WIFI_AP:       ok = wifiApInit();  break;
+    case LINK_MODE_WIFI_STA:      ok = wifiStaInit(); break;
+    case LINK_MODE_WIFI_AP_BLE:   ok = wifiApInit();  break;
+    case LINK_MODE_WIFI_STA_BLE:  ok = wifiStaInit(); break;
+#if LINK_USE_BT_SPP
+    case LINK_MODE_BT_SPP:        ok = btInit(WIFI_AP_SSID); break;
+#endif
+#if LINK_USE_BLE
+    case LINK_MODE_BLE:           ok = bleInit(WIFI_AP_SSID); break;
+#endif
+    default:
+      Serial.printf("[LINK] profile %u not built in — falling back to softAP\n", link_mode);
+      link_mode = LINK_MODE_WIFI_AP;
+      ok = wifiApInit();
+      break;
+  }
+
+#if LINK_USE_BLE
+  if (ok && ble && link_mode != LINK_MODE_BLE) bleInit(WIFI_AP_SSID);
+#endif
+
+  link_ready = ok;
+  Serial.printf("[LINK] profile %u %s\n", link_mode, ok ? "up" : "FAILED");
+}
+
+// Send a CRTP packet (no checksum) to the phone. linkSend adds whatever
+// framing the active transport needs.
+bool crtpSend(const uint8_t *payload, size_t len) {
+  return linkSend(payload, len);
+}
+
+// Convenience: send human-readable console text (CRTP port 0, channel 0).
+// NOTE: the iOS app decodes inbound datagrams as UTF-8 text and would crash on
+// raw binary, so console text is the only payload both apps tolerate.
+void crtpConsole(const char *text) {
+  // Never emit an empty datagram: the client's resend-queue matcher indexes
+  // into the payload without a bounds check, so a 1-byte packet could throw.
+  if (!text || !*text) return;
+  uint8_t buf[CRTP_MAX_SIZE];
+  size_t n = strlen(text);
+  if (n > CRTP_MAX_SIZE - 1) n = CRTP_MAX_SIZE - 1;
+  buf[0] = (CRTP_PORT_CONSOLE << 4);   // port 0, channel 0
+  memcpy(buf + 1, text, n);
+  crtpSend(buf, n + 1);
+}
+
+// ---- CommanderPacket (CRTP port 3, channel 0) ------------------------------
+// [0] 0x30 header | [1..4] float roll | [5..8] float pitch (already negated
+// by the client) | [9..12] float yaw | [13..14] uint16 thrust | [15] checksum
+void crtpHandleCommander(const uint8_t *p, size_t len) {
+  // 1 header + 14 payload = 15 CRTP bytes (checksum handled by caller)
+  if (len < 15) return;
+  float roll, pitch, yaw;
+  uint16_t thrust;
+  memcpy(&roll,  p + 1,  4);
+  memcpy(&pitch, p + 5,  4);
+  memcpy(&yaw,   p + 9,  4);
+  memcpy(&thrust, p + 13, 2);
+
+  // sanity: reject NaN/inf and absurd angles
+  if (!isfinite(roll) || !isfinite(pitch) || !isfinite(yaw)) return;
+  if (fabsf(roll) > 180.0f || fabsf(pitch) > 180.0f || fabsf(yaw) > 2000.0f) return;
+
+  cmd_roll_deg  = roll;
+  cmd_pitch_deg = pitch;
+  cmd_yaw_dps   = yaw;
+  cmd_thrust    = thrust;
+  cmd_valid     = true;
+  cmd_last_ms   = millis();
+}
+
+// ---- Flight control (CRTP port 7, channel 0) ------------------------------
+// [0] 0x70 | [1] cmd | [2..] args      reply: [0x70][cmd][status u8]
+// Every command re-acks on retransmission: the client retries unacknowledged
+// packets every 500 ms, and these must be safe to apply twice. The only
+// non-idempotent one is TAKEOFF, which simply restarts the ramp.
+void crtpHandleFlightControl(const uint8_t *p, size_t len) {
+  if (len < 2) return;
+  uint8_t cmd = p[1];
+  uint8_t status = 0;                 // 0 = OK, 1 = bad request
+
+  switch (cmd) {
+    case FC_CMD_SET_MODE:
+      // Modes run 0..4 (MANUAL..RTH), not 0..2 — the old bound silently
+      // rejected FOLLOW and RTH, which are the whole point of the nav stack.
+      if (len < 3 || p[2] > MODE_RTH) { status = 1; break; }
+      // Once the battery is critical the drone is landing. A mode command (the
+      // GPS screen resends SET_MODE every tick) must not cancel that.
+      if (armed && vbat_crit) { status = 1; break; }
+      flightSetMode(p[2]);
+      break;
+
+    case FC_CMD_TAKEOFF: {
+      uint16_t thrust = hover_thrust;
+      if (len >= 4) memcpy(&thrust, p + 2, 2);
+      if (!flightTakeoff(thrust)) status = 1;
+      break;
+    }
+
+    case FC_CMD_LAND:
+      flightLand();
+      break;
+
+    case FC_CMD_SET_HOVER:
+      if (len < 4) { status = 1; break; }
+      { uint16_t t = 0;
+        memcpy(&t, p + 2, 2);
+        hover_thrust = constrain(t, HOVER_THRUST_MIN, HOVER_THRUST_MAX); }
+      break;
+
+    case FC_CMD_EMERGENCY:
+      flightEmergency();
+      break;
+
+    case FC_CMD_SET_HEADING:
+      if (len < 6) { status = 1; break; }
+      { float h = 0.0f;
+        memcpy(&h, p + 2, 4);
+        if (!isfinite(h)) { status = 1; break; }
+        hold_heading_deg = fmodf(h, 360.0f);
+        if (hold_heading_deg < 0.0f) hold_heading_deg += 360.0f; }
+      break;
+
+    case FC_CMD_ARM:
+      // Refused unless the motors would start from idle: MANUAL with the
+      // phone's thrust at zero, or AUTO before a takeoff. In HOLD/FOLLOW/RTH the
+      // motors would jump straight to hover thrust -- use TAKEOFF for that.
+      if (!armed) {
+        bool from_idle = (flight_mode == MODE_MANUAL && cmd_thrust <= 500) ||
+                         (flight_mode == MODE_AUTO && auto_state == AUTO_IDLE);
+        if (!from_idle || !armChecksOk("CRTP ARM")) { status = 1; break; }
+        armed = true;
+        pidReset();
+      }
+      break;
+
+    case FC_CMD_DISARM:
+      armed = false;
+      motorStop();
+      pidReset();
+      break;
+
+    case FC_CMD_SAVE:
+      // NVS writes erase flash, which stalls both cores for milliseconds.
+      if (armed) { status = 1; break; }
+      cfgSave();
+      break;
+
+    case FC_CMD_DEFAULTS:
+      flightConfigDefaults();
+      break;
+
+    case FC_CMD_LOAD:
+      cfgLoad();
+      break;
+
+    case FC_CMD_LINK:
+      // Never write flash and reboot in the air.
+      if (armed || len < 3 || p[2] >= LINK_MODE_COUNT) { status = 1; break; }
+      nvs.putUChar("link", p[2]);
+      pending_link_mode = p[2];
+      reboot_at_ms = millis() + 1500;   // time for the reply to get out first
+      break;
+
+    default:
+      status = 1;
+      break;
+  }
+
+  // Two payload bytes after the header, so the client's resend-queue matcher
+  // can index it without a bounds check.
+  uint8_t out[3] = { FC_HDR, cmd, status };
+  crtpSend(out, sizeof(out));
+}
+
+// ---- Navigation (CRTP port 7, channel 1) ---------------------------------
+// The phone computes the target from its own GPS and compass and sends it as
+// an offset from the launch point. Everything the drone does with it is an
+// estimate — see the NAVIGATION section above.
+void crtpHandleNav(const uint8_t *p, size_t len) {
+  if (len < 2) return;
+  uint8_t cmd = p[1];
+  uint8_t status = 0;
+
+  switch (cmd) {
+    case NAV_CMD_TARGET:
+      // north/east offset of the target from the launch point, in metres.
+      // The drone has no compass, so it cannot rotate these into its own
+      // frame by itself — NAV_CMD_ALIGN supplied that angle at launch.
+      if (len < 10) { status = 1; break; }
+      { float n = 0.0f, e = 0.0f;
+        memcpy(&n, p + 2, 4);
+        memcpy(&e, p + 6, 4);
+        if (!isfinite(n) || !isfinite(e)) { status = 1; break; }
+        // Launch frame: +x is where the nose pointed at ALIGN, +y is 90 deg to
+        // the LEFT of that -- the same frame navUpdate() integrates into, so
+        // navSetpoints() can subtract the two directly. Projecting (n, e) onto
+        // the unit vectors at bearing alpha and bearing alpha-90:
+        //   +x = n*cos(a) + e*sin(a)
+        //   +y = n*sin(a) - e*cos(a)
+        // The second line used to carry the opposite sign, which put the target
+        // on the STARBOARD side and made the drone fly away from any target
+        // that was not straight ahead. frame_test.cpp pins this.
+        const float a = align_alpha_deg * DEG_TO_RAD;
+        const float ca = cosf(a), sa = sinf(a);
+        tgt_x = n * ca + e * sa;
+        tgt_y = n * sa - e * ca;
+        tgt_valid = true;
+        tgt_last_ms = millis(); }
+      break;
+
+    case NAV_CMD_RESET:
+      navReset();
+      break;
+
+    case NAV_CMD_ALIGN:
+      // The compass bearing of the nose at launch. This is the one frame
+      // relationship the drone cannot measure — it has no magnetometer — so
+      // the phone supplies it and the drone treats this moment as launch:
+      // heading_ref_deg is zeroed here and the dead reckoning restarts.
+      if (len < 6) { status = 1; break; }
+      { float a = 0.0f;
+        memcpy(&a, p + 2, 4);
+        if (!isfinite(a)) { status = 1; break; }
+        align_alpha_deg = fmodf(a, 360.0f);
+        if (align_alpha_deg < 0.0f) align_alpha_deg += 360.0f;
+        navReset();
+        Serial.printf("[NAV] aligned: nose at compass %.1f deg, position zeroed\n",
+                      align_alpha_deg); }
+      break;
+
+    default:
+      status = 1;
+      break;
+  }
+
+  uint8_t out[3] = { NAV_HDR, cmd, status };
+  crtpSend(out, sizeof(out));
+}
+
+// =============================================================================
+//  CRTP TOC / PARAMETERS / LOGGING
+//
+//  Byte layouts are dictated by the Bitcraze "crazyflie" Java library the
+//  Android client is built from, and are pinned to these files:
+//    toc/TocFetcher.java  channel 0: CMD_TOC_ELEMENT=0, CMD_TOC_INFO=1
+//                         info    -> <cmd><uint8 nItems><uint32 crc LE>
+//                         element -> <cmd><uint8 id><type|access><group\0><name\0>
+//    toc/TocElement.java  read-only when (type|access) & 0x40
+//    param/Param.java     ch 1 read : <id>          -> <id><value LE>
+//                         ch 2 write: <id><value LE> -> <id><value LE>
+//    log/Logg.java        ch 1 ctrl : <cmd><id>...   -> <cmd><id><err>
+//                         ch 2 data : <id><ts24 LE><value...>
+//
+//  The client keeps a 500 ms resend queue, so every handler here must be
+//  idempotent: a retransmitted CREATE/START/DELETE has to re-ack success
+//  rather than report "already exists" / "no such id".
+// =============================================================================
+
+// The command codes and the TocEntry/LogBlock types are defined up with the
+// other #defines at the top of the file; see the note there about the Arduino
+// preprocessor's generated prototypes.
+
+// The three parameters MainPresenter.java probes at connect time. This board
+// has no buzzer deck, zRanger or LED ring, so all three report 0 — which is
+// what keeps the matching buttons disabled instead of silently dead.
+static uint32_t p_cpu_flash      = 0;
+static uint8_t  p_deck_bczranger = 0;
+static uint8_t  p_ring_neffect   = 0;
+
+static const TocEntry PARAM_TOC[] = {
+  { "cpu",  "flash",     PT_UINT32, 4, TOC_ACCESS_RO, &p_cpu_flash      },
+  { "deck", "bcZRanger", PT_UINT8,  1, TOC_ACCESS_RO, &p_deck_bczranger },
+  { "ring", "neffect",   PT_UINT8,  1, TOC_ACCESS_RO, &p_ring_neffect   },
+  // PID gains are exposed read/write so they can be tuned from the phone.
+  { "pid",  "roll_kp",   PT_FLOAT,  4, TOC_ACCESS_RW, &pid_p_gain_roll, 0.0f, 100.0f },
+  { "pid",  "roll_ki",   PT_FLOAT,  4, TOC_ACCESS_RW, &pid_i_gain_roll, 0.0f, 20.0f },
+  { "pid",  "roll_kd",   PT_FLOAT,  4, TOC_ACCESS_RW, &pid_d_gain_roll, 0.0f, 200.0f },
+  { "pid",  "pitch_kp",  PT_FLOAT,  4, TOC_ACCESS_RW, &pid_p_gain_pitch, 0.0f, 100.0f },
+  { "pid",  "pitch_ki",  PT_FLOAT,  4, TOC_ACCESS_RW, &pid_i_gain_pitch, 0.0f, 20.0f },
+  { "pid",  "pitch_kd",  PT_FLOAT,  4, TOC_ACCESS_RW, &pid_d_gain_pitch, 0.0f, 200.0f },
+  { "pid",  "yaw_kp",    PT_FLOAT,  4, TOC_ACCESS_RW, &pid_p_gain_yaw, 0.0f, 100.0f },
+  { "pid",  "yaw_ki",    PT_FLOAT,  4, TOC_ACCESS_RW, &pid_i_gain_yaw, 0.0f, 20.0f },
+  { "pid",  "yaw_kd",    PT_FLOAT,  4, TOC_ACCESS_RW, &pid_d_gain_yaw, 0.0f, 200.0f },
+  { "flight", "hover_thrust", PT_UINT16, 2, TOC_ACCESS_RW, &hover_thrust, 8000.0f, 55000.0f },
+  { "flight", "takeoff_ms",   PT_UINT16, 2, TOC_ACCESS_RW, &takeoff_ms, 100.0f, 20000.0f },
+  { "flight", "land_ms",      PT_UINT16, 2, TOC_ACCESS_RW, &land_ms, 100.0f, 20000.0f },
+  { "nav",    "kp",           PT_FLOAT,  4, TOC_ACCESS_RW, &nav_kp, 0.0f, 20.0f },
+};
+#define PARAM_TOC_COUNT ((uint8_t)(sizeof(PARAM_TOC) / sizeof(PARAM_TOC[0])))
+
+// Telemetry the app can subscribe to. pm.vbat is the one MainPresenter's
+// "Standard" config actually requests; the rest are here for flight-data views.
+// There is no magnetometer, so stabilizer.yaw is the yaw RATE in deg/s.
+static const TocEntry LOG_TOC[] = {
+  { "pm",         "vbat",  LT_FLOAT,  4, TOC_ACCESS_RO, &vbat            },
+  { "stabilizer", "roll",  LT_FLOAT,  4, TOC_ACCESS_RO, &angle_roll_deg  },
+  { "stabilizer", "pitch", LT_FLOAT,  4, TOC_ACCESS_RO, &angle_pitch_deg },
+  { "stabilizer", "yaw",   LT_FLOAT,  4, TOC_ACCESS_RO, &gyro_yaw        },
+  { "controller", "roll",  LT_FLOAT,  4, TOC_ACCESS_RO, &pid_output_roll  },
+  { "controller", "pitch", LT_FLOAT,  4, TOC_ACCESS_RO, &pid_output_pitch },
+  { "controller", "yaw",   LT_FLOAT,  4, TOC_ACCESS_RO, &pid_output_yaw   },
+  { "motor",      "m1",    LT_UINT16, 2, TOC_ACCESS_RO, &motor_rf         },
+  { "motor",      "m2",    LT_UINT16, 2, TOC_ACCESS_RO, &motor_rr         },
+  { "motor",      "m3",    LT_UINT16, 2, TOC_ACCESS_RO, &motor_lr         },
+  { "motor",      "m4",    LT_UINT16, 2, TOC_ACCESS_RO, &motor_lf         },
+
+  // Flight state, so the phone can show mode / sequence / armed without a
+  // second protocol. `armed` is a bool, read back as one little-endian byte.
+  { "flight", "mode",       LT_UINT8,  1, TOC_ACCESS_RO, &flight_mode  },
+  { "flight", "auto_state", LT_UINT8,  1, TOC_ACCESS_RO, &auto_state   },
+  { "flight", "armed",      LT_UINT8,  1, TOC_ACCESS_RO, &armed        },
+  { "flight", "heading",    LT_FLOAT,  4, TOC_ACCESS_RO, &heading_deg  },
+
+  // Dead-reckoned position. Rough — see the NAVIGATION section. Surfaced so
+  // the app can draw it and say plainly that it drifts.
+  { "nav", "pos_x", LT_FLOAT, 4, TOC_ACCESS_RO, &pos_x },
+  { "nav", "pos_y", LT_FLOAT, 4, TOC_ACCESS_RO, &pos_y },
+  { "nav", "vel_x", LT_FLOAT, 4, TOC_ACCESS_RO, &vel_x },
+  { "nav", "vel_y", LT_FLOAT, 4, TOC_ACCESS_RO, &vel_y },
+  { "nav", "tgt_x", LT_FLOAT, 4, TOC_ACCESS_RO, &tgt_x },
+  { "nav", "tgt_y", LT_FLOAT, 4, TOC_ACCESS_RO, &tgt_y },
+
+  // Per-term breakdown of the PID output. Charting these is how you see which
+  // loop is doing the work — a D term spiking against P is a different fix
+  // from I windup, and the summed output hides the difference.
+  { "pid", "roll_p",  LT_FLOAT, 4, TOC_ACCESS_RO, &pid_p_roll  },
+  { "pid", "roll_i",  LT_FLOAT, 4, TOC_ACCESS_RO, &pid_i_roll  },
+  { "pid", "roll_d",  LT_FLOAT, 4, TOC_ACCESS_RO, &pid_d_roll  },
+  { "pid", "pitch_p", LT_FLOAT, 4, TOC_ACCESS_RO, &pid_p_pitch },
+  { "pid", "pitch_i", LT_FLOAT, 4, TOC_ACCESS_RO, &pid_i_pitch },
+  { "pid", "pitch_d", LT_FLOAT, 4, TOC_ACCESS_RO, &pid_d_pitch },
+  { "pid", "yaw_p",   LT_FLOAT, 4, TOC_ACCESS_RO, &pid_p_yaw   },
+  { "pid", "yaw_i",   LT_FLOAT, 4, TOC_ACCESS_RO, &pid_i_yaw   },
+  { "pid", "yaw_d",   LT_FLOAT, 4, TOC_ACCESS_RO, &pid_d_yaw   },
+};
+#define LOG_TOC_COUNT ((uint8_t)(sizeof(LOG_TOC) / sizeof(LOG_TOC[0])))
+
+static LogBlock log_blocks[LOG_MAX_BLOCKS];
+
+// CRC-32 (IEEE) over the TOC contents. The client only compares this against
+// its own cache key, so it has to be stable and content-derived; it does not
+// need to match any external implementation.
+uint32_t crc32Byte(uint32_t crc, uint8_t b) {
+  crc ^= b;
+  for (uint8_t i = 0; i < 8; i++)
+    crc = (crc >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(crc & 1u)));
+  return crc;
+}
+
+uint32_t tocCrc(const TocEntry *toc, uint8_t n) {
+  uint32_t crc = 0xFFFFFFFFu;
+  for (uint8_t i = 0; i < n; i++) {
+    crc = crc32Byte(crc, i);
+    for (const char *s = toc[i].group; *s; s++) crc = crc32Byte(crc, (uint8_t)*s);
+    crc = crc32Byte(crc, 0);
+    for (const char *s = toc[i].name; *s; s++) crc = crc32Byte(crc, (uint8_t)*s);
+    crc = crc32Byte(crc, 0);
+  }
+  return ~crc;
+}
+
+// <cmd><nItems><crc32 LE> on the TOC channel of the given port.
+void tocSendInfo(uint8_t port, const TocEntry *toc, uint8_t n) {
+  uint8_t buf[CRTP_MAX_SIZE];
+  buf[0] = (uint8_t)((port << 4) | LOG_CHAN_TOC);
+  buf[1] = TOC_CMD_GET_INFO;
+  buf[2] = n;
+  uint32_t crc = tocCrc(toc, n);
+  memcpy(buf + 3, &crc, 4);
+  crtpSend(buf, 7);
+}
+
+// <cmd><id><type|access><group\0><name\0>. Refusing to send rather than
+// truncating matters: TocElement.java needs exactly two NUL-separated fields,
+// so a clipped name would silently drop the element and desync the TOC.
+void tocSendElement(uint8_t port, const TocEntry *toc, uint8_t n, uint8_t id) {
+  if (id >= n) return;
+  const TocEntry &e = toc[id];
+  size_t need = 4 + strlen(e.group) + 1 + strlen(e.name) + 1;
+  if (need > CRTP_MAX_SIZE) return;
+
+  uint8_t buf[CRTP_MAX_SIZE];
+  buf[0] = (uint8_t)((port << 4) | LOG_CHAN_TOC);
+  buf[1] = TOC_CMD_GET_ELEMENT;
+  buf[2] = id;
+  buf[3] = e.ctype | e.access;
+  size_t pos = 4;
+  for (const char *s = e.group; *s; s++) buf[pos++] = (uint8_t)*s;
+  buf[pos++] = 0;
+  for (const char *s = e.name; *s; s++) buf[pos++] = (uint8_t)*s;
+  buf[pos++] = 0;
+  crtpSend(buf, pos);
+}
+
+// Store a value written from the phone. Floats must be finite, and every
+// numeric value is clamped into the entry's [lo, hi]. Without this a NaN gain,
+// or a takeoff_ms of 0 (a divide-by-zero in the ramp), reached the motors.
+static float paramClampF(const TocEntry &e, float v) {
+  if (v < e.lo) return e.lo;
+  if (v > e.hi) return e.hi;
+  return v;
+}
+
+void paramStore(const TocEntry &e, const uint8_t *src) {
+  if (e.ctype == PT_FLOAT) {
+    float v;
+    memcpy(&v, src, 4);
+    if (!isfinite(v)) return;          // refused -- the echo shows the old value
+    v = paramClampF(e, v);
+    memcpy(e.value, &v, 4);
+  } else if (e.ctype == PT_UINT16) {
+    uint16_t v;
+    memcpy(&v, src, 2);
+    v = (uint16_t)paramClampF(e, (float)v);
+    memcpy(e.value, &v, 2);
+  } else if (src != e.value) {
+    memcpy(e.value, src, e.size);      // no RW entries of other types today
+  }
+}
+
+// After loading from NVS: a non-finite stored gain restores all defaults, then
+// every RW entry is clamped into its range.
+void paramSanitizeAll() {
+  bool bad = false;
+  for (uint8_t i = 0; i < PARAM_TOC_COUNT; i++) {
+    const TocEntry &e = PARAM_TOC[i];
+    if (e.access != TOC_ACCESS_RW || e.ctype != PT_FLOAT) continue;
+    float v;
+    memcpy(&v, e.value, 4);
+    if (!isfinite(v)) bad = true;
+  }
+  if (bad) {
+    flightConfigDefaults();
+    Serial.println(F("[CFG] stored gains were not finite -- defaults restored"));
+  }
+  for (uint8_t i = 0; i < PARAM_TOC_COUNT; i++) {
+    const TocEntry &e = PARAM_TOC[i];
+    if (e.access == TOC_ACCESS_RW) paramStore(e, (const uint8_t *)e.value);
+  }
+}
+
+// ---- CRTP port 2: parameters ---------------------------------------------
+void crtpHandleParams(const uint8_t *p, size_t len) {
+  if (len < 2) return;
+  uint8_t ch = p[0] & 0x03;
+
+  if (ch == PARAM_CHAN_TOC) {
+    if (p[1] == TOC_CMD_GET_INFO) {
+      tocSendInfo(CRTP_PORT_PARAMS, PARAM_TOC, PARAM_TOC_COUNT);
+    } else if (p[1] == TOC_CMD_GET_ELEMENT && len >= 3) {
+      tocSendElement(CRTP_PORT_PARAMS, PARAM_TOC, PARAM_TOC_COUNT, p[2]);
+    }
+    return;
+  }
+
+  // Value access — <id><value LE> in both directions.
+  uint8_t id = p[1];
+  if (id >= PARAM_TOC_COUNT) return;
+  const TocEntry &e = PARAM_TOC[id];
+
+  if (ch == PARAM_CHAN_READ) {
+    uint8_t buf[CRTP_MAX_SIZE];
+    buf[0] = (uint8_t)((CRTP_PORT_PARAMS << 4) | PARAM_CHAN_READ);
+    buf[1] = id;
+    memcpy(buf + 2, e.value, e.size);
+    crtpSend(buf, 2 + e.size);
+  } else if (ch == PARAM_CHAN_WRITE) {
+    if (len < (size_t)(2 + e.size)) return;
+    // Read-only entries are not stored, but silence is the wrong answer: the
+    // client's resend queue retries an unmatched write every 500 ms and never
+    // gives up. Ack with whatever is actually in the variable so the matcher
+    // clears; the app's read-back then shows the true value.
+    if (e.access == TOC_ACCESS_RW) paramStore(e, p + 2);
+    uint8_t buf[CRTP_MAX_SIZE];
+    buf[0] = (uint8_t)((CRTP_PORT_PARAMS << 4) | PARAM_CHAN_WRITE);
+    buf[1] = id;
+    memcpy(buf + 2, e.value, e.size);           // echo what is actually stored
+    crtpSend(buf, 2 + e.size);
+  }
+}
+
+// ---- CRTP port 5: logging ------------------------------------------------
+LogBlock *logFind(uint8_t id) {
+  for (uint8_t i = 0; i < LOG_MAX_BLOCKS; i++)
+    if (log_blocks[i].used && log_blocks[i].id == id) return &log_blocks[i];
+  return NULL;
+}
+
+LogBlock *logAlloc() {
+  for (uint8_t i = 0; i < LOG_MAX_BLOCKS; i++)
+    if (!log_blocks[i].used) return &log_blocks[i];
+  return NULL;
+}
+
+// Every control reply is <cmd><id><err>. Logg.java reads all three bytes
+// unconditionally, so a shorter reply would throw there.
+void logReply(uint8_t cmd, uint8_t id, uint8_t err) {
+  uint8_t buf[CRTP_MAX_SIZE];
+  buf[0] = (uint8_t)((CRTP_PORT_LOGGING << 4) | LOG_CHAN_SETTINGS);
+  buf[1] = cmd;
+  buf[2] = id;
+  buf[3] = err;
+  crtpSend(buf, 4);
+}
+
+// <id><ts24 LE><value...> on the log-data channel. Values are read straight out
+// of the live variables so one packet is internally consistent.
+void logSendData(const LogBlock &b) {
+  uint8_t buf[CRTP_MAX_SIZE];
+  buf[0] = (uint8_t)((CRTP_PORT_LOGGING << 4) | LOG_CHAN_LOGDATA);
+  buf[1] = b.id;
+
+  uint32_t ts = (millis() - b.start_ms) & 0xFFFFFFu;
+  buf[2] = (uint8_t)( ts        & 0xFF);
+  buf[3] = (uint8_t)((ts >> 8)  & 0xFF);
+  buf[4] = (uint8_t)((ts >> 16) & 0xFF);
+
+  size_t pos = LOG_DATA_OVERHEAD;
+  for (uint8_t i = 0; i < b.nvars; i++) {
+    const TocEntry &e = LOG_TOC[b.var_id[i]];
+    memcpy(buf + pos, e.value, e.size);
+    pos += e.size;
+  }
+  crtpSend(buf, pos);
+}
+
+// Push each log block whose period has elapsed. period is in 10 ms units.
+void logUpdate() {
+  if (!link_ready) return;      // linkSend() handles "no phone yet" for each transport
+  uint32_t now = millis();
+  for (uint8_t i = 0; i < LOG_MAX_BLOCKS; i++) {
+    LogBlock &b = log_blocks[i];
+    if (!b.used || !b.started) continue;
+    if (now - b.last_ms < (uint32_t)b.period * 10u) continue;
+    b.last_ms = now;
+    logSendData(b);
+  }
+}
+
+void crtpHandleLogging(const uint8_t *p, size_t len) {
+  if (len < 2) return;
+  uint8_t ch = p[0] & 0x03;
+
+  if (ch == LOG_CHAN_TOC) {
+    if (p[1] == TOC_CMD_GET_INFO) {
+      tocSendInfo(CRTP_PORT_LOGGING, LOG_TOC, LOG_TOC_COUNT);
+    } else if (p[1] == TOC_CMD_GET_ELEMENT && len >= 3) {
+      tocSendElement(CRTP_PORT_LOGGING, LOG_TOC, LOG_TOC_COUNT, p[2]);
+    }
+    return;
+  }
+  if (ch != LOG_CHAN_SETTINGS) return;   // channel 2 is our own output
+
+  const uint8_t cmd = p[1];
+  const uint8_t id  = (len >= 3) ? p[2] : 0;
+
+  switch (cmd) {
+
+    case LOG_CMD_RESET:
+      for (uint8_t i = 0; i < LOG_MAX_BLOCKS; i++) {
+        log_blocks[i].used = false;
+        log_blocks[i].started = false;
+        log_blocks[i].nvars = 0;
+      }
+      logReply(cmd, 0, LOG_ERR_OK);
+      break;
+
+    case LOG_CMD_CREATE:
+    case LOG_CMD_APPEND: {
+      // Payload after <cmd><id> is a flat list of <type><tocId> pairs. The type
+      // byte is informational — the TOC id already fixes type and width — so
+      // only the ids are kept.
+      //
+      // The whole block is validated before anything is committed: Logg.java
+      // unpacks a log packet against its own variable list, so accepting a
+      // subset would desynchronise the payload and read garbage.
+      uint8_t  ids[LOG_MAX_VARS];
+      uint8_t  n     = 0;
+      uint16_t total = 0;
+      bool     ok    = true;
+
+      LogBlock *b = logFind(id);
+      if (cmd == LOG_CMD_APPEND) {
+        if (!b) { logReply(cmd, id, LOG_ERR_NO_ID); break; }
+        for (uint8_t i = 0; i < b->nvars; i++) {
+          ids[i] = b->var_id[i];
+          total += LOG_TOC[b->var_id[i]].size;
+        }
+        n = b->nvars;
+      }
+
+      for (size_t i = 3; i + 1 < len; i += 2) {
+        // Logg.create() builds this request in a fixed 31-byte ByteBuffer and
+        // sends the entire backing array (CrtpPacket does not trim), so the
+        // real <type><tocId> pairs are followed by zero padding. Log type codes
+        // start at 1 (see Toc.java), so a zero type byte cannot be a real
+        // element and ends the list. Without this the padding would parse as
+        // repeated element 0 and overflow the block.
+        if (p[i] == 0) break;
+        uint8_t tid = p[i + 1];
+        if (tid >= LOG_TOC_COUNT || n >= LOG_MAX_VARS ||
+            total + LOG_TOC[tid].size > LOG_MAX_PAYLOAD) {
+          ok = false;
+          break;
+        }
+        total += LOG_TOC[tid].size;
+        ids[n++] = tid;
+      }
+      if (n == 0) ok = false;
+
+      if (!ok) { logReply(cmd, id, LOG_ERR_TOO_LARGE); break; }
+
+      if (cmd == LOG_CMD_CREATE && b) {
+        // A retransmitted CREATE has to re-ack OK. The client resends every
+        // 500 ms until something matches its expectation, and LOG_ERR_EXISTS
+        // would surface to the user as a failure for what is really just a
+        // lost ack. Only a genuinely different variable list is a conflict.
+        if (b->nvars == n && memcmp(b->var_id, ids, n) == 0) {
+          logReply(cmd, id, LOG_ERR_OK);
+        } else {
+          logReply(cmd, id, LOG_ERR_EXISTS);
+        }
+        break;
+      }
+
+      if (!b) {
+        b = logAlloc();
+        if (!b) { logReply(cmd, id, LOG_ERR_NO_MEMORY); break; }
+        memset(b, 0, sizeof(*b));
+      }
+      for (uint8_t i = 0; i < n; i++) b->var_id[i] = ids[i];
+      b->nvars = n;
+      b->used  = true;
+      b->id    = id;
+      logReply(cmd, id, LOG_ERR_OK);
+      break;
+    }
+
+    case LOG_CMD_DELETE:
+      // Deleting an absent block still acks: a lost ack would otherwise make
+      // the client's retransmission look like a failed delete.
+      if (LogBlock *b = logFind(id)) {
+        b->used = false;
+        b->started = false;
+        b->nvars = 0;
+      }
+      logReply(cmd, id, LOG_ERR_OK);
+      break;
+
+    case LOG_CMD_START: {
+      LogBlock *b = logFind(id);
+      if (!b) { logReply(cmd, id, LOG_ERR_NO_ID); break; }
+      if (len >= 4 && p[3] > 0) b->period = p[3];
+      if (!b->started) {
+        b->started = true;
+        b->start_ms = millis();
+        b->last_ms  = millis();
+      }
+      logReply(cmd, id, LOG_ERR_OK);
+      break;
+    }
+
+    case LOG_CMD_STOP:
+      if (LogBlock *b = logFind(id)) b->started = false;
+      logReply(cmd, id, LOG_ERR_OK);
+      break;
+
+    default:
+      logReply(cmd, id, LOG_ERR_NO_CMD);
+      break;
+  }
+}
+
+// Dispatch one full CRTP packet (checksum already verified).
+void crtpDispatch(const uint8_t *p, size_t len) {
+  uint8_t port = (p[0] >> 4) & 0x0F;
+  switch (port) {
+    case CRTP_PORT_COMMANDER:
+      crtpHandleCommander(p, len);
+      break;
+    case CRTP_PORT_PARAMS:
+      crtpHandleParams(p, len);
+      break;
+    case CRTP_PORT_LOGGING:
+      crtpHandleLogging(p, len);
+      break;
+    case CRTP_PORT_GENERIC:
+      switch (p[0] & 0x03) {
+        case 0: crtpHandleFlightControl(p, len); break;   // flight control
+        case 1: crtpHandleNav(p, len);          break;   // navigation
+        default: break;
+      }
+      break;
+    default:
+      break;                             // unknown ports are ignored
+  }
+}
+
+// (wifiUdpInit() / crtpPoll() moved into the TRANSPORT section above.)
+
+// =============================================================================
+//  Motor PWM  (LEDC, brushed MOSFET drive — duty cycle, not servo pulse)
+//  20 kHz keeps switching above audible range for 8520 coreless motors.
+// =============================================================================
+#define MOTOR_PWM_FREQ_HZ  20000
+#define MOTOR_PWM_BITS     10          // 0..1023 duty
+#define MOTOR_PWM_MAX      ((1 << MOTOR_PWM_BITS) - 1)
+
+void motorInit() {
+  // ESP32 Arduino core 2.x: ledcSetup / ledcAttachPin  —  3.x: ledcAttach
+  const uint8_t pins[4] = { PIN_MOTOR_RF, PIN_MOTOR_RR, PIN_MOTOR_LR, PIN_MOTOR_LF };
+  for (uint8_t i = 0; i < 4; i++) {
+    pinMode(pins[i], OUTPUT);
+    digitalWrite(pins[i], LOW);
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+    ledcAttach(pins[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcWrite(pins[i], 0);
+#else
+    ledcSetup(i, MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);
+    ledcAttachPin(pins[i], i);
+    ledcWrite(i, 0);
+#endif
+  }
+}
+
+// Convert the internal 1000..2000 µs convention to a 0..1023 duty
+inline uint16_t usToDuty(int16_t us) {
+  if (us <= 1000) return 0;
+  if (us >= 2000) return MOTOR_PWM_MAX;
+  return (uint16_t)(((uint32_t)(us - 1000) * MOTOR_PWM_MAX) / 1000);
+}
+
+void motorWrite(int16_t rf, int16_t rr, int16_t lr, int16_t lf) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  ledcWrite(PIN_MOTOR_RF, usToDuty(rf));
+  ledcWrite(PIN_MOTOR_RR, usToDuty(rr));
+  ledcWrite(PIN_MOTOR_LR, usToDuty(lr));
+  ledcWrite(PIN_MOTOR_LF, usToDuty(lf));
+#else
+  ledcWrite(0, usToDuty(rf));
+  ledcWrite(1, usToDuty(rr));
+  ledcWrite(2, usToDuty(lr));
+  ledcWrite(3, usToDuty(lf));
+#endif
+}
+
+void motorStop() {
+  motorWrite(1000, 1000, 1000, 1000);
+}
+
+// =============================================================================
+//  Battery monitor
+// =============================================================================
+void batteryUpdate() {
+  // analogReadMilliVolts() uses the factory Vref calibration
+  uint32_t mv = analogReadMilliVolts(PIN_VBAT);
+  float sample = (mv / 1000.0f) * VBAT_DIVIDER;
+  // Smooth it: one ADC read is noisy and sags with every throttle punch.
+  if (vbat <= 0.0f) vbat = sample;
+  else              vbat += VBAT_FILTER_ALPHA * (sample - vbat);
+  vbat_warn = (vbat < VBAT_CELLS * VBAT_CELL_WARN);
+
+  uint32_t now = millis();
+  if (vbat < VBAT_CELLS * VBAT_CELL_CRIT) {
+    if (vbat_low_since_ms == 0) vbat_low_since_ms = now;
+    vbat_crit = (now - vbat_low_since_ms) >= VBAT_CRIT_HOLD_MS;
+  } else {
+    vbat_low_since_ms = 0;
+    vbat_crit = false;
+  }
+}
+
+// Pre-arm checks shared by every arming path (SBUS, CRTP thrust-up, ARM,
+// TAKEOFF). The message is rate-limited so a held stick or a streaming thrust
+// value cannot flood the console.
+bool armChecksOk(const char *who) {
+#if VBAT_ARM_CHECK
+  if (vbat < VBAT_CELLS * VBAT_CELL_CRIT) {
+    static uint32_t last_msg_ms = 0;
+    uint32_t now = millis();
+    if (now - last_msg_ms > 1000) {
+      last_msg_ms = now;
+      Serial.printf("[ARM] %s refused: battery %.2f V is below %.2f V\n",
+                    who, vbat, VBAT_CELLS * VBAT_CELL_CRIT);
+      crtpConsole("arm refused: low battery");
+    }
+    return false;
+  }
+#endif
+  (void)who;
+  return true;
+}
+
+// =============================================================================
+//  PID  (rate loop; stick gives rate setpoint, accelerometer levels the frame)
+// =============================================================================
+void pidCompute() {
+  float err;
+
+  // ---- ROLL ----
+  err = gyro_roll - roll_setpoint;
+  pid_i_mem_roll += pid_i_gain_roll * err;
+  pid_i_mem_roll = constrain(pid_i_mem_roll, -I_TERM_LIMIT, I_TERM_LIMIT);
+  pid_p_roll = pid_p_gain_roll * err;
+  pid_i_roll = pid_i_mem_roll;
+  pid_d_roll = pid_d_gain_roll * (err - pid_last_roll_err);
+  pid_output_roll = pid_p_roll + pid_i_roll + pid_d_roll;
+  pid_last_roll_err = err;
+  pid_output_roll = constrain(pid_output_roll, -PID_LIMIT, PID_LIMIT);
+
+  // ---- PITCH ----
+  err = gyro_pitch - pitch_setpoint;
+  pid_i_mem_pitch += pid_i_gain_pitch * err;
+  pid_i_mem_pitch = constrain(pid_i_mem_pitch, -I_TERM_LIMIT, I_TERM_LIMIT);
+  pid_p_pitch = pid_p_gain_pitch * err;
+  pid_i_pitch = pid_i_mem_pitch;
+  pid_d_pitch = pid_d_gain_pitch * (err - pid_last_pitch_err);
+  pid_output_pitch = pid_p_pitch + pid_i_pitch + pid_d_pitch;
+  pid_last_pitch_err = err;
+  pid_output_pitch = constrain(pid_output_pitch, -PID_LIMIT, PID_LIMIT);
+
+  // ---- YAW ----
+  err = gyro_yaw - yaw_setpoint;
+  pid_i_mem_yaw += pid_i_gain_yaw * err;
+  pid_i_mem_yaw = constrain(pid_i_mem_yaw, -I_TERM_LIMIT, I_TERM_LIMIT);
+  pid_p_yaw = pid_p_gain_yaw * err;
+  pid_i_yaw = pid_i_mem_yaw;
+  pid_d_yaw = pid_d_gain_yaw * (err - pid_last_yaw_err);
+  pid_output_yaw = pid_p_yaw + pid_i_yaw + pid_d_yaw;
+  pid_last_yaw_err = err;
+  pid_output_yaw = constrain(pid_output_yaw, -PID_LIMIT, PID_LIMIT);
+}
+
+void pidReset() {
+  pid_i_mem_roll = pid_i_mem_pitch = pid_i_mem_yaw = 0;
+  pid_last_roll_err = pid_last_pitch_err = pid_last_yaw_err = 0;
+  pid_output_roll = pid_output_pitch = pid_output_yaw = 0;
+}
+
+// =============================================================================
+//  Attitude  (complementary filter, 250 Hz)
+//  gyro_pitch/gyro_roll/gyro_yaw are RATES in deg/s (fed to the PID).
+//  angle_pitch_deg/angle_roll_deg are filtered ANGLES in deg (used to self-level).
+// =============================================================================
+
+void attitudeUpdate() {
+  // raw minus bias, with configurable axis signs
+  const float gx = (raw_gx - gyro_x_cal) * GYRO_X_SIGN / 65.5f;   // deg/s
+  const float gy = (raw_gy - gyro_y_cal) * GYRO_Y_SIGN / 65.5f;
+  const float gz = (raw_gz - gyro_z_cal) * GYRO_Z_SIGN / 65.5f;
+
+  gyro_pitch = gx;    // rate to PID
+  gyro_roll  = gy;
+  gyro_yaw   = gz;
+
+  // ---- accelerometer tilt angles ----
+  const float ax = raw_ax * (float)ACC_X_SIGN;
+  const float ay = raw_ay * (float)ACC_Y_SIGN;
+  const float az = raw_az;
+  float acc_total = sqrtf(ax * ax + ay * ay + az * az);
+  if (acc_total < 1.0f) acc_total = 1.0f;
+
+  // only trust asin argument while |axis| < |vector|
+  if (fabsf(ay) < acc_total) angle_pitch_acc = asinf(ay / acc_total) * RAD_TO_DEG;
+  if (fabsf(ax) < acc_total) angle_roll_acc  = asinf(-ax / acc_total) * RAD_TO_DEG;
+
+  const float dt = LOOP_TIME_US / 1000000.0f;
+  if (!gyro_angles_set) {
+    angle_pitch_deg = angle_pitch_acc;
+    angle_roll_deg  = angle_roll_acc;
+    gyro_angles_set = true;
+  } else {
+    angle_pitch_deg += gx * dt;
+    angle_roll_deg  += gy * dt;
+    angle_pitch_deg = angle_pitch_deg * 0.996f + angle_pitch_acc * 0.004f;
+    angle_roll_deg  = angle_roll_deg  * 0.996f + angle_roll_acc  * 0.004f;
+  }
+
+  // Heading is integrated from the yaw rate. There is no magnetometer on this
+  // board, so heading hold is only as good as the gyro bias over a flight —
+  // it drifts slowly. That is a real limit, not something to paper over.
+  heading_deg += gz * dt;
+  if      (heading_deg >= 360.0f) heading_deg -= 360.0f;
+  else if (heading_deg < 0.0f)    heading_deg += 360.0f;
+}
+
+// =============================================================================
+//  NAVIGATION  — accelerometer dead reckoning toward a phone-supplied target
+//
+//  This board has no GPS, no magnetometer and no rangefinder, so the drone
+//  cannot measure where it is. What it can do is integrate its own
+//  accelerometer and fly toward an offset the phone computed from the phone's
+//  own GPS. That estimate drifts — metres within a minute — because MEMS
+//  accelerometer bias is integrated twice. The mitigations here are a leaky
+//  velocity integrator, a velocity zero whenever the drone is holding still,
+//  and a position reset at launch and landing. Treat the result as "roughly
+//  toward the pilot", never as a tracked position.
+// =============================================================================
+void navReset() {
+  pos_x = pos_y = 0.0f;
+  vel_x = vel_y = 0.0f;
+  heading_ref_deg = heading_deg;
+  tgt_valid = false;
+}
+
+void navUpdate(float dt, bool holding) {
+  const float G = NAV_GRAVITY;
+
+  // MPU6500 specific force -> m/s^2. It reads +1 g on the vertical axis at
+  // rest, so subtracting the attitude-derived gravity leaves linear accel.
+  const float ax_b = raw_ax / NAV_ACC_LSB_PER_G * G;
+  const float ay_b = raw_ay / NAV_ACC_LSB_PER_G * G;
+
+  const float roll_rad  = angle_roll_deg  * DEG_TO_RAD;
+  const float pitch_rad = angle_pitch_deg * DEG_TO_RAD;
+  const float sg = sinf(roll_rad),  cg = cosf(roll_rad);
+  const float st = sinf(pitch_rad), ct = cosf(pitch_rad);
+
+  // Gravity in the sensor frame. Matches the firmware's own tilt convention
+  // (pitch from +ay, roll from -ax), so the unit vector is consistent.
+  const float gx_g = -G * sg * ct;
+  const float gy_g = +G * st;
+
+  // Linear acceleration along the two horizontal sensor axes.
+  float fwd  = (ay_b - gy_g) * (float)NAV_FWD_SIGN;
+  float left = (ax_b - gx_g) * (float)NAV_LEFT_SIGN;
+
+  // Rotate into the launch frame using the yaw since launch.
+  const float yaw_rel = (heading_deg - heading_ref_deg) * (float)NAV_HEADING_SIGN * DEG_TO_RAD;
+  const float cy = cosf(yaw_rel), sy = sinf(yaw_rel);
+  const float ax_w = fwd * cy - left * sy;
+  const float ay_w = fwd * sy + left * cy;
+
+  vel_x += ax_w * dt;
+  vel_y += ay_w * dt;
+
+  // Leaky integrator: without this, bias integrates into a velocity error that
+  // grows without bound. The leak costs a little of any sustained move, which
+  // is the right trade for a craft that mostly hovers.
+  const float leak = powf(NAV_VEL_LEAK_PER_S, dt);
+  vel_x *= leak;
+  vel_y *= leak;
+
+  // Holding still is the one thing we know for certain, so use it.
+  if (holding) {
+    vel_x = 0.0f;
+    vel_y = 0.0f;
+  }
+
+  pos_x += vel_x * dt;
+  pos_y += vel_y * dt;
+}
+
+// Position controller: turn an offset error into a tilt angle toward it.
+// Fills sp_roll_deg / sp_pitch_deg; yaw is left to the heading hold.
+void navSetpoints() {
+  float ex = tgt_x - pos_x;
+  float ey = tgt_y - pos_y;
+  float dist = sqrtf(ex * ex + ey * ey);
+
+  if (dist < NAV_STOP_BAND_M || !tgt_valid) {
+    // close enough (or no target): hold where we are
+    return;
+  }
+
+  // Command a tilt toward the target, magnitude proportional to distance and
+  // capped. nav_kp is already deg-of-tilt per metre, so mag is in degrees.
+  float mag = constrain(dist * nav_kp, 0.0f, (float)NAV_MAX_TILT_DEG);
+  float ux = ex / dist * mag;             // toward the target, launch frame
+  float uy = ey / dist * mag;
+
+  const float yaw_rel = (heading_deg - heading_ref_deg) * (float)NAV_HEADING_SIGN * DEG_TO_RAD;
+  const float cy = cosf(yaw_rel), sy = sinf(yaw_rel);
+  float body_fwd   =  ux * cy + uy * sy;
+  float body_left  = -ux * sy + uy * cy;
+
+  // +x body = nose, and a nose-up pitch is +pitch; +y body = left, and a
+  // left-wing-down roll is +roll in this firmware's convention.
+  sp_pitch_deg = constrain(body_fwd,  -MAX_TILT_DEG, MAX_TILT_DEG);
+  sp_roll_deg  = constrain(body_left, -MAX_TILT_DEG, MAX_TILT_DEG);
+}
+
+// =============================================================================
+//  FLIGHT MODES  — manual / hold / auto(takeoff -> hold -> land)
+//
+//  This board has ONLY an MPU6500: no barometer, no ToF/rangefinder, no GPS.
+//  So "hold" holds attitude level + heading locked + a held THRUST, and "auto"
+//  is a takeoff / hover / land sequence. Neither one claims an altitude —
+//  hover height is whatever hover_thrust produces and drifts as the battery
+//  sags. The phone UI says so instead of drawing a fake altitude hold.
+//
+//  Modes apply to the CRTP (phone) path only. SBUS stays rate-mode manual
+//  always: the physical RC is the safety net and must never be overridden.
+// =============================================================================
+void flightConfigDefaults() {
+  pid_p_gain_roll  = PID_ROLL_KP;   pid_i_gain_roll  = PID_ROLL_KI;   pid_d_gain_roll  = PID_ROLL_KD;
+  pid_p_gain_pitch = PID_PITCH_KP;  pid_i_gain_pitch = PID_PITCH_KI;  pid_d_gain_pitch = PID_PITCH_KD;
+  pid_p_gain_yaw   = PID_YAW_KP;    pid_i_gain_yaw   = PID_YAW_KI;    pid_d_gain_yaw   = PID_YAW_KD;
+  hover_thrust = HOVER_THRUST_DEFAULT;
+  takeoff_ms   = TAKEOFF_MS_DEFAULT;
+  land_ms      = LAND_MS_DEFAULT;
+}
+
+// The nine gains plus the flight config are what the phone's tuning screen
+// persists. Stored as raw floats so a read-back is byte-identical to what was
+// written — no rounding between the editor and the loop.
+void cfgSave() {
+  float g[9] = {
+    pid_p_gain_roll,  pid_i_gain_roll,  pid_d_gain_roll,
+    pid_p_gain_pitch, pid_i_gain_pitch, pid_d_gain_pitch,
+    pid_p_gain_yaw,   pid_i_gain_yaw,   pid_d_gain_yaw,
+  };
+  uint16_t f[3] = { hover_thrust, takeoff_ms, land_ms };
+  nvs.putBytes("pid",  g, sizeof(g));
+  nvs.putBytes("fcfg", f, sizeof(f));
+  Serial.println(F("[CFG] gains + flight config saved to NVS"));
+}
+
+void cfgLoad() {
+  float g[9];
+  if (nvs.getBytes("pid", g, sizeof(g)) == sizeof(g)) {
+    pid_p_gain_roll  = g[0]; pid_i_gain_roll  = g[1]; pid_d_gain_roll  = g[2];
+    pid_p_gain_pitch = g[3]; pid_i_gain_pitch = g[4]; pid_d_gain_pitch = g[5];
+    pid_p_gain_yaw   = g[6]; pid_i_gain_yaw   = g[7]; pid_d_gain_yaw   = g[8];
+    Serial.println(F("[CFG] gains loaded from NVS"));
+  }
+  uint16_t f[3];
+  if (nvs.getBytes("fcfg", f, sizeof(f)) == sizeof(f)) {
+    hover_thrust = constrain(f[0], HOVER_THRUST_MIN, HOVER_THRUST_MAX);
+    takeoff_ms = f[1];
+    land_ms    = f[2];
+    Serial.println(F("[CFG] flight config loaded from NVS"));
+  }
+  paramSanitizeAll();
+}
+
+void flightSetMode(uint8_t mode) {
+  if (mode > MODE_RTH) return;
+  if (mode != MODE_AUTO) auto_state = AUTO_IDLE;   // FOLLOW/RTH are not a sequence
+  if (mode == MODE_HOLD) hold_heading_deg = heading_deg;   // lock where we are
+  flight_mode = mode;
+}
+
+bool flightTakeoff(uint16_t thrust) {
+  hover_thrust = constrain(thrust, HOVER_THRUST_MIN, HOVER_THRUST_MAX);
+  // A retransmitted TAKEOFF (the client resends every 500 ms until it sees the
+  // ack) must not restart the ramp from zero while climbing or hovering --
+  // that would drop the drone. Treat it as already done.
+  if (armed && flight_mode == MODE_AUTO &&
+      (auto_state == AUTO_TAKEOFF || auto_state == AUTO_HOLD)) return true;
+  // Flying in another mode: a ramp from zero thrust is never what is wanted.
+  bool spinning = motor_rf > 1000 || motor_rr > 1000 || motor_lr > 1000 || motor_lf > 1000;
+  if (armed && spinning) return false;
+  if (!armed && !armChecksOk("TAKEOFF")) return false;
+  hold_heading_deg = heading_deg;
+  navReset();                        // this is the launch point
+  flight_mode = MODE_AUTO;
+  auto_state  = AUTO_TAKEOFF;
+  auto_phase_start_ms = millis();
+  armed = true;
+  pidReset();
+  Serial.printf("[FLIGHT] takeoff -> hover thrust %u\n", hover_thrust);
+  return true;
+}
+
+void flightLand() {
+  if (flight_mode != MODE_AUTO) {
+    flight_mode = MODE_AUTO;
+    hold_heading_deg = heading_deg;
+  }
+  auto_state = AUTO_LAND;
+  auto_phase_start_ms = millis();
+  Serial.println(F("[FLIGHT] landing"));
+}
+
+// Always honoured, whatever the mode: props off, now.
+void flightEmergency() {
+  armed = false;
+  motorStop();
+  pidReset();
+  flight_mode = MODE_MANUAL;
+  auto_state  = AUTO_IDLE;
+  Serial.println(F("[FLIGHT] EMERGENCY — motors cut"));
+}
+
+// Fill sp_* from the active mode. Called once per loop, before pidCompute().
+void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
+  sp_roll_deg = sp_pitch_deg = 0.0f;
+  sp_roll_rate = sp_pitch_rate = sp_yaw_rate = 0.0f;
+  sp_throttle_us = 1000;
+
+  if (use_crtp && flight_mode != MODE_MANUAL) {
+    // ---- HOLD / AUTO: the state machine owns every setpoint ----
+    float thrust = (float)hover_thrust;
+
+    if (flight_mode == MODE_AUTO) {
+      switch (auto_state) {
+        case AUTO_TAKEOFF: {
+          float t = (float)(now - auto_phase_start_ms) / (float)(takeoff_ms ? takeoff_ms : 1);
+          if (t >= 1.0f) {
+            t = 1.0f;
+            auto_state = AUTO_HOLD;
+            auto_phase_start_ms = now;
+            Serial.println(F("[FLIGHT] takeoff complete -> hover"));
+          }
+          thrust = t * (float)hover_thrust;
+          break;
+        }
+        case AUTO_HOLD:
+          thrust = (float)hover_thrust;
+          break;
+        case AUTO_LAND: {
+          float t = (float)(now - auto_phase_start_ms) / (float)(land_ms ? land_ms : 1);
+          if (t >= 1.0f) {
+            auto_state   = AUTO_IDLE;
+            flight_mode  = MODE_MANUAL;
+            armed        = false;
+            motorStop();
+            pidReset();
+            Serial.println(F("[FLIGHT] landed, disarmed"));
+            return;
+          }
+          thrust = (1.0f - t) * (float)hover_thrust;
+          break;
+        }
+        default:
+          thrust = 0.0f;
+          break;
+      }
+    }
+
+    // Heading hold: turn a heading error into a yaw rate setpoint.
+    float herr = hold_heading_deg - heading_deg;
+    if      (herr >  180.0f) herr -= 360.0f;
+    else if (herr < -180.0f) herr += 360.0f;
+    sp_yaw_rate = constrain(herr * HEADING_KP, -MAX_YAW_RATE, MAX_YAW_RATE);
+
+    // Attitude target is level, with no rate feed-forward — that is the
+    // whole point of hold: the pilot is not flying the axes.
+    sp_roll_deg = sp_pitch_deg = 0.0f;
+    sp_roll_rate = sp_pitch_rate = 0.0f;
+
+    // FOLLOW/RTH tilt toward the target instead of holding level. The
+    // controller works in the body frame, so the drone slides toward the
+    // target whichever way it happens to face; the phone can still command
+    // heading separately if it wants the nose pointed at the pilot.
+    if (flight_mode == MODE_FOLLOW || flight_mode == MODE_RTH) {
+      if (flight_mode == MODE_RTH) { tgt_x = 0.0f; tgt_y = 0.0f; tgt_valid = true; }
+      navSetpoints();
+    }
+
+    sp_throttle_us = (int16_t)(1000.0f + (thrust / 65535.0f) * 1000.0f);
+    return;
+  }
+
+  if (use_crtp) {
+    // ---- MANUAL over CRTP: a CommanderPacket commands tilt ANGLES ----
+    sp_roll_deg    = constrain(cmd_roll_deg,  -MAX_TILT_DEG, MAX_TILT_DEG);
+    sp_pitch_deg   = constrain(cmd_pitch_deg, -MAX_TILT_DEG, MAX_TILT_DEG);
+    sp_roll_rate   = 0.0f;
+    sp_pitch_rate  = 0.0f;
+    sp_yaw_rate    = constrain(cmd_yaw_dps,   -MAX_YAW_RATE, MAX_YAW_RATE);
+    sp_throttle_us = (int16_t)(1000.0f + (cmd_thrust / 65535.0f) * 1000.0f);
+    return;
+  }
+
+  if (!sbus_ok) return;
+
+  // ---- SBUS: rate mode. Sticks command body RATES and the frame self-levels,
+  //      so the attitude target stays 0 and the stick feeds the rate term. ----
+  if (rc[CH_ROLL] > 1508)       sp_roll_rate  = (rc[CH_ROLL]  - 1508) / SETPOINT_DIVISOR;
+  else if (rc[CH_ROLL] < 1492)  sp_roll_rate  = (rc[CH_ROLL]  - 1492) / SETPOINT_DIVISOR;
+
+  if (rc[CH_PITCH] > 1508)      sp_pitch_rate = (rc[CH_PITCH] - 1508) / SETPOINT_DIVISOR;
+  else if (rc[CH_PITCH] < 1492) sp_pitch_rate = (rc[CH_PITCH] - 1492) / SETPOINT_DIVISOR;
+
+  if (rc[CH_THROTTLE] > 1050) {
+    if (rc[CH_YAW] > 1508)       sp_yaw_rate = (rc[CH_YAW] - 1508) / SETPOINT_DIVISOR;
+    else if (rc[CH_YAW] < 1492)  sp_yaw_rate = (rc[CH_YAW] - 1492) / SETPOINT_DIVISOR;
+  }
+  sp_throttle_us = rc[CH_THROTTLE];
+}
+
+// =============================================================================
+//  Arm / disarm
+//  CRTP path (phone app): manual mode auto-arms on throttle-up and auto-disarms
+//  when thrust falls back to zero. HOLD/AUTO arm and disarm explicitly, driven
+//  by the flight-control commands (takeoff arms; landing end / emergency cuts).
+//  SBUS path (RC transmitter): throttle low + yaw gesture / CH5 switch.
+// =============================================================================
+void armUpdate(uint32_t now, bool use_crtp) {
+  if (use_crtp) {
+    arm_stick_ms = 0;
+    disarm_stick_ms = 0;
+
+    // HOLD/AUTO arm and disarm from the flight-control commands, not from the
+    // thrust stick — the stick is not the throttle in those modes. Letting the
+    // implicit thrust-up arming run here would fight the auto sequence.
+    if (flight_mode != MODE_MANUAL) return;
+
+    if (!armed) {
+      // Arm on thrust-up, but only after the app has shown thrust at zero: a
+      // phone whose throttle is already up when it connects must not spin the
+      // props straight to that level.
+      if (cmd_thrust <= 500) crtp_thrust_was_low = true;
+      if (cmd_thrust > 1000 && crtp_thrust_was_low && armChecksOk("CRTP thrust-up")) {
+        armed = true;
+        crtp_thrust_was_low = false;
+        pidReset();
+        Serial.println(F("[ARM] Armed (CRTP thrust-up) — props will spin!"));
+      }
+    } else {
+      // disarm the moment the app drops thrust to (near) zero
+      if (cmd_thrust <= 500) {
+        armed = false;
+        motorStop();
+        pidReset();
+        Serial.println(F("[ARM] Disarmed (CRTP thrust-down)."));
+      }
+    }
+    return;
+  }
+
+  bool throttle_low = (rc[CH_THROTTLE] < THROTTLE_ARM_MAX);
+  bool stick_arm    = (rc[CH_YAW] > YAW_ARM_THRESHOLD);
+  bool stick_disarm = (rc[CH_YAW] < YAW_DISARM_THR);
+  bool switch_arm   = (rc[CH_ARM] > 1500);
+
+  if (!armed) {
+    disarm_stick_ms = 0;
+    if (throttle_low && (stick_arm || switch_arm)) {
+      if (arm_stick_ms == 0) arm_stick_ms = now;
+      else if (now - arm_stick_ms >= ARM_HOLD_MS && armChecksOk("SBUS")) {
+        armed = true;
+        pidReset();
+        arm_stick_ms = 0;
+        Serial.println(F("[ARM] Armed — props will spin!"));
+      }
+    } else {
+      arm_stick_ms = 0;
+    }
+  } else {
+    arm_stick_ms = 0;
+    // Disarm: throttle low + yaw-left held, OR arm switch dropped (if one is used)
+    bool switch_disarm = arm_switch_seen && !switch_arm;
+    if ((throttle_low && stick_disarm) || switch_disarm) {
+      if (disarm_stick_ms == 0) disarm_stick_ms = now;
+      else if (now - disarm_stick_ms >= ARM_HOLD_MS) {
+        armed = false;
+        disarm_stick_ms = 0;
+        motorStop();
+        Serial.println(F("[ARM] Disarmed."));
+      }
+    } else {
+      disarm_stick_ms = 0;
+    }
+  }
+
+  if (switch_arm) arm_switch_seen = true;   // remember a switch is in use
+}
+
+// =============================================================================
+//  Motor mixing  (X-quad, matches schematic labels)
+//    RF = throttle - pitch + roll - yaw
+//    RR = throttle + pitch + roll + yaw
+//    LR = throttle + pitch - roll - yaw
+//    LF = throttle - pitch - roll + yaw
+// =============================================================================
+void motorMix(int16_t throttle) {
+  int16_t t = constrain(throttle, RC_MIN, THROTTLE_MAX);
+
+  if (t > THROTTLE_ARM_MAX) {
+    motor_rf = t - (int16_t)pid_output_pitch + (int16_t)pid_output_roll - (int16_t)(pid_output_yaw * YAW_DIRECTION);
+    motor_rr = t + (int16_t)pid_output_pitch + (int16_t)pid_output_roll + (int16_t)(pid_output_yaw * YAW_DIRECTION);
+    motor_lr = t + (int16_t)pid_output_pitch - (int16_t)pid_output_roll - (int16_t)(pid_output_yaw * YAW_DIRECTION);
+    motor_lf = t - (int16_t)pid_output_pitch - (int16_t)pid_output_roll + (int16_t)(pid_output_yaw * YAW_DIRECTION);
+
+    motor_rf = constrain(motor_rf, 1100, 2000);
+    motor_rr = constrain(motor_rr, 1100, 2000);
+    motor_lr = constrain(motor_lr, 1100, 2000);
+    motor_lf = constrain(motor_lf, 1100, 2000);
+  } else {
+    motor_rf = motor_rr = motor_lr = motor_lf = 1000;
+    pidReset();   // avoid I-term windup while disarmed / at idle
+  }
+}
+
+// =============================================================================
+//  Telemetry (1 Hz, human-readable)
+// =============================================================================
+void telemetry(uint32_t now) {
+  if (now - last_telemetry_ms < 1000) return;
+  last_telemetry_ms = now;
+  Serial.printf("%s | VBAT:%.2fV | RC r:%d p:%d t:%d y:%d | ang p:%+.1f r:%+.1f | "
+                "mot RF:%d RR:%d LR:%d LF:%d\n",
+                armed ? "ARMED  " : "disarm ",
+                vbat,
+                rc[CH_ROLL], rc[CH_PITCH], rc[CH_THROTTLE], rc[CH_YAW],
+                angle_pitch_deg, angle_roll_deg,
+                motor_rf, motor_rr, motor_lr, motor_lf);
+}
+
+// =============================================================================
+//  Serial console commands — bench use; the phone uses CRTP instead.
+//    link <n>           switch transport profile (applied after a reboot)
+//    sta <ssid> <pass>  set station-mode credentials (saved to NVS)
+//    save | load | defaults
+//    status
+// =============================================================================
+void serialCommandPoll() {
+  static char  line[96];
+  static size_t len = 0;
+
+  while (Serial.available()) {
+    char c = (char)Serial.read();
+    if (c == '\r') continue;
+    if (c != '\n') {
+      if (len + 1 < sizeof(line)) line[len++] = c;
+      continue;
+    }
+    line[len] = '\0';
+    len = 0;
+    if (line[0] == '\0') continue;
+
+    char *argv[4];
+    int   argc = 0;
+    char *tok = strtok(line, " ");
+    while (tok != NULL && argc < 4) { argv[argc++] = tok; tok = strtok(NULL, " "); }
+    if (argc == 0) continue;
+
+    if (armed && (strcmp(argv[0], "link") == 0 || strcmp(argv[0], "save") == 0 ||
+                  strcmp(argv[0], "sta") == 0)) {
+      Serial.println(F("refused while armed -- disarm first"));
+    } else if (strcmp(argv[0], "link") == 0 && argc >= 2) {
+      long m = atol(argv[1]);
+      if (m >= 0 && m < LINK_MODE_COUNT) {
+        nvs.putUChar("link", (uint8_t)m);
+        pending_link_mode = (uint8_t)m;
+        reboot_at_ms = millis() + 500;
+        Serial.printf("link: profile %ld after reboot\n", m);
+      } else {
+        Serial.println(F("link: profile out of range"));
+      }
+    } else if (strcmp(argv[0], "sta") == 0 && argc >= 2) {
+      strncpy(sta_ssid, argv[1], sizeof(sta_ssid) - 1);
+      sta_ssid[sizeof(sta_ssid) - 1] = '\0';
+      if (argc >= 3) {
+        strncpy(sta_pass, argv[2], sizeof(sta_pass) - 1);
+        sta_pass[sizeof(sta_pass) - 1] = '\0';
+      }
+      nvs.putString("ssid", sta_ssid);
+      nvs.putString("pass", sta_pass);
+      Serial.printf("sta: saved '%s' — now \"link 1\" for station mode\n", sta_ssid);
+    } else if (strcmp(argv[0], "save") == 0) {
+      cfgSave();
+    } else if (strcmp(argv[0], "load") == 0) {
+      cfgLoad();
+    } else if (strcmp(argv[0], "defaults") == 0) {
+      flightConfigDefaults();
+      Serial.println(F("cfg: defaults restored (not saved)"));
+    } else if (strcmp(argv[0], "status") == 0) {
+      Serial.printf("link %u | mode %u | auto %u | armed %u | hover %u | heading %.1f | vbat %.2f\n",
+                    link_mode, flight_mode, auto_state, armed ? 1 : 0,
+                    hover_thrust, heading_deg, vbat);
+    } else {
+      Serial.println(F("commands: link <n> | sta <ssid> <pass> | save | load | defaults | status"));
+    }
+  }
+}
+
+// =============================================================================
+//  SETUP
+// =============================================================================
+void setup() {
+  Serial.begin(115200);
+  delay(200);
+  Serial.println();
+  Serial.println(F("=== XW_Z1_V2.0  ESP32 Drone Flight Controller ==="));
+
+  motorInit();
+  motorStop();
+
+  if (!mpuInit()) {
+    Serial.println(F("[MPU] WHO_AM_I mismatch — check SPI wiring (SCK18/MISO19/MOSI23/CS5)"));
+    while (true) { delay(1000); }
+  }
+  Serial.println(F("[MPU] MPU6500 detected, SPI OK."));
+
+  analogSetAttenuation(ADC_11db);          // full 0-3.3 V range on GPIO36
+  pinMode(PIN_VBAT, INPUT);
+
+  sbusInit();
+  Serial.println(F("[SBUS] UART2 listening on GPIO4 (100000 8E2, inverted)."));
+
+  nvs.begin("drone", false);
+  cfgLoad();
+  nvs.getString("ssid", sta_ssid, sizeof(sta_ssid));
+  nvs.getString("pass", sta_pass, sizeof(sta_pass));
+  linkInit();
+
+  mpuCalibrateGyro();
+  batteryUpdate();
+  Serial.printf("[PWR] VBAT = %.2f V\n", vbat);
+
+  Serial.println(F("[ARM] SBUS : throttle LOW + yaw RIGHT (or CH5 high) 1 s to arm;"));
+  Serial.println(F("            throttle LOW + yaw LEFT 1 s to disarm."));
+  Serial.println(F("[ARM] CRTP : thrust at 0, then up, arms; thrust back to 0 disarms."));
+  Serial.println(F("[MODE] manual | hold | auto(takeoff->hover->land) over CRTP port 7."));
+  Serial.println(F("[NOTE] IMU only — hold keeps a thrust level, not an altitude."));
+  Serial.println(F("=================================================="));
+
+  loop_timer = micros();
+}
+
+// =============================================================================
+//  MAIN LOOP  (250 Hz hard-timed)
+// =============================================================================
+void loop() {
+  uint32_t now = millis();
+
+  // ---- receivers ----
+  sbusPoll();
+  if (link_ready) linkPoll();
+
+  // Ages are compared SIGNED. `now` is read before the receivers are polled, so
+  // a packet handled this very loop can carry a timestamp 1 ms newer than `now`.
+  // Unsigned, that wrapped to ~49 days old and tripped the failsafe for one
+  // loop -- enough to cut the motors mid-flight.
+  bool sbus_ok = sbus_frame_ok && (int32_t)(now - sbus_last_frame_ms) < FAILSAFE_MS;
+  bool cmd_ok  = cmd_valid     && (int32_t)(now - cmd_last_ms)        < FAILSAFE_MS;
+  // Any CRTP packet proves the phone link is alive (PROTOCOL.md "Failsafe").
+  // HOLD/AUTO/FOLLOW/RTH are driven by port-7 commands, not CommanderPackets,
+  // so any traffic keeps them alive. MANUAL still needs a live CommanderPacket
+  // stream, because that stream IS the setpoint -- other traffic alone would
+  // leave the last thrust latched.
+  bool crtp_ok  = (crtp_last_rx_ms != 0) &&
+                  (int32_t)(now - crtp_last_rx_ms) < FAILSAFE_MS;
+  bool phone_ok = (flight_mode == MODE_MANUAL) ? cmd_ok : crtp_ok;
+  if (!cmd_ok) crtp_thrust_was_low = false;   // a reconnect must show zero thrust again
+
+  // The phone wins whenever it is live; otherwise fall back to the SBUS receiver
+  bool rx_ok     = phone_ok || sbus_ok;
+  bool use_crtp  = phone_ok;
+
+  // ---- failsafe ----
+  if (!rx_ok && armed) {
+    armed = false;
+    motorStop();
+    pidReset();
+    flight_mode = MODE_MANUAL;
+    auto_state  = AUTO_IDLE;
+    Serial.println(F("[FAILSAFE] RC signal lost — motors stopped."));
+  }
+
+  // ---- arm state ----
+  if (rx_ok) armUpdate(now, use_crtp);
+
+  // ---- critical battery: land the phone-flown modes, warn an RC/manual pilot ----
+  if (armed && vbat_crit) {
+    if (use_crtp && flight_mode != MODE_MANUAL) {
+      if (!(flight_mode == MODE_AUTO && auto_state == AUTO_LAND)) {
+        Serial.println(F("[PWR] battery critical -- auto-landing"));
+        crtpConsole("battery critical: landing");
+        flightLand();
+      }
+    } else {
+      static uint32_t last_low_msg_ms = 0;
+      if (now - last_low_msg_ms > 2000) {
+        last_low_msg_ms = now;
+        Serial.printf("[PWR] battery critical %.2f V -- land now\n", vbat);
+        crtpConsole("battery critical: land now");
+      }
+    }
+  }
+
+  // ---- attitude ----
+  mpuReadRaw();
+  attitudeUpdate();
+
+  // ---- dead reckoning (feeds follow / return-to-launch) ----
+  // "Holding" is the one state where we know the drone is not translating, so
+  // it is the only anchor the velocity leak has. FOLLOW/RTH with no live target
+  // is just as stationary as HOLD -- navSetpoints() leaves the tilt level -- so
+  // it belongs in the same bucket, otherwise the estimate keeps drifting for no
+  // reason while the drone sits there.
+  bool holding = (flight_mode == MODE_HOLD) ||
+                 (flight_mode == MODE_AUTO && auto_state == AUTO_HOLD) ||
+                 ((flight_mode == MODE_FOLLOW || flight_mode == MODE_RTH) && !tgt_valid);
+  navUpdate(LOOP_TIME_US / 1000000.0f, holding && armed);
+  if (tgt_valid && (int32_t)(now - tgt_last_ms) > NAV_TARGET_TIMEOUT_MS) {
+    tgt_valid = false;          // phone reference went stale — stop chasing
+  }
+
+  // ---- setpoints (manual / hold / auto / follow / return) ----
+  flightSetpoints(now, use_crtp, sbus_ok);
+
+  // ---- self-level: drive angle error to zero, then add the rate term ----
+  float roll_err_deg  = angle_roll_deg  - sp_roll_deg;
+  float pitch_err_deg = angle_pitch_deg - sp_pitch_deg;
+
+  roll_level_adjust  = constrain(roll_err_deg  * LEVEL_SENSITIVITY, -200.0f, 200.0f);
+  pitch_level_adjust = constrain(pitch_err_deg * LEVEL_SENSITIVITY, -200.0f, 200.0f);
+
+  // The level term is SUBTRACTED. Tilted +5 deg past the target, the rate loop
+  // must be asked for a NEGATIVE rate to come back. Adding it (the old code)
+  // asked for more tilt in the same direction, and the drone flipped.
+  // test/level_test.cpp pins this.
+  roll_setpoint  = sp_roll_rate  - roll_level_adjust;
+  pitch_setpoint = sp_pitch_rate - pitch_level_adjust;
+  yaw_setpoint   = sp_yaw_rate;
+
+  // ---- PID + mix ----
+  pidCompute();
+
+  if (armed && rx_ok) {
+    motorMix(sp_throttle_us);
+  } else {
+    motor_rf = motor_rr = motor_lr = motor_lf = 1000;
+    if (!armed) pidReset();
+  }
+  motorWrite(motor_rf, motor_rr, motor_lr, motor_lf);
+
+  // ---- housekeeping ----
+  batteryUpdate();
+  logUpdate();          // stream any CRTP log block the app has started
+  telemetry(now);
+  serialCommandPoll();
+
+  // A link-profile change was requested over CRTP: give the reply time to
+  // leave, then reboot so the radios come up in the new configuration.
+  if (reboot_at_ms != 0 && (int32_t)(now - reboot_at_ms) >= 0) {
+    Serial.printf("[LINK] switching to profile %u, rebooting\n", pending_link_mode);
+    Serial.flush();
+    ESP.restart();
+  }
+
+  // ---- hard 250 Hz pacing ----
+  while (micros() - loop_timer < LOOP_TIME_US) { /* spin */ }
+  loop_timer = micros();
+}

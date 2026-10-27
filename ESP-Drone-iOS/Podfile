@@ -1,0 +1,31 @@
+source 'https://github.com/CocoaPods/Specs.git'
+platform :ios, '15.0'
+use_frameworks!
+
+target 'Crazyflie client' do
+  pod 'CocoaAsyncSocket'
+  pod 'AFNetworking', '~> 4.0'
+end
+
+# Xcode 27 rejects deployment targets below iOS 15. The pods still carry
+# 8.0/9.0 from their podspecs, so force every pod target up to the floor.
+post_install do |installer|
+  installer.pods_project.targets.each do |t|
+    t.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+  end
+
+  # AFNetworking 4.0.1 imports <netinet6/in6.h>, which the iOS 27 SDK marks
+  # private ("Use of private header from outside its module"). The public
+  # <netinet/in.h> it already imports provides sockaddr_in6 / AF_INET6, so the
+  # private import is redundant — strip it. Done here so `pod install` keeps it.
+  afn = Dir.glob(File.join(installer.sandbox.root, 'AFNetworking', 'AFNetworking', '*.m'))
+  afn.each do |path|
+    src = File.read(path)
+    next unless src.include?('<netinet6/in6.h>')
+    File.chmod(0644, path)              # CocoaPods marks pod sources read-only
+    File.write(path, src.gsub(%r{^\s*#import <netinet6/in6\.h>\s*\n}, ''))
+    puts "  Patched #{File.basename(path)}: removed private netinet6/in6.h import"
+  end
+end

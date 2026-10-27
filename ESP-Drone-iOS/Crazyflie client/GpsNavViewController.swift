@@ -1,0 +1,474 @@
+//
+//  GpsNavViewController.swift
+//  Crazyflie client
+//
+//  GPS mission navigation screen (PROTOCOL.md §10). MapKit shows the plan and
+//  the drone's estimated track; the phone runs the mission and the drone chases
+//  one launch-frame offset at a time.
+//
+//  The drone marker is labelled "estimated" — it is accelerometer dead
+//  reckoning (§6), not GPS tracking, and NAV_FWD_SIGN / NAV_LEFT_SIGN are
+//  still unverified hardware constants.
+//
+
+import UIKit
+import MapKit
+import CoreLocation
+
+final class GpsNavViewController: UIViewController {
+
+    private let client: CrtpClient
+    private let telemetry: TelemetryStore
+
+    private let mapView = MKMapView()
+    private let statusLabel = UILabel()
+    private let accuracyLabel = UILabel()
+    private let modeControl = UISegmentedControl(items: ["MISSION", "GUIDED", "RTL"])
+    private let armAlignButton = UIButton(type: .system)
+    private let startButton = UIButton(type: .system)
+    private let pauseButton = UIButton(type: .system)
+    private let stopButton = UIButton(type: .system)
+    private let loadFileButton = UIButton(type: .system)
+    private let clearButton = UIButton(type: .system)
+
+    private let locationManager = CLLocationManager()
+    private let navigator = Navigator()
+    private var tapTarget: Waypoint?
+
+    /// TARGET is sent at ~5 Hz while FOLLOW/RTH/mission is active (§9).
+    private var sendTimer: Timer?
+    private var listener: ((LogSample) -> Void)?
+
+    /// Current phone fix. Used only to define the plan and the launch frame.
+    private var phoneFix: CLLocation?
+    private var alphaDegrees: Double = 0
+    private var aligned = false
+
+    // MARK: - Init
+
+    init(client: CrtpClient, telemetry: TelemetryStore) {
+        self.client = client
+        self.telemetry = telemetry
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    deinit {
+        sendTimer?.invalidate()
+        if let listener = listener {
+            telemetry.listeners.removeAll { $0 as AnyObject === listener as AnyObject }
+        }
+    }
+
+    // MARK: - View
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemBackground
+        title = "GPS Nav"
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            barButtonSystemItem: .done, target: self, action: #selector(close))
+
+        mapView.translatesAutoresizingMaskIntoConstraints = false
+        mapView.delegate = self
+        mapView.showsUserLocation = true
+        view.addSubview(mapView)
+
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            mapView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            mapView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            mapView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            mapView.bottomAnchor.constraint(equalTo: stack.topAnchor, constant: -8),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+        ])
+
+        statusLabel.numberOfLines = 0
+        statusLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        accuracyLabel.font = .systemFont(ofSize: 12)
+        accuracyLabel.textColor = .secondaryLabel
+        accuracyLabel.numberOfLines = 0
+
+        modeControl.selectedSegmentIndex = 0
+
+        armAlignButton.setTitle("Arm + ALIGN", for: .normal)
+        armAlignButton.addTarget(self, action: #selector(armAndAlign), for: .touchUpInside)
+
+        startButton.setTitle("Start mission", for: .normal)
+        startButton.addTarget(self, action: #selector(startNav), for: .touchUpInside)
+
+        pauseButton.setTitle("Pause", for: .normal)
+        pauseButton.addTarget(self, action: #selector(togglePause), for: .touchUpInside)
+
+        stopButton.setTitle("Stop", for: .normal)
+        stopButton.setTitleColor(.systemRed, for: .normal)
+        stopButton.addTarget(self, action: #selector(stopNav), for: .touchUpInside)
+
+        loadFileButton.setTitle("Load .waypoints", for: .normal)
+        loadFileButton.addTarget(self, action: #selector(loadFile), for: .touchUpInside)
+
+        clearButton.setTitle("Clear plan", for: .normal)
+        clearButton.addTarget(self, action: #selector(clearPlan), for: .touchUpInside)
+
+        let row1 = UIStackView(arrangedSubviews: [armAlignButton, startButton, pauseButton, stopButton])
+        row1.axis = .horizontal
+        row1.distribution = .fillEqually
+        let row2 = UIStackView(arrangedSubviews: [loadFileButton, clearButton])
+        row2.axis = .horizontal
+        row2.distribution = .fillEqually
+
+        stack.addArrangedSubview(accuracyLabel)
+        stack.addArrangedSubview(modeControl)
+        stack.addArrangedSubview(row1)
+        stack.addArrangedSubview(row2)
+        stack.addArrangedSubview(statusLabel)
+
+        // Tap the map to drop a GUIDED target.
+        let tap = UITapGestureRecognizer(target: self, action: #selector(mapTapped(_:)))
+        mapView.addGestureRecognizer(tap)
+
+        // Long-press to add a mission waypoint.
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(mapLongPressed(_:)))
+        mapView.addGestureRecognizer(longPress)
+
+        // Location
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.requestWhenInUseAuthorization()
+        locationManager.startUpdatingLocation()
+        locationManager.startUpdatingHeading()
+
+        // Telemetry listener for nav.pos_* and flight state.
+        let listener: (LogSample) -> Void = { [weak self] _ in
+            self?.tickFromTelemetry()
+        }
+        self.listener = listener
+        telemetry.listeners.append(listener)
+
+        // TARGET sender at 5 Hz.
+        sendTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            self?.sendTargetIfNeeded()
+        }
+
+        statusLabel.text = "Drop waypoints (long-press) or tap for a GUIDED target.\n" +
+            "The drone marker is ESTIMATED dead reckoning, not GPS."
+        refreshOverlays()
+    }
+
+    // MARK: - Actions
+
+    @objc private func close() {
+        sendTimer?.invalidate()
+        sendTimer = nil
+        locationManager.stopUpdatingLocation()
+        locationManager.stopUpdatingHeading()
+        dismiss(animated: true)
+    }
+
+    @objc private func armAndAlign() {
+        guard let fix = phoneFix else {
+            flash("No phone GPS fix yet — cannot ALIGN.")
+            return
+        }
+        // Compass bearing of the nose at launch. `locationManager.heading` is
+        // magnetic; the drone's SET_HEADING is also a compass bearing (§6).
+        let heading = locationManager.heading?.magneticHeading ?? 0
+        alphaDegrees = heading
+        navigator.align(launchLatitude: fix.coordinate.latitude,
+                        launchLongitude: fix.coordinate.longitude,
+                        alphaDegrees: heading)
+        aligned = true
+        navigator.markHome(fix.coordinate.latitude, fix.coordinate.longitude)
+
+        client.arm()
+        client.sendNavAlign(alphaDegrees: Float(heading))
+        flash(String(format: "ALIGN α=%.1f°  launch %.5f,%.5f", heading,
+                    fix.coordinate.latitude, fix.coordinate.longitude))
+        refreshOverlays()
+    }
+
+    @objc private func startNav() {
+        guard aligned else {
+            flash("Arm + ALIGN first.")
+            return
+        }
+        switch modeControl.selectedSegmentIndex {
+        case 0:
+            if !navigator.startMission() {
+                flash("No waypoints to fly.")
+            } else {
+                // MISSION → drone FOLLOW (0x03).
+                client.setFlightMode(.follow)
+                flash("Mission started — FOLLOW.")
+            }
+        case 1:
+            if let t = tapTarget {
+                navigator.startGuided(latitude: t.latitude, longitude: t.longitude)
+                client.setFlightMode(.follow)
+                flash("GUIDED → FOLLOW.")
+            } else {
+                flash("Tap the map for a GUIDED target first.")
+            }
+        case 2:
+            if navigator.startRTL() {
+                // RTL → drone RTH (0x04).
+                client.setFlightMode(.rth)
+                flash("RTL → RTH.")
+            } else {
+                flash("No home recorded — Arm + ALIGN first.")
+            }
+        default:
+            break
+        }
+        refreshOverlays()
+    }
+
+    @objc private func togglePause() {
+        if navigator.isPaused {
+            navigator.resume()
+            pauseButton.setTitle("Pause", for: .normal)
+            flash("Resumed.")
+        } else {
+            navigator.pause()
+            pauseButton.setTitle("Resume", for: .normal)
+            flash("Paused — drone holds after 3 s.")
+        }
+    }
+
+    @objc private func stopNav() {
+        navigator.stop()
+        client.setFlightMode(.manual)
+        flash("Stopped.")
+        refreshOverlays()
+    }
+
+    @objc private func loadFile() {
+        let picker = UIDocumentPickerViewController(documentTypes: ["public.plain-text"], in: .import)
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+
+    @objc private func clearPlan() {
+        navigator.mission.clearWaypoints()
+        tapTarget = nil
+        refreshOverlays()
+    }
+
+    @objc private func mapTapped(_ gesture: UITapGestureRecognizer) {
+        let point = gesture.location(in: mapView)
+        let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
+        tapTarget = Waypoint(latitude: coordinate.latitude, longitude: coordinate.longitude, name: "Guided")
+        // Drop a pin so the user sees what they tapped.
+        mapView.removeAnnotations(mapView.annotations.filter { $0.title ?? "" == "Guided" })
+        let ann = MKPointAnnotation()
+        ann.title = "Guided"
+        ann.coordinate = coordinate
+        mapView.addAnnotation(ann)
+        flash("GUIDED target set. Tap Start to fly there.")
+    }
+
+    @objc private func mapLongPressed(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        let point = gesture.location(in: mapView)
+        let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
+        let wp = Waypoint(latitude: coordinate.latitude, longitude: coordinate.longitude,
+                          name: "WP\(navigator.mission.count + 1)")
+        navigator.mission.addWaypoint(wp)
+        flash(String(format: "Added %@" , wp.name))
+        refreshOverlays()
+    }
+
+    private func flash(_ text: String) {
+        statusLabel.text = text
+    }
+
+    // MARK: - Nav loop
+
+    private func tickFromTelemetry() {
+        // Drone position from the nav log block (ids 15/16), launch frame.
+        let droneX = telemetry.value("nav.pos_x") ?? 0
+        let droneY = telemetry.value("nav.pos_y") ?? 0
+        guard let fix = phoneFix else { return }
+
+        let status = navigator.step(
+            droneX: droneX, droneY: droneY,
+            phoneLatitude: fix.coordinate.latitude,
+            phoneLongitude: fix.coordinate.longitude,
+            accuracyMeters: fix.horizontalAccuracy
+        )
+        statusLabel.text = status.message.isEmpty
+            ? String(format: "dist %.1f m  bearing %.0f°",
+                     status.distanceMeters ?? 0, status.bearingDegrees ?? 0)
+            : status.message
+        refreshOverlays()
+    }
+
+    private func sendTargetIfNeeded() {
+        guard navigator.isNavigating, !navigator.isPaused else { return }
+        guard let target = navigator.currentTarget() else { return }
+        // TARGET is a north/east offset from launch (§6) — the firmware does
+        // the launch-frame rotation. ~5 Hz is the keepalive; the drone holds
+        // after 3 s of silence.
+        guard let fix = phoneFix else { return }
+        let ne = GeoMath.northEastOffset(
+            fromLat: navigator.launchLatitude, fromLon: navigator.launchLongitude,
+            toLat: target.latitude, toLon: target.longitude
+        )
+        client.sendNavTarget(north: Float(ne.north), east: Float(ne.east))
+    }
+
+    // MARK: - Overlays
+
+    private func refreshOverlays() {
+        mapView.removeOverlays(mapView.overlays)
+
+        // Mission legs.
+        let mission = navigator.mission
+        var coords: [CLLocationCoordinate2D] = []
+        if let lat = mission.homeLatitude, let lon = mission.homeLongitude {
+            coords.append(CLLocationCoordinate2D(latitude: lat, longitude: lon))
+        }
+        for wp in mission.waypoints {
+            coords.append(CLLocationCoordinate2D(latitude: wp.latitude, longitude: wp.longitude))
+        }
+        if coords.count > 1 {
+            let polyline = MKPolyline(coordinates: &coords, count: coords.count)
+            mapView.addOverlay(polyline)
+        }
+
+        // Waypoint annotations.
+        let existing = mapView.annotations.filter { !($0 is MKUserLocation) }
+        mapView.removeAnnotations(existing)
+        if let lat = mission.homeLatitude, let lon = mission.homeLongitude {
+            let ann = MKPointAnnotation()
+            ann.title = "Home"
+            ann.coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+            mapView.addAnnotation(ann)
+        }
+        for (i, wp) in mission.waypoints.enumerated() {
+            let ann = MKPointAnnotation()
+            ann.title = wp.name.isEmpty ? "WP\(i + 1)" : wp.name
+            ann.coordinate = CLLocationCoordinate2D(latitude: wp.latitude, longitude: wp.longitude)
+            mapView.addAnnotation(ann)
+        }
+
+        // Drone estimated marker. We only have the launch-frame position, so
+        // convert it back to lat/lon via the ALIGN frame. Label is "estimated".
+        if aligned, let fix = phoneFix {
+            let x = telemetry.value("nav.pos_x") ?? 0
+            let y = telemetry.value("nav.pos_y") ?? 0
+            let ne = LaunchFrame.toNorthEast(x: x, y: y, alphaDegrees: alphaDegrees)
+            let dest = GeoMath.destinationPoint(
+                fix.coordinate.latitude, fix.coordinate.longitude,
+                0, ne.north
+            )
+            // east offset from the north-shifted point
+            let final = GeoMath.destinationPoint(
+                dest.latitude, dest.longitude,
+                90, ne.east
+            )
+            let droneAnn = MKPointAnnotation()
+            droneAnn.title = "Drone (estimated)"
+            droneAnn.coordinate = CLLocationCoordinate2D(latitude: final.latitude, longitude: final.longitude)
+            mapView.addAnnotation(droneAnn)
+
+            accuracyLabel.text = String(
+                format: "Drone marker is ESTIMATED dead reckoning (not GPS). NAV_FWD_SIGN/NAV_LEFT_SIGN unverified — expect to flip one after first flight."
+            )
+        }
+    }
+}
+
+// MARK: - MKMapViewDelegate
+
+extension GpsNavViewController: MKMapViewDelegate {
+    func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+        if let polyline = overlay as? MKPolyline {
+            let r = MKPolylineRenderer(polyline: polyline)
+            r.strokeColor = UIColor.systemBlue
+            r.lineWidth = 3
+            return r
+        }
+        return MKOverlayRenderer(overlay: overlay)
+    }
+
+    func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+        if annotation is MKUserLocation { return nil }
+        let id = "pin"
+        let view = mapView.dequeueReusableAnnotationView(withIdentifier: id) as? MKMarkerAnnotationView
+            ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: id)
+        view.annotation = annotation
+        if annotation.title ?? "" == "Drone (estimated)" {
+            view.markerTintColor = .systemOrange
+            view.displayPriority = .required
+        } else if annotation.title ?? "" == "Guided" {
+            view.markerTintColor = .systemPurple
+        } else {
+            view.markerTintColor = .systemBlue
+        }
+        return view
+    }
+}
+
+// MARK: - CLLocationManagerDelegate
+
+extension GpsNavViewController: CLLocationManagerDelegate {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let fix = locations.last else { return }
+        // Ignore fixes worse than ~15 m — navigating on a bad fix is worse
+        // than waiting (PROTOCOL.md §10).
+        if fix.horizontalAccuracy > Navigator.maxPositionAccuracyMeters {
+            accuracyLabel.text = String(
+                format: "GPS accuracy %.1f m, holding — waiting for a better fix.",
+                fix.horizontalAccuracy
+            )
+            return
+        }
+        phoneFix = fix
+        accuracyLabel.text = String(format: "GPS accuracy %.1f m", fix.horizontalAccuracy)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        // Kept for the ALIGN capture; no continuous use — the drone holds its
+        // own heading after SET_HEADING.
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        accuracyLabel.text = "Location error: \(error.localizedDescription)"
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager.authorizationStatus == .authorizedWhenInUse
+            || manager.authorizationStatus == .authorizedAlways {
+            manager.startUpdatingLocation()
+            manager.startUpdatingHeading()
+        }
+    }
+}
+
+// MARK: - UIDocumentPickerDelegate
+
+extension GpsNavViewController: UIDocumentPickerDelegate {
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        do {
+            let contents = try String(contentsOf: url, encoding: .utf8)
+            let mission = try navigator.loadMissionFile(contents)
+            flash(String(format: "Loaded %d waypoints (%.0f m)",
+                        mission.count, mission.totalDistanceMeters()))
+            refreshOverlays()
+        } catch {
+            flash("Could not load file: \(error)")
+        }
+    }
+}
