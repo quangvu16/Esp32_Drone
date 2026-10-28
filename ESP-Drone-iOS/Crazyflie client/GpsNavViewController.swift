@@ -14,6 +14,7 @@
 import UIKit
 import MapKit
 import CoreLocation
+import UniformTypeIdentifiers
 
 final class GpsNavViewController: UIViewController {
 
@@ -299,7 +300,10 @@ final class GpsNavViewController: UIViewController {
     }
 
     @objc private func loadFile() {
-        let picker = UIDocumentPickerViewController(documentTypes: ["public.plain-text"], in: .import)
+        // `asCopy: true` is the old `.import` mode: take a copy of the file
+        // rather than hold security-scoped access to the original.
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.plainText],
+                                                    asCopy: true)
         picker.delegate = self
         present(picker, animated: true)
     }
@@ -365,7 +369,7 @@ final class GpsNavViewController: UIViewController {
         // TARGET is a north/east offset from launch (§6) — the firmware does
         // the launch-frame rotation. ~5 Hz is the keepalive; the drone holds
         // after 3 s of silence.
-        guard let fix = phoneFix else { return }
+        guard phoneFix != nil else { return }
         let ne = GeoMath.northEastOffset(
             fromLat: navigator.launchLatitude, fromLon: navigator.launchLongitude,
             toLat: target.latitude, toLon: target.longitude

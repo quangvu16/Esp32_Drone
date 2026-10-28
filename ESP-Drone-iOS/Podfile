@@ -13,6 +13,16 @@ post_install do |installer|
   installer.pods_project.targets.each do |t|
     t.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+
+      # Not our code to modernise. AFNetworking still calls the SecTrust and
+      # UTType APIs deprecated in iOS 14/15, and CocoaAsyncSocket's TLS layer
+      # is built on SecureTransport, deprecated since iOS 13. Neither the
+      # certificate-pinning nor the TLS code is reachable from here — we use
+      # CocoaAsyncSocket for UDP and AFNetworking for plain HTTP — so the calls
+      # are dead weight, but their warnings would bury anything real in our own
+      # sources. Suppress them for pod targets only; the app keeps every warning.
+      config.build_settings['WARNING_CFLAGS'] =
+        '$(inherited) -Wno-deprecated-declarations -Wno-strict-prototypes'
     end
   end
 

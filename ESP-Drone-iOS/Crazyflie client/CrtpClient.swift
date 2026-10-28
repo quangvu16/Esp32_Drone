@@ -232,14 +232,12 @@ final class CrtpClient {
 
     private func startFetch(_ fetcher: TocFetcher, port: CrtpPort) {
         guard fetcher.state == .idle else { return }
-        let header = (port.rawValue << 4) | 0     // channel 0
-        let packet = CrtpPacket(port: port, channel: 0, payload: TocFetcher.infoRequest)
+        // Channel 0 — the CRTP header byte is (port << 4) | channel.
         sendReliable(CrtpPacket(port: port, channel: 0, payload: TocFetcher.infoRequest),
                      matches: { p in p.port == port && p.channel == 0 && p.payload.first == 1 },
                      onGiveUp: { [weak self] in
                          self?.onConnectionEvent?("TOC info request timed out on \(port)")
                      })
-        _ = header
     }
 
     private func requestTocElement(_ request: TocFetcher.Request, fetcher: TocFetcher, port: CrtpPort) {

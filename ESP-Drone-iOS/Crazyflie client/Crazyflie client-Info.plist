@@ -26,14 +26,14 @@
 	<string></string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSMotionUsageDescription</key>
-	<string>Tilt the phone to fly the drone. Motion data never leaves the device.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your GPS position defines the flight plan and the launch point for Follow / Return-to-home. It is not used for tracking.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Bluetooth LE connects to the drone when WiFi is not available.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Bluetooth LE connects to the drone when WiFi is not available.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your GPS position defines the flight plan and the launch point for Follow / Return-to-home. It is not used for tracking.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Tilt the phone to fly the drone. Motion data never leaves the device.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
