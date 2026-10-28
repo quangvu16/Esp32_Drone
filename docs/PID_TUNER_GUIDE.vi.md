@@ -5,7 +5,7 @@ Hướng dẫn từng bước để chỉnh hệ số PID của drone từ máy 
 thức chấm điểm, các file log) nằm ở [tools/pid-tune/README.md](../tools/pid-tune/README.md).
 **English:** [PID_TUNER_GUIDE.md](PID_TUNER_GUIDE.md).
 
-![Sơ đồ màn hình của công cụ chỉnh PID](pid-tuner-gui.svg)
+![Sơ đồ màn hình của công cụ chỉnh PID](pid-tuner-gui.vi.svg)
 
 ---
 
