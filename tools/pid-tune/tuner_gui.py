@@ -35,7 +35,9 @@ over the gains (for all but ML only a picture of the trials).
   python3 tuner_gui.py                      # the soft-AP default, 192.168.43.42
   python3 tuner_gui.py --host esp-drone.local --axis pitch --window 20
 
-The drone must be on its stand with the props clear: the tuner spins the motors.
+Spin up (Drone panel) streams level setpoints at the Thrust % so the motors run;
+the drone must be held by a stand, or have its props off. Stop, EMERGENCY or
+closing the window drops thrust to zero, which disarms the board.
 """
 import argparse
 import csv
@@ -56,7 +58,8 @@ from matplotlib.ticker import FuncFormatter, LogFormatter  # noqa: E402
 
 import ml_tune  # noqa: E402
 from drone import (AXES, MOTOR_SAT_HI, MOTOR_SAT_LO, PORT_LOG, PORT_PARAMS,  # noqa: E402
-                   Drone, axis_names, gain_name, open_tune_blocks, stop_log_blocks)
+                   THRUST_MAX_PCT, Drone, ThrustStream, axis_names, gain_name,
+                   open_tune_blocks, stop_log_blocks)
 from ml_tune import from_y, read_history  # noqa: E402
 
 # (subplot title, unit, [(series key, label, colour)])
@@ -202,6 +205,7 @@ class TunerGui:
         self.ml_queue = queue.Queue()
         self.model_win = None
         self.ml_last = None                 # latest "trial" report, for the model window
+        self.stream = None                  # drone.ThrustStream while the motors spin
         root.title(f"Drone Tuner — {axis}")
         root.protocol("WM_DELETE_WINDOW", self.close)
 
@@ -292,6 +296,17 @@ class TunerGui:
         self.pause_btn.grid(row=3, column=0, sticky=tk.W, pady=(4, 0))
         self.rec_btn = ttk.Button(box, text="Record CSV", command=self.toggle_record)
         self.rec_btn.grid(row=3, column=1, columnspan=2, pady=(4, 0), sticky=tk.W)
+        # Stand thrust: the firmware spins the motors only while CommanderPackets
+        # arrive (drone.ThrustStream). Spin up arms it; Stop / EMERGENCY / closing
+        # this window drops thrust to zero, which disarms it.
+        ttk.Label(box, text="Thrust %").grid(row=4, column=0, sticky=tk.W, pady=(6, 0))
+        self.thrust_pct = tk.DoubleVar(value=30.0)
+        tsp = ttk.Spinbox(box, from_=0, to=THRUST_MAX_PCT, increment=1, width=4,
+                          textvariable=self.thrust_pct, command=self.set_thrust)
+        tsp.bind("<Return>", lambda _e: self.set_thrust())
+        tsp.grid(row=4, column=1, sticky=tk.W, pady=(6, 0))
+        self.spin_btn = ttk.Button(box, text="Spin up", command=self.toggle_spin)
+        self.spin_btn.grid(row=4, column=2, sticky=tk.W, pady=(6, 0))
 
     def _build_autotune(self, parent):
         box = ttk.LabelFrame(parent, text="Auto-tune", padding=4)
@@ -421,28 +436,75 @@ class TunerGui:
         v = v * (1 + 0.1 * sign) if v else 0.1 * max(sign, 0)
         self.set_param(k, round(v, 4))
 
+    def command(self, what, fn):
+        """Run a port-7 command and say whether the firmware accepted it.
+        The firmware answers status 1 when it refuses (ARM not from idle,
+        SAVE while armed, low battery), which is not an error to swallow."""
+        ok = self.run(what, fn)
+        if ok is True:
+            self.status.set(f"{what}: OK")
+        elif ok is False:
+            self.status.set(f"{what}: refused by the drone")
+        return ok
+
     def save(self):
         if messagebox.askyesno("Save", "Write the current gains to NVS?"):
-            self.run("save", self.drone.save)
+            self.command("save", self.drone.save)
 
     def load(self):
-        if self.run("load", self.drone.load) is not None:
+        if self.command("load", self.drone.load):
             self.refresh_params()
 
     def defaults(self):
         if messagebox.askyesno("Defaults", "Restore the firmware's default gains?"):
-            if self.run("defaults", self.drone.defaults) is not None:
+            if self.command("defaults", self.drone.defaults):
                 self.refresh_params()
 
+    def toggle_spin(self):
+        if self.stream and self.stream.running:
+            self.stop_spin()
+            self.status.set("motors stopped (thrust 0, disarmed)")
+            return
+        try:
+            pct = float(self.thrust_pct.get())
+        except (tk.TclError, ValueError):
+            self.status.set("thrust %: not a number")
+            return
+        if not messagebox.askyesno(
+                "Spin up", f"Spin the motors to {pct:.0f} % thrust?\n\n"
+                "The drone must be held by a stand (props on) or have its props off. "
+                "Stop, EMERGENCY or closing this window stops them."):
+            return
+        self.stream = ThrustStream(self.drone, pct)
+        self.spin_btn.config(text="Stop motors")
+        self.status.set(f"spinning up to {pct:.0f} %")
+
+    def set_thrust(self):
+        if self.stream and self.stream.running:
+            try:
+                self.stream.set_pct(float(self.thrust_pct.get()))
+            except (tk.TclError, ValueError):
+                pass
+
+    def stop_spin(self):
+        if self.stream:
+            self.stream.stop()
+            self.stream = None
+        self.spin_btn.config(text="Spin up")
+
     def arm(self):
-        self.run("arm", self.drone.arm)
+        self.command("arm", self.drone.arm)
 
     def disarm(self):
-        self.run("disarm", self.drone.disarm)
+        self.command("disarm", self.drone.disarm)
 
     def emergency(self):
-        if messagebox.askyesno("Emergency", "Cut the motors now?"):
-            self.run("emergency", self.drone.emergency)
+        # No confirmation: one click cuts the motors, as CUT MOTORS does on the
+        # phone's Tune screen. A dialog here would cost seconds when it matters.
+        if self.stream:
+            self.stream.target = 0          # zero thrust at once, before the reply
+        self.command("emergency", self.drone.emergency)
+        self.stop_spin()
 
     # ---------------------------------------------------------------- auto-tune
     def toggle_autotune(self):
@@ -461,6 +523,11 @@ class TunerGui:
             self.ml_info.set("trials / trial s / range: not a number")
             return
         minutes = trials * (trial_s + 5) / 60
+        if not (self.stream and self.stream.running) and not messagebox.askyesno(
+                "Auto-tune", "The motors are not spinning (Spin up in the Drone panel).\n\n"
+                "Without thrust every trial measures a still drone, so the scores mean "
+                "nothing. Start anyway?"):
+            return
         if not messagebox.askyesno(
                 "Auto-tune", "The drone will try parameter sets on its own for about "
                 f"{minutes:.0f} min.\n\nOn a stand, props clear, armed. Stop it at any time "
@@ -598,6 +665,7 @@ class TunerGui:
 
     def close(self):
         self.ml_stop.set()
+        self.stop_spin()
         if self.rec:
             self.rec[0].close()
         try:

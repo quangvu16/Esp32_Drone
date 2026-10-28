@@ -25,6 +25,10 @@ docs/              install guide, pilot's guide, course slides, diagrams, board 
    screen, CUT MOTORS, arming, failsafe, low battery, and a first-flight
    checklist. **Tiếng Việt:** [docs/USER_GUIDE.vi.md](docs/USER_GUIDE.vi.md).
 
+**Tuning PID from a computer?** [docs/PID_TUNER_GUIDE.md](docs/PID_TUNER_GUIDE.md)
+— step by step with the desktop tuner in `tools/pid-tune`
+(**Tiếng Việt:** [docs/PID_TUNER_GUIDE.vi.md](docs/PID_TUNER_GUIDE.vi.md)).
+
 **New to drones?** [docs/slides](docs/slides/README.md) — a 150-slide course on
 how the drone flies, every part on the board, and the firmware line by line
 ([PDF](docs/slides/ESP32_Drone_Course_EN.pdf) ·

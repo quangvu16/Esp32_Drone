@@ -110,6 +110,11 @@ class FakeFirmware:
         for i, (g, n, t, size, ro, lo, hi) in enumerate(PARAM_TOC):
             self.values[i] = 1 + i          # an int packs into every param fmt
         self.blocks = {}                  # id -> {"vars": [...], "started": bool}
+        self.fc_seen = []                 # raw port-7 packets, header included
+        self.thrusts = []                 # thrust of every CommanderPacket
+        self.armed = False
+        self.thrust_was_low = False
+        self.arm_events = []
         self.running = True
         self.thread = threading.Thread(target=self.serve, daemon=True)
         self.thread.start()
@@ -154,6 +159,8 @@ class FakeFirmware:
                 self.log_ctrl(p)
             elif port == D.PORT_FLIGHT:
                 self.flight_ctrl(p)
+            elif port == D.PORT_COMMANDER:
+                self.commander(p)
 
     # --- TOC ---
     def toc(self, port, p):
@@ -258,10 +265,33 @@ class FakeFirmware:
                 vals += struct.pack(fmt, v)
             self._send(D.PORT_LOG, D.LOG_CH_DATA, bytes([bid, 0, 0, 0]) + vals)
 
+    # crtpHandleCommander() + armUpdate()'s CRTP branch: 15 bytes, thrust at
+    # p+13; arms on thrust-up after a low thrust, disarms at <= 500.
+    def commander(self, p):
+        if len(p) < 15:
+            return
+        thrust = struct.unpack("<H", bytes(p[13:15]))[0]
+        self.thrusts.append(thrust)
+        if not self.armed:
+            if thrust <= 500:
+                self.thrust_was_low = True
+            if thrust > 1000 and self.thrust_was_low:
+                self.armed, self.thrust_was_low = True, False
+                self.arm_events.append("arm")
+        elif thrust <= 500:
+            self.armed = False
+            self.arm_events.append("disarm")
+
+    # crtpHandleFlightControl(): p[0] is the 0x70 header, p[1] the command;
+    # the reply is <0x70><cmd><status>, status 1 for an unknown command.
+    FC_KNOWN = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x10}
+
     def flight_ctrl(self, p):
-        if len(p) >= 2 and p[1] == D.FC_MAGIC:
-            cmd = p[2] if len(p) > 2 else 0
-            self._send(D.PORT_FLIGHT, 0, bytes([D.FC_MAGIC, cmd, 0]))
+        if len(p) < 2:
+            return
+        cmd = p[1]
+        self.fc_seen.append(bytes(p))
+        self._send(D.PORT_FLIGHT, 0, bytes([cmd, 0 if cmd in self.FC_KNOWN else 1]))
 
 
 # ============================================================ wire tests
@@ -386,6 +416,37 @@ def test_link():
         close("tip cost is 100 + 10 x seconds lost", 175.0, cost, 1e-6)
         cost, m = D.cost_of(flat, 10.0)
         check("a clean window costs under 1", not m["fell"] and cost < 1.0)
+
+        print("\n--- flight-control commands (port 7) ---")
+        # The firmware reads the command from p[1], right after the 0x70
+        # header. An extra magic byte there made every command a "bad
+        # request" on the real board, EMERGENCY included.
+        fw.fc_seen.clear()
+        check("ARM is acknowledged", d.arm())
+        expect("ARM goes out as <0x70><0x07>", bytes([0x70, 0x07]), fw.fc_seen[-1])
+        check("EMERGENCY is acknowledged", d.emergency())
+        expect("EMERGENCY goes out as <0x70><0x05>", bytes([0x70, 0x05]), fw.fc_seen[-1])
+        check("DISARM is acknowledged", d.disarm())
+        check("SAVE is acknowledged", d.save())
+        check("LOAD is acknowledged", d.load())
+        check("DEFAULTS is acknowledged", d.defaults())
+        check("an unknown command reports refused", d._fc(0x7E)[-1] == 1)
+
+        print("\n--- stand thrust stream (port 3) ---")
+        expect("40 % is 26214 thrust units", 26214, D.thrust_counts(40))
+        expect("thrust is capped at THRUST_MAX_PCT", D.thrust_counts(D.THRUST_MAX_PCT), D.thrust_counts(95))
+        fw.thrusts.clear()
+        st = D.ThrustStream(d, pct=30, ramp_s=0.5)
+        time.sleep(1.6)
+        check("the stream starts at zero thrust", fw.thrusts and fw.thrusts[0] == 0)
+        check("~50 packets a second", 60 <= len(fw.thrusts) <= 95)
+        close("it ramps to the target", D.thrust_counts(30), fw.thrusts[-1], 1)
+        check("the board armed on thrust-up", fw.arm_events[:1] == ["arm"] and fw.armed)
+        st.stop()
+        time.sleep(0.2)
+        expect("stop() ends at zero thrust", 0, fw.thrusts[-1])
+        check("zero thrust disarms the board", not fw.armed)
+        check("the thread is gone", not st.running)
     finally:
         d.close()
         fw.close()

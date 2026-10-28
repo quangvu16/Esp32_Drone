@@ -1,0 +1,237 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 880" width="1280" height="880" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">pid-tune — desktop PID auto-tuner</title>
+  <desc id="desc">Screen map of tools/pid-tune/tuner_gui.py: the Link, Gains, Drone and Auto-tune panels on the left, live stats under them, and five stacked telemetry plots on the right, with numbered callouts explained in the legend.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f6f8fa; }
+      .h1 { font: 700 26px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .h2 { font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .sub { font: 400 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lbl { font: 500 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .lblm { font: 400 11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lblw { font: 600 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #ffffff; }
+      .grp { font: 700 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .mono { font: 500 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1f2328; }
+      .chip { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #0969da; }
+      .num { font: 700 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #ffffff; }
+      .leg { font: 400 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .legb { font: 700 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .frame { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .titlebar { fill: #eaeef2; }
+      .side { fill: #f0f0ee; }
+      .box { fill: none; stroke: #8c959f; stroke-width: 1; }
+      .btn { fill: #ffffff; stroke: #8c959f; stroke-width: 1; }
+      .btn-dan { fill: #cf222e; stroke: #cf222e; stroke-width: 1; }
+      .field { fill: #ffffff; stroke: #8c959f; stroke-width: 1; }
+      .plot { fill: #ffffff; stroke: #d0d7de; stroke-width: 1; }
+      .grid { stroke: #eaeef2; stroke-width: 1; }
+      .rule { stroke: #d0d7de; stroke-width: 1; }
+      .marker { fill: #bc4c00; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1280" height="880"/>
+  <text class="h1" x="40" y="44">Desktop PID auto-tuner — tools/pid-tune</text>
+  <text class="sub" x="40" y="70">python tuner_gui.py · tkinter + matplotlib · CRTP over UDP 2390/2399 · one axis at a time · props off or on a stand</text>
+  <line class="rule" x1="40" y1="88" x2="1240" y2="88"/>
+
+<rect class="frame" x="40" y="104" width="840" height="740" rx="8"/>
+<rect class="titlebar" x="41" y="105" width="838" height="26" rx="7"/>
+<circle cx="56" cy="118" r="5" fill="#ff5f57"/>
+<circle cx="72" cy="118" r="5" fill="#febc2e"/>
+<circle cx="88" cy="118" r="5" fill="#28c840"/>
+<text class="lbl" x="460.0" y="122" text-anchor="middle">ESP-Drone PID tuner — roll</text>
+<rect class="side" x="41" y="131" width="262" height="712"/>
+<rect class="box" x="49" y="147" width="246" height="72" rx="3"/>
+<rect x="55" y="139" width="36" height="14" fill="#f0f0ee"/>
+<text class="grp" x="59" y="151">Link</text>
+<text class="mono" x="57" y="169">192.168.43.42</text>
+<text class="lbl" x="57" y="189">Axis</text>
+<circle cx="97" cy="185" r="5" fill="#1f2328" stroke="#57606a"/>
+<text class="lbl" x="106" y="189">Roll</text>
+<circle cx="149" cy="185" r="5" fill="#ffffff" stroke="#57606a"/>
+<text class="lbl" x="158" y="189">Pitch</text>
+<circle cx="205" cy="185" r="5" fill="#ffffff" stroke="#57606a"/>
+<text class="lbl" x="214" y="189">Yaw</text>
+<rect class="btn" x="57" y="195" width="80" height="20" rx="3"/>
+<text class="lbl" x="97.0" y="209" text-anchor="middle">Reconnect</text>
+<rect class="box" x="49" y="235" width="246" height="118" rx="3"/>
+<rect x="55" y="227" width="43" height="14" fill="#f0f0ee"/>
+<text class="grp" x="59" y="239">Gains</text>
+<text class="mono" x="57" y="260">pid.roll_kp</text>
+<rect class="field" x="135" y="247" width="64" height="18"/>
+<text class="mono" x="139" y="260">1.3</text>
+<rect class="btn" x="205" y="247" width="20" height="20" rx="3"/>
+<text class="lbl" x="215.0" y="261" text-anchor="middle">−</text>
+<rect class="btn" x="229" y="247" width="20" height="20" rx="3"/>
+<text class="lbl" x="239.0" y="261" text-anchor="middle">+</text>
+<rect class="btn" x="255" y="247" width="34" height="20" rx="3"/>
+<text class="lbl" x="272.0" y="261" text-anchor="middle">Set</text>
+<text class="mono" x="57" y="284">pid.roll_ki</text>
+<rect class="field" x="135" y="271" width="64" height="18"/>
+<text class="mono" x="139" y="284">0.04</text>
+<rect class="btn" x="205" y="271" width="20" height="20" rx="3"/>
+<text class="lbl" x="215.0" y="285" text-anchor="middle">−</text>
+<rect class="btn" x="229" y="271" width="20" height="20" rx="3"/>
+<text class="lbl" x="239.0" y="285" text-anchor="middle">+</text>
+<rect class="btn" x="255" y="271" width="34" height="20" rx="3"/>
+<text class="lbl" x="272.0" y="285" text-anchor="middle">Set</text>
+<text class="mono" x="57" y="308">pid.roll_kd</text>
+<rect class="field" x="135" y="295" width="64" height="18"/>
+<text class="mono" x="139" y="308">18</text>
+<rect class="btn" x="205" y="295" width="20" height="20" rx="3"/>
+<text class="lbl" x="215.0" y="309" text-anchor="middle">−</text>
+<rect class="btn" x="229" y="295" width="20" height="20" rx="3"/>
+<text class="lbl" x="239.0" y="309" text-anchor="middle">+</text>
+<rect class="btn" x="255" y="295" width="34" height="20" rx="3"/>
+<text class="lbl" x="272.0" y="309" text-anchor="middle">Set</text>
+<rect class="btn" x="57" y="323" width="56" height="20" rx="3"/>
+<text class="lbl" x="85.0" y="337" text-anchor="middle">Get</text>
+<rect class="btn" x="115" y="323" width="56" height="20" rx="3"/>
+<text class="lbl" x="143.0" y="337" text-anchor="middle">Save</text>
+<rect class="btn" x="173" y="323" width="56" height="20" rx="3"/>
+<text class="lbl" x="201.0" y="337" text-anchor="middle">Load</text>
+<rect class="btn" x="231" y="323" width="56" height="20" rx="3"/>
+<text class="lbl" x="259.0" y="337" text-anchor="middle">Defaults</text>
+<rect class="box" x="49" y="369" width="246" height="118" rx="3"/>
+<rect x="55" y="361" width="43" height="14" fill="#f0f0ee"/>
+<text class="grp" x="59" y="373">Drone</text>
+<rect class="btn" x="57" y="381" width="64" height="20" rx="3"/>
+<text class="lbl" x="89.0" y="395" text-anchor="middle">ARM</text>
+<rect class="btn" x="125" y="381" width="64" height="20" rx="3"/>
+<text class="lbl" x="157.0" y="395" text-anchor="middle">DISARM</text>
+<rect class="btn-dan" x="193" y="381" width="92" height="20" rx="3"/>
+<text class="lblw" x="239.0" y="395" text-anchor="middle">EMERGENCY</text>
+<text class="lbl" x="57" y="421">Log Hz</text>
+<rect class="field" x="113" y="409" width="46" height="18"/>
+<text class="mono" x="117" y="422">20</text>
+<text class="lbl" x="169" y="421">Window s</text>
+<rect class="field" x="227" y="409" width="46" height="18"/>
+<text class="mono" x="231" y="422">10.0</text>
+<rect class="btn" x="57" y="433" width="64" height="20" rx="3"/>
+<text class="lbl" x="89.0" y="447" text-anchor="middle">Pause</text>
+<rect class="btn" x="125" y="433" width="84" height="20" rx="3"/>
+<text class="lbl" x="167.0" y="447" text-anchor="middle">Record CSV</text>
+<text class="lbl" x="57" y="473">Thrust %</text>
+<rect class="field" x="113" y="461" width="46" height="18"/>
+<text class="mono" x="117" y="474">30</text>
+<rect class="btn" x="169" y="459" width="84" height="20" rx="3"/>
+<text class="lbl" x="211.0" y="473" text-anchor="middle">Spin up</text>
+<rect class="box" x="49" y="503" width="246" height="186" rx="3"/>
+<rect x="55" y="495" width="71" height="14" fill="#f0f0ee"/>
+<text class="grp" x="59" y="507">Auto-tune</text>
+<rect class="field" x="57" y="515" width="228" height="20"/>
+<text class="lbl" x="62" y="529">ML (Bayesian)</text><text class="lbl" x="273" y="529">▾</text>
+<rect x="57" y="546" width="10" height="10" fill="#57606a"/>
+<text class="lbl" x="71" y="555">pid.roll_kp</text>
+<rect x="172" y="546" width="10" height="10" fill="#57606a"/>
+<text class="lbl" x="186" y="555">pid.roll_ki</text>
+<rect x="57" y="564" width="10" height="10" fill="#57606a"/>
+<text class="lbl" x="71" y="573">pid.roll_kd</text>
+<rect x="57" y="584" width="10" height="10" fill="#57606a"/>
+<text class="lbl" x="71" y="593">learn from past trials (logs)</text>
+<text class="lbl" x="57" y="615">Trials</text>
+<rect class="field" x="99" y="603" width="46" height="18"/>
+<text class="mono" x="103" y="616">20</text>
+<text class="lbl" x="157" y="615">Trial s</text>
+<rect class="field" x="205" y="603" width="46" height="18"/>
+<text class="mono" x="209" y="616">6.0</text>
+<text class="lbl" x="57" y="639">Range x</text>
+<rect class="field" x="109" y="627" width="46" height="18"/>
+<text class="mono" x="113" y="640">2.0</text>
+<rect class="btn" x="57" y="653" width="110" height="20" rx="3"/>
+<text class="lbl" x="112.0" y="667" text-anchor="middle">Start auto-tune</text>
+<rect class="btn" x="183" y="653" width="70" height="20" rx="3"/>
+<text class="lbl" x="218.0" y="667" text-anchor="middle">Model</text>
+<text class="lblm" x="57" y="687">Gaussian process + expected improvement.</text>
+<text class="mono" x="57" y="715">roll  level  18.9 Hz</text>
+<text class="mono" x="57" y="732">angle mean -0.12  std 2.19</text>
+<text class="mono" x="57" y="749">rate rms   10.3</text>
+<text class="mono" x="57" y="766">ctrl mean   5.6</text>
+<text class="mono" x="57" y="783">motor sat    0%</text>
+<text class="mono" x="57" y="800">tilt     1.4  -0.7</text>
+<rect class="plot" x="343" y="143" width="520" height="128"/>
+<line class="grid" x1="343" y1="175.0" x2="863" y2="175.0"/>
+<line class="grid" x1="343" y1="207.0" x2="863" y2="207.0"/>
+<line class="grid" x1="343" y1="239.0" x2="863" y2="239.0"/>
+<text class="lblm" x="335" y="207.0" text-anchor="end" transform="rotate(-90 331 207.0)">Angle °</text>
+<polyline fill="none" stroke="#1f77b4" stroke-width="1.6" points="347.0,207.0 351.3,198.9 355.5,191.5 359.8,185.1 364.1,180.1 368.3,176.9 372.6,175.5 376.9,175.7 381.1,177.3 385.4,179.8 389.7,182.9 393.9,185.9 398.2,188.5 402.5,190.4 406.7,191.5 411.0,191.6 415.3,191.1 419.5,190.2 423.8,189.2 428.1,188.7 432.3,189.1 436.6,190.7 440.9,193.7 445.1,198.1 449.4,203.9 453.7,210.7 457.9,218.1 462.2,225.6 466.5,232.6 470.7,238.5 475.0,243.0 479.3,245.6 483.5,246.3 487.8,245.0 492.1,242.1 496.3,237.8 500.6,232.7 504.9,227.3 509.1,222.0 513.4,217.4 517.7,213.7 521.9,211.1 526.2,209.5 530.5,208.8 534.7,208.7 539.0,208.7 543.3,208.5 547.5,207.6 551.8,205.7 556.1,202.8 560.3,198.7 564.6,193.6 568.9,188.0 573.1,182.1 577.4,176.6 581.7,171.9 585.9,168.7 590.2,167.1 594.5,167.5 598.7,169.8 603.0,174.0 607.3,179.6 611.5,186.4 615.8,193.6 620.1,200.8 624.3,207.4 628.6,212.9 632.9,217.2 637.1,220.1 641.4,221.7 645.7,222.1 649.9,221.8 654.2,221.2 658.5,220.6 662.7,220.5 667.0,221.2 671.3,222.7 675.5,225.2 679.8,228.3 684.1,231.8 688.3,235.3 692.6,238.2 696.9,240.1 701.1,240.6 705.4,239.4 709.7,236.3 713.9,231.5 718.2,225.2 722.5,217.8 726.7,209.7 731.0,201.7 735.3,194.2 739.5,187.8 743.8,182.8 748.1,179.5 752.3,177.9 756.6,177.9 760.9,179.1 765.1,181.3 769.4,183.9 773.7,186.4 777.9,188.5 782.2,189.9 786.5,190.3 790.7,190.0 795.0,189.0 799.3,187.7 803.5,186.5 807.8,185.8 812.1,186.0 816.3,187.5 820.6,190.6 824.9,195.1 829.1,201.1 833.4,208.1 837.7,215.7 841.9,223.4 846.2,230.6 850.5,236.8 854.7,241.5 859.0,244.3"/>
+<rect class="plot" x="343" y="281" width="520" height="128"/>
+<line class="grid" x1="343" y1="313.0" x2="863" y2="313.0"/>
+<line class="grid" x1="343" y1="345.0" x2="863" y2="345.0"/>
+<line class="grid" x1="343" y1="377.0" x2="863" y2="377.0"/>
+<text class="lblm" x="335" y="345.0" text-anchor="end" transform="rotate(-90 331 345.0)">Rate °/s</text>
+<polyline fill="none" stroke="#ff7f0e" stroke-width="1.6" points="347.0,345.0 351.3,313.2 355.5,317.8 359.8,335.1 364.1,333.0 368.3,332.3 372.6,359.8 376.9,386.5 381.1,373.8 385.4,342.5 389.7,334.4 393.9,339.2 398.2,324.8 402.5,308.3 406.7,327.4 411.0,365.4 415.3,375.3 419.5,359.6 423.8,357.0 428.1,364.2 432.3,345.8 436.6,311.1 440.9,306.7 445.1,335.0 449.4,352.0 453.7,347.8 457.9,356.4 462.2,379.8 466.5,376.7 470.7,340.4 475.0,316.9 479.3,326.0 483.5,333.3 487.8,323.5 492.1,330.1 496.3,365.2 500.6,386.1 504.9,367.4 509.1,344.1 513.4,344.3 517.7,342.3 521.9,317.9 526.2,305.2 530.5,332.2 534.7,365.2 539.0,366.7 543.3,356.6 547.5,365.2 551.8,370.0 556.1,341.8 560.3,308.7 564.6,312.8 568.9,337.7 573.1,343.6 577.4,340.7 581.7,360.6 585.9,385.3 590.2,373.4 594.5,337.4 598.7,323.9 603.0,332.9 607.3,328.5 611.5,315.3 615.8,331.3 620.1,369.5 624.3,381.9 628.6,361.5 632.9,349.0 637.1,353.9 641.4,342.0 645.7,311.4 649.9,306.0 654.2,337.2 658.5,361.4 662.7,357.5 667.0,356.9 671.3,373.8 675.5,372.3 679.8,336.9 684.1,310.0 688.3,320.3 692.6,337.2 696.9,333.9 701.1,336.7 705.4,366.3 709.7,387.5 713.9,368.0 718.2,337.3 722.5,333.1 726.7,337.3 731.0,321.5 735.3,309.9 739.5,335.1 743.8,371.3 748.1,374.8 752.3,357.5 756.6,356.7 760.9,361.5 765.1,338.9 769.4,306.8 773.7,310.1 777.9,340.8 782.2,354.4 786.5,349.4 790.7,360.3 795.0,381.2 799.3,371.0 803.5,332.9 807.8,314.9 812.1,327.6 816.3,333.4 820.6,324.4 824.9,336.1 829.1,371.9 833.4,385.9 837.7,362.1 841.9,340.7 846.2,343.0 850.5,338.5 854.7,314.0 859.0,308.0"/>
+<rect class="plot" x="343" y="419" width="520" height="128"/>
+<line class="grid" x1="343" y1="451.0" x2="863" y2="451.0"/>
+<line class="grid" x1="343" y1="483.0" x2="863" y2="483.0"/>
+<line class="grid" x1="343" y1="515.0" x2="863" y2="515.0"/>
+<text class="lblm" x="335" y="483.0" text-anchor="end" transform="rotate(-90 331 483.0)">P · I · D</text>
+<polyline fill="none" stroke="#2ca02c" stroke-width="1.6" points="347.0,483.0 351.3,478.4 355.5,473.8 359.8,469.5 364.1,465.4 368.3,461.6 372.6,458.3 376.9,455.5 381.1,453.2 385.4,451.4 389.7,450.3 393.9,449.9 398.2,450.1 402.5,450.9 406.7,452.3 411.0,454.4 415.3,457.0 419.5,460.1 423.8,463.7 428.1,467.6 432.3,471.9 436.6,476.4 440.9,481.0 445.1,485.6 449.4,490.2 453.7,494.6 457.9,498.8 462.2,502.8 466.5,506.3 470.7,509.3 475.0,511.9 479.3,513.9 483.5,515.3 487.8,516.0 492.1,516.1 496.3,515.6 500.6,514.4 504.9,512.6 509.1,510.2 513.4,507.3 517.7,503.9 521.9,500.1 526.2,496.0 530.5,491.6 534.7,487.1 539.0,482.4 543.3,477.8 547.5,473.3 551.8,469.0 556.1,464.9 560.3,461.2 564.6,458.0 568.9,455.2 573.1,452.9 577.4,451.3 581.7,450.2 585.9,449.9 590.2,450.1 594.5,451.0 598.7,452.6 603.0,454.7 607.3,457.4 611.5,460.5 615.8,464.2 620.1,468.1 624.3,472.4 628.6,476.9 632.9,481.5 637.1,486.2 641.4,490.7 645.7,495.1 649.9,499.3 654.2,503.2 658.5,506.7 662.7,509.7 667.0,512.2 671.3,514.1 675.5,515.4 679.8,516.0 684.1,516.1 688.3,515.5 692.6,514.2 696.9,512.3 701.1,509.9 705.4,506.9 709.7,503.5 713.9,499.7 718.2,495.5 722.5,491.1 726.7,486.5 731.0,481.9 735.3,477.3 739.5,472.8 743.8,468.5 748.1,464.5 752.3,460.8 756.6,457.6 760.9,454.9 765.1,452.7 769.4,451.1 773.7,450.2 777.9,449.9 782.2,450.2 786.5,451.2 790.7,452.8 795.0,455.0 799.3,457.7 803.5,460.9 807.8,464.6 812.1,468.6 816.3,473.0 820.6,477.5 824.9,482.1 829.1,486.7 833.4,491.3 837.7,495.7 841.9,499.8 846.2,503.6 850.5,507.1 854.7,510.0 859.0,512.4"/>
+<polyline fill="none" stroke="#d62728" stroke-width="1.6" points="347.0,469.7 351.3,469.7 355.5,469.7 359.8,469.7 364.1,469.7 368.3,469.7 372.6,469.7 376.9,469.7 381.1,469.7 385.4,469.7 389.7,469.7 393.9,469.7 398.2,469.7 402.5,469.7 406.7,469.7 411.0,469.7 415.3,469.7 419.5,469.7 423.8,469.7 428.1,469.7 432.3,469.7 436.6,469.7 440.9,469.7 445.1,469.7 449.4,469.7 453.7,469.7 457.9,469.7 462.2,469.7 466.5,469.7 470.7,469.7 475.0,469.7 479.3,469.7 483.5,469.7 487.8,469.7 492.1,469.7 496.3,469.7 500.6,469.7 504.9,469.7 509.1,469.7 513.4,469.7 517.7,469.7 521.9,469.7 526.2,469.7 530.5,469.7 534.7,469.7 539.0,469.7 543.3,469.7 547.5,469.7 551.8,469.7 556.1,469.7 560.3,469.7 564.6,469.7 568.9,469.7 573.1,469.7 577.4,469.7 581.7,469.7 585.9,469.7 590.2,469.7 594.5,469.7 598.7,469.7 603.0,469.7 607.3,469.7 611.5,469.7 615.8,469.7 620.1,469.7 624.3,469.7 628.6,469.7 632.9,469.7 637.1,469.7 641.4,469.7 645.7,469.7 649.9,469.7 654.2,469.7 658.5,469.7 662.7,469.7 667.0,469.7 671.3,469.7 675.5,469.7 679.8,469.7 684.1,469.7 688.3,469.7 692.6,469.7 696.9,469.7 701.1,469.7 705.4,469.7 709.7,469.7 713.9,469.7 718.2,469.7 722.5,469.7 726.7,469.7 731.0,469.7 735.3,469.7 739.5,469.7 743.8,469.7 748.1,469.7 752.3,469.7 756.6,469.7 760.9,469.7 765.1,469.7 769.4,469.7 773.7,469.7 777.9,469.7 782.2,469.7 786.5,469.7 790.7,469.7 795.0,469.7 799.3,469.7 803.5,469.7 807.8,469.7 812.1,469.7 816.3,469.7 820.6,469.7 824.9,469.7 829.1,469.7 833.4,469.7 837.7,469.7 841.9,469.7 846.2,469.7 850.5,469.7 854.7,469.7 859.0,469.7"/>
+<polyline fill="none" stroke="#9467bd" stroke-width="1.6" points="347.0,433.3 351.3,433.8 355.5,435.2 359.8,437.6 364.1,440.9 368.3,445.0 372.6,449.8 376.9,455.3 381.1,461.3 385.4,467.8 389.7,474.6 393.9,481.5 398.2,488.4 402.5,495.3 406.7,501.9 411.0,508.1 415.3,513.8 419.5,519.0 423.8,523.4 428.1,527.1 432.3,529.8 436.6,531.7 440.9,532.6 445.1,532.6 449.4,531.5 453.7,529.6 457.9,526.7 462.2,522.9 466.5,518.4 470.7,513.2 475.0,507.4 479.3,501.1 483.5,494.4 487.8,487.6 492.1,480.6 496.3,473.7 500.6,467.0 504.9,460.6 509.1,454.6 513.4,449.2 517.7,444.4 521.9,440.4 526.2,437.3 530.5,435.0 534.7,433.7 539.0,433.3 543.3,433.9 547.5,435.5 551.8,438.0 556.1,441.3 560.3,445.5 564.6,450.4 568.9,456.0 573.1,462.1 577.4,468.6 581.7,475.4 585.9,482.3 590.2,489.2 594.5,496.1 598.7,502.6 603.0,508.8 607.3,514.5 611.5,519.6 615.8,523.9 620.1,527.4 624.3,530.1 628.6,531.9 632.9,532.7 637.1,532.5 641.4,531.3 645.7,529.3 649.9,526.3 654.2,522.4 658.5,517.8 662.7,512.5 667.0,506.6 671.3,500.3 675.5,493.6 679.8,486.8 684.1,479.8 688.3,472.9 692.6,466.2 696.9,459.8 701.1,453.9 705.4,448.6 709.7,443.9 713.9,440.0 718.2,437.0 722.5,434.8 726.7,433.6 731.0,433.3 735.3,434.0 739.5,435.7 743.8,438.3 748.1,441.8 752.3,446.1 756.6,451.1 760.9,456.7 765.1,462.9 769.4,469.4 773.7,476.2 777.9,483.1 782.2,490.1 786.5,496.9 790.7,503.4 795.0,509.5 799.3,515.1 803.5,520.1 807.8,524.4 812.1,527.8 816.3,530.4 820.6,532.0 824.9,532.7 829.1,532.4 833.4,531.1 837.7,528.9 841.9,525.8 846.2,521.9 850.5,517.2 854.7,511.8 859.0,505.9"/>
+<rect class="plot" x="343" y="557" width="520" height="128"/>
+<line class="grid" x1="343" y1="589.0" x2="863" y2="589.0"/>
+<line class="grid" x1="343" y1="621.0" x2="863" y2="621.0"/>
+<line class="grid" x1="343" y1="653.0" x2="863" y2="653.0"/>
+<text class="lblm" x="335" y="621.0" text-anchor="end" transform="rotate(-90 331 621.0)">Controller</text>
+<polyline fill="none" stroke="#8c564b" stroke-width="1.6" points="347.0,604.1 351.3,598.6 355.5,593.6 359.8,589.2 364.1,585.4 368.3,582.2 372.6,579.9 376.9,578.3 381.1,577.6 385.4,577.7 389.7,578.6 393.9,580.4 398.2,583.0 402.5,586.3 406.7,590.4 411.0,595.0 415.3,600.1 419.5,605.6 423.8,611.4 428.1,617.5 432.3,623.5 436.6,629.6 440.9,635.4 445.1,641.0 449.4,646.2 453.7,650.9 457.9,655.0 462.2,658.5 466.5,661.2 470.7,663.1 475.0,664.2 479.3,664.5 483.5,663.9 487.8,662.5 492.1,660.2 496.3,657.2 500.6,653.5 504.9,649.1 509.1,644.2 513.4,638.9 517.7,633.2 521.9,627.2 526.2,621.1 530.5,615.1 534.7,609.1 539.0,603.4 543.3,598.0 547.5,593.1 551.8,588.7 556.1,585.0 560.3,581.9 564.6,579.6 568.9,578.2 573.1,577.5 577.4,577.7 581.7,578.8 585.9,580.7 590.2,583.4 594.5,586.8 598.7,590.9 603.0,595.6 607.3,600.7 611.5,606.3 615.8,612.2 620.1,618.2 624.3,624.3 628.6,630.3 632.9,636.1 637.1,641.7 641.4,646.8 645.7,651.4 649.9,655.5 654.2,658.8 658.5,661.5 662.7,663.3 667.0,664.3 671.3,664.5 675.5,663.8 679.8,662.2 684.1,659.9 688.3,656.8 692.6,653.0 696.9,648.6 701.1,643.6 705.4,638.2 709.7,632.5 713.9,626.5 718.2,620.4 722.5,614.3 726.7,608.4 731.0,602.7 735.3,597.4 739.5,592.5 743.8,588.2 748.1,584.5 752.3,581.6 756.6,579.4 760.9,578.0 765.1,577.5 769.4,577.8 773.7,579.0 777.9,581.0 782.2,583.8 786.5,587.3 790.7,591.4 795.0,596.2 799.3,601.4 803.5,607.0 807.8,612.9 812.1,618.9 816.3,625.0 820.6,631.0 824.9,636.8 829.1,642.3 833.4,647.4 837.7,652.0 841.9,655.9 846.2,659.2 850.5,661.7 854.7,663.5 859.0,664.4"/>
+<rect class="plot" x="343" y="695" width="520" height="128"/>
+<line class="grid" x1="343" y1="727.0" x2="863" y2="727.0"/>
+<line class="grid" x1="343" y1="759.0" x2="863" y2="759.0"/>
+<line class="grid" x1="343" y1="791.0" x2="863" y2="791.0"/>
+<text class="lblm" x="335" y="759.0" text-anchor="end" transform="rotate(-90 331 759.0)">Motor m1</text>
+<line x1="343" y1="704.3" x2="863" y2="704.3" stroke="#cf222e" stroke-width="1" stroke-dasharray="4 3"/>
+<line x1="343" y1="813.7" x2="863" y2="813.7" stroke="#cf222e" stroke-width="1" stroke-dasharray="4 3"/>
+<polyline fill="none" stroke="#17becf" stroke-width="1.6" points="347.0,753.8 351.3,752.1 355.5,750.6 359.8,749.2 364.1,748.0 368.3,747.1 372.6,746.3 376.9,745.9 381.1,745.6 385.4,745.7 389.7,746.0 393.9,746.5 398.2,747.3 402.5,748.3 406.7,749.6 411.0,751.0 415.3,752.6 419.5,754.3 423.8,756.1 428.1,757.9 432.3,759.8 436.6,761.6 440.9,763.4 445.1,765.2 449.4,766.8 453.7,768.2 457.9,769.5 462.2,770.5 466.5,771.4 470.7,772.0 475.0,772.3 479.3,772.4 483.5,772.2 487.8,771.8 492.1,771.1 496.3,770.1 500.6,769.0 504.9,767.7 509.1,766.1 513.4,764.5 517.7,762.7 521.9,760.9 526.2,759.0 530.5,757.2 534.7,755.3 539.0,753.6 543.3,751.9 547.5,750.4 551.8,749.1 556.1,747.9 560.3,747.0 564.6,746.3 568.9,745.8 573.1,745.6 577.4,745.7 581.7,746.0 585.9,746.6 590.2,747.4 594.5,748.5 598.7,749.7 603.0,751.2 607.3,752.8 611.5,754.5 615.8,756.3 620.1,758.1 624.3,760.0 628.6,761.9 632.9,763.7 637.1,765.4 641.4,766.9 645.7,768.4 649.9,769.6 654.2,770.6 658.5,771.5 662.7,772.0 667.0,772.3 671.3,772.4 675.5,772.2 679.8,771.7 684.1,771.0 688.3,770.0 692.6,768.8 696.9,767.5 701.1,766.0 705.4,764.3 709.7,762.5 713.9,760.7 718.2,758.8 722.5,757.0 726.7,755.1 731.0,753.4 735.3,751.7 739.5,750.2 743.8,748.9 748.1,747.8 752.3,746.9 756.6,746.2 760.9,745.8 765.1,745.6 769.4,745.7 773.7,746.1 777.9,746.7 782.2,747.5 786.5,748.6 790.7,749.9 795.0,751.4 799.3,753.0 803.5,754.7 807.8,756.5 812.1,758.4 816.3,760.2 820.6,762.1 824.9,763.9 829.1,765.6 833.4,767.1 837.7,768.5 841.9,769.7 846.2,770.8 850.5,771.5 854.7,772.1 859.0,772.3"/>
+<text class="lblm" x="603.0" y="839" text-anchor="middle">last 10 s ·  live at the Log Hz rate</text>
+<circle class="marker" cx="289" cy="147" r="10"/><text class="num" x="289" y="151" text-anchor="middle">1</text>
+<circle class="marker" cx="289" cy="235" r="10"/><text class="num" x="289" y="239" text-anchor="middle">2</text>
+<circle class="marker" cx="289" cy="369" r="10"/><text class="num" x="289" y="373" text-anchor="middle">3</text>
+<circle class="marker" cx="289" cy="503" r="10"/><text class="num" x="289" y="507" text-anchor="middle">4</text>
+<circle class="marker" cx="289" cy="715" r="10"/><text class="num" x="289" y="719" text-anchor="middle">5</text>
+<circle class="marker" cx="849" cy="157" r="10"/><text class="num" x="849" y="161" text-anchor="middle">6</text>
+<circle class="marker" cx="849" cy="433" r="10"/><text class="num" x="849" y="437" text-anchor="middle">7</text>
+<circle class="marker" cx="849" cy="709" r="10"/><text class="num" x="849" y="713" text-anchor="middle">8</text>
+<text class="h2" x="904" y="122">What each part does</text>
+<circle class="marker" cx="913" cy="146" r="9"/><text class="num" x="913" y="150" text-anchor="middle">1</text>
+<text class="legb" x="930" y="150">Link</text>
+<text class="leg" x="930" y="169">Drone address; Roll / Pitch / Yaw picks the</text>
+<text class="leg" x="930" y="187">axis. Changing axis rebuilds both log blocks.</text>
+<circle class="marker" cx="913" cy="212" r="9"/><text class="num" x="913" y="216" text-anchor="middle">2</text>
+<text class="legb" x="930" y="216">Gains</text>
+<text class="leg" x="930" y="235">Kp, Ki, Kd for that axis. −/+ step 10 %,</text>
+<text class="leg" x="930" y="253">Set writes, Get reads back, Save → NVS.</text>
+<text class="leg" x="930" y="271">Firmware clamps kp 0–100, ki 0–20, kd 0–200.</text>
+<circle class="marker" cx="913" cy="296" r="9"/><text class="num" x="913" y="300" text-anchor="middle">3</text>
+<text class="legb" x="930" y="300">Drone</text>
+<text class="leg" x="930" y="319">EMERGENCY cuts the motors in one click.</text>
+<text class="leg" x="930" y="337">Thrust % + Spin up streams thrust so the</text>
+<text class="leg" x="930" y="355">motors run on the stand (Stop = thrust 0).</text>
+<text class="leg" x="930" y="373">Log Hz, plot window, Pause, Record CSV.</text>
+<circle class="marker" cx="913" cy="398" r="9"/><text class="num" x="913" y="402" text-anchor="middle">4</text>
+<text class="legb" x="930" y="402">Auto-tune</text>
+<text class="leg" x="930" y="421">Method (11 choices, ML Bayesian default),</text>
+<text class="leg" x="930" y="439">which gains to search, trials, seconds per</text>
+<text class="leg" x="930" y="457">trial, search range ×. Start / Stop, Model.</text>
+<circle class="marker" cx="913" cy="482" r="9"/><text class="num" x="913" y="486" text-anchor="middle">5</text>
+<text class="legb" x="930" y="486">Live stats</text>
+<text class="leg" x="930" y="505">Log rate, angle mean / std, rate RMS,</text>
+<text class="leg" x="930" y="523">controller mean, motor saturation, tilt.</text>
+<circle class="marker" cx="913" cy="548" r="9"/><text class="num" x="913" y="552" text-anchor="middle">6</text>
+<text class="legb" x="930" y="552">Angle and rate</text>
+<text class="leg" x="930" y="571">stabilizer.&lt;axis&gt; and its rate (roll / pitch</text>
+<text class="leg" x="930" y="589">rate is differenced from the angle).</text>
+<circle class="marker" cx="913" cy="614" r="9"/><text class="num" x="913" y="618" text-anchor="middle">7</text>
+<text class="legb" x="930" y="618">P, I, D terms</text>
+<text class="leg" x="930" y="637">pid.&lt;axis&gt;_p / _i / _d as the firmware</text>
+<text class="leg" x="930" y="655">computed them — see which term works.</text>
+<circle class="marker" cx="913" cy="680" r="9"/><text class="num" x="913" y="684" text-anchor="middle">8</text>
+<text class="legb" x="930" y="684">Controller and m1</text>
+<text class="leg" x="930" y="703">PID output, and motor m1 with dashed</text>
+<text class="leg" x="930" y="721">saturation rails at 1990 and 1010.</text>
+<rect x="904" y="750" width="336" height="76" rx="8" fill="#fff8c5" stroke="#bc4c00"/>
+<text class="legb" x="918" y="772">Safety</text>
+<text class="leg" x="918" y="790">Props off or the drone on a stand.</text>
+<text class="leg" x="918" y="806">Spin up runs all four motors; Stop ends it.</text>
+<text class="leg" x="918" y="822">Verify a result by hand before flying.</text>
+</svg>

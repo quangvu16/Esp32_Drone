@@ -391,7 +391,8 @@ final class CrtpClient {
         sendReliable(packet,
                      matches: { p in
                          p.port == .generic && p.channel == 0 &&
-                         p.payload.count >= 2 && p.payload[p.payload.index(p.payload.startIndex, offsetBy: 1)] == command.rawValue
+                         // reply payload is <cmd><status>: the command is the FIRST byte
+                         p.payload.count >= 2 && p.payload.first == command.rawValue
                      })
     }
 
@@ -450,7 +451,8 @@ final class CrtpClient {
         sendReliable(packet,
                      matches: { p in
                          p.port == .generic && p.channel == 1 &&
-                         p.payload.count >= 2 && p.payload[p.payload.index(p.payload.startIndex, offsetBy: 1)] == command.rawValue
+                         // reply payload is <cmd><status>: the command is the FIRST byte
+                         p.payload.count >= 2 && p.payload.first == command.rawValue
                      })
     }
 
