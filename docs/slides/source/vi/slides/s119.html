@@ -1,0 +1,23 @@
+<section id="s119" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Chế độ và an toàn</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Lỗi thật: thời gian bị đo ngược</h2>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#13202E">Một mili giây, đọc sai thứ tự, có thể cắt động cơ.</p>
+<div style="display:flex;gap:32px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #B42318">
+<h3 style="font-size:38px;font-weight:600;color:#B42318">Trước (lỗi)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">So sánh tuổi gói bằng số không dấu</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Gói xử lý trong vòng này có thể mới hơn <i>now</i> 1 ms</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">now − last = −1 → quấn thành ~49 ngày → failsafe → cắt động cơ</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #1F7A4D">
+<h3 style="font-size:38px;font-weight:600;color:#1F7A4D">Sau (đã sửa)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">(int32_t)(now − last) &lt; FAILSAFE_MS</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">−1 ms đơn giản là “rất mới”</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">So sánh có dấu vẫn đúng qua lần quấn 49 ngày</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Chế độ và an toàn · 119 · Nguồn: chú thích loop()</p>
+<aside>Chỗ tinh tế: now được đọc ở đầu loop(), còn các bộ thu chạy sau đó. Gói đến trong lúc sbusPoll() nhận mốc millis(), có thể muộn hơn now một mili giây. Với số 32 bit không dấu, now − last khi đó là 4.294.967.295 — khoảng 49,7 ngày — và failsafe kích hoạt trong một vòng, cắt động cơ giữa không trung. Ép hiệu số sang có dấu là sửa được.</aside>
+</section>

@@ -1,0 +1,27 @@
+<section id="s075" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">PID control</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">The sign of the error matters</h2>
+</div>
+<p style="font-size:34px;line-height:1.4;color:#13202E">Here error = measured − wanted (gyro − setpoint). Many textbooks write wanted − measured.</p>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Either works</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">…as long as the mixer signs match the choice.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">The rule</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">A positive output must push the drone toward a negative rate.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">If one sign is wrong</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">The correction becomes a push, and the drone flips at once.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Test with props off: tilt the drone by hand while armed. The motors on the low side must speed up. If the high side speeds up, a sign is wrong.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">PID control · 75 · Source: Esp32_drone.ino pidCompute(), #define GYRO_X_SIGN</p>
+<aside>Why point this out? Signs are the most common bug in drone firmware, and they hide in four places: the gyro axis signs (GYRO_*_SIGN), the error, the self-level term and the mixer. This firmware had one such bug in the self-level term, which you will see on slide 81.</aside>
+</section>

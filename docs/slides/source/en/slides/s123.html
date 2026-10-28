@@ -1,0 +1,27 @@
+<section id="s123" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Modes and safety</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Bad numbers never reach the motors</h2>
+</div>
+<p style="font-size:34px;line-height:1.4;color:#13202E">Every value from outside is checked before it is used.</p>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Commander packets</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">NaN, infinity or absurd angles → ignored.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Parameter writes</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">NaN refused; others clamped into the TOC range.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Hover thrust</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">clamped to 8000 – 55000 from SET_HOVER, TAKEOFF and flash.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Flash at boot</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">a non-finite saved gain restores all defaults.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Modes and safety · 123 · Source: Esp32_drone.ino crtpHandleCommander(), paramStore(), paramSanitizeAll()</p>
+<aside>Why so many checks? Data from a phone, a radio link or flash memory can be corrupted, or simply wrong because of an app bug. The flight loop trusts its inputs completely, so the checking has to happen at the edges, where data comes in. This is called validating at the boundary.</aside>
+</section>

@@ -1,0 +1,26 @@
+<section id="s085" style="background:#13202E;color:#F6F5F0;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:3px;text-transform:uppercase">PID control · Ask why</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Check your understanding</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why does a drone need I if P already corrects?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: what does P do when the error is small but constant?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why is I reset when the throttle is at idle?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: what grows while the drone sits on grass?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why does too much D make the motors hot?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: what does D do to sensor noise?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why is the self-level term subtracted?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: tilted +5°, which way must it rotate?</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#8FA3B8">PID control · 85</p>
+<aside>Deeper: why does this PID have no dt in it? Because the loop is hard-timed at 4 ms, the gains absorb dt. What would break if the loop period changed — for example if the Wi-Fi stack made one loop take 6 ms? Which term is most sensitive: I (which grows per loop) or D (which divides by the loop time implicitly)?</aside>
+</section>

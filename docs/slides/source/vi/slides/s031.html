@@ -1,0 +1,30 @@
+<section id="s031" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Phần cứng</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Pin: một cell LiPo (1S)</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">Một cell LiPo (1S): điện áp chính là đồng hồ nhiên liệu.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Cell đầy là <b>4,2 V</b>.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Dưới <b>3,5 V</b> firmware cảnh báo (VBAT_CELL_WARN).</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Dưới <b>3,3 V</b> không cho arm, và tự hạ cánh nếu ở mức đó 3 s (VBAT_CELL_CRIT).</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:24px 32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:26px;line-height:1.4">Lực đẩy cũng giảm theo điện áp — vì vậy độ cao lơ lửng tụt dần trong chuyến bay.</p>
+</div>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Thước đo pin từ 3,0 đến 4,2 vôn, cảnh báo ở 3,5 và nguy hiểm ở 3,3" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><rect x="330.0" y="50.0" width="180.0" height="480.0" rx="18" fill="none" stroke="#13202E" stroke-width="6"/><rect x="380.0" y="30.0" width="80.0" height="22.0" rx="6" fill="#13202E" stroke="none" stroke-width="0"/><rect x="342.0" y="74.0" width="156.0" height="258.5" rx="0" fill="#2F6FA3" stroke="none" stroke-width="0" opacity="0.35"/><rect x="342.0" y="332.5" width="156.0" height="75.0" rx="0" fill="#F29E5C" stroke="none" stroke-width="0" opacity="0.6"/><rect x="342.0" y="407.5" width="156.0" height="106.5" rx="0" fill="#B42318" stroke="none" stroke-width="0" opacity="0.45"/><line x1="310.0" y1="70.0" x2="540.0" y2="70.0" stroke="#13202E" stroke-width="4" stroke-linecap="round"/><line x1="310.0" y1="257.5" x2="540.0" y2="257.5" stroke="#13202E" stroke-width="4" stroke-linecap="round"/><line x1="310.0" y1="332.5" x2="540.0" y2="332.5" stroke="#B5501A" stroke-width="4" stroke-linecap="round"/><line x1="310.0" y1="407.5" x2="540.0" y2="407.5" stroke="#B42318" stroke-width="4" stroke-linecap="round"/></svg>
+<p style="position:absolute;left:556px;top:54px;width:250px;font-size:26px;line-height:1.25;color:#13202E;text-align:left;font-weight:600">4,2 V đầy</p>
+<p style="position:absolute;left:556px;top:241px;width:250px;font-size:26px;line-height:1.25;color:#13202E;text-align:left;font-weight:600">3,7 V danh định</p>
+<p style="position:absolute;left:556px;top:316px;width:250px;font-size:26px;line-height:1.25;color:#B5501A;text-align:left;font-weight:600">3,5 V cảnh báo</p>
+<p style="position:absolute;left:556px;top:392px;width:250px;font-size:26px;line-height:1.25;color:#B42318;text-align:left;font-weight:600">3,3 V nguy hiểm</p>
+<p style="position:absolute;left:40px;top:185px;width:260px;font-size:26px;line-height:1.25;color:#2F6FA3;text-align:right;font-weight:600">bay</p>
+<p style="position:absolute;left:40px;top:354px;width:260px;font-size:26px;line-height:1.25;color:#B5501A;text-align:right;font-weight:600">cảnh báo</p>
+<p style="position:absolute;left:40px;top:434px;width:260px;font-size:24px;line-height:1.25;color:#B42318;text-align:right;font-weight:600">cấm arm · tự hạ<br>cánh sau 3 s</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Phần cứng · 31 · Nguồn: các #define pin trong Esp32_drone.ino</p>
+<aside>Vì sao quan tâm điện áp đến vậy? Cell lithium bị hỏng nếu xả quá sâu, và cell yếu bị sụt áp khi tải nặng, nên drone có thể mất lực đẩy đột ngột. Firmware không cho arm dưới 3,3 V và tự hạ cánh khi pin ở mức nguy hiểm liên tục 3 giây.</aside>
+</section>

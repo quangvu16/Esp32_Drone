@@ -1,0 +1,36 @@
+<section id="s088" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Bộ trộn và động cơ</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Ví dụ tính: một vòng trộn</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">Ví dụ tính: một vòng trộn.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Đầu ra PID vòng này: <b>pitch −20, roll +50, yaw +10</b>. Ga 1400.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">RF = 1400 + 20 + 50 − 10 = <b>1460</b>; RR = 1400 − 20 + 50 + 10 = <b>1440</b>.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">LR = 1400 − 20 − 50 − 10 = <b>1320</b>; LF = 1400 + 20 − 50 + 10 = <b>1380</b>.</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:24px 32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:26px;line-height:1.4">Trung bình = (1460 + 1440 + 1320 + 1380) ÷ 4 = 1400 — trộn chỉ chuyển lực đẩy qua lại; không thêm chút nào.</p>
+</div>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Biểu đồ cột: RF 1460, RR 1440, LR 1320, LF 1380; đường trung bình nét đứt ở 1400, đúng mức ga" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><line x1="110.0" y1="470.0" x2="790.0" y2="470.0" stroke="#E2DFD6" stroke-width="2" stroke-linecap="round"/><line x1="110.0" y1="336.7" x2="790.0" y2="336.7" stroke="#E2DFD6" stroke-width="2" stroke-linecap="round"/><line x1="110.0" y1="203.3" x2="790.0" y2="203.3" stroke="#E2DFD6" stroke-width="2" stroke-linecap="round"/><line x1="110.0" y1="70.0" x2="790.0" y2="70.0" stroke="#E2DFD6" stroke-width="2" stroke-linecap="round"/><rect x="150.0" y="123.3" width="110.0" height="346.7" rx="8" fill="#B5501A" stroke="none" stroke-width="0" opacity="0.85"/><rect x="310.0" y="150.0" width="110.0" height="320.0" rx="8" fill="#B5501A" stroke="none" stroke-width="0" opacity="0.85"/><rect x="470.0" y="310.0" width="110.0" height="160.0" rx="8" fill="#2F6FA3" stroke="none" stroke-width="0" opacity="0.85"/><rect x="630.0" y="230.0" width="110.0" height="240.0" rx="8" fill="#2F6FA3" stroke="none" stroke-width="0" opacity="0.85"/><line x1="120.0" y1="203.3" x2="790.0" y2="203.3" stroke="#13202E" stroke-width="4" stroke-linecap="round" stroke-dasharray="12 10"/></svg>
+<p style="position:absolute;left:10px;top:454px;width:90px;font-size:24px;line-height:1.25;color:#4A5568;text-align:right">1200</p>
+<p style="position:absolute;left:10px;top:321px;width:90px;font-size:24px;line-height:1.25;color:#4A5568;text-align:right">1300</p>
+<p style="position:absolute;left:10px;top:187px;width:90px;font-size:24px;line-height:1.25;color:#4A5568;text-align:right">1400</p>
+<p style="position:absolute;left:10px;top:54px;width:90px;font-size:24px;line-height:1.25;color:#4A5568;text-align:right">1500</p>
+<p style="position:absolute;left:130px;top:133px;width:150px;font-size:26px;line-height:1.25;color:#F6F5F0;text-align:center"><b>1460</b></p>
+<p style="position:absolute;left:130px;top:484px;width:150px;font-size:26px;line-height:1.25;color:#13202E;text-align:center"><b>RF</b></p>
+<p style="position:absolute;left:290px;top:160px;width:150px;font-size:26px;line-height:1.25;color:#F6F5F0;text-align:center"><b>1440</b></p>
+<p style="position:absolute;left:290px;top:484px;width:150px;font-size:26px;line-height:1.25;color:#13202E;text-align:center"><b>RR</b></p>
+<p style="position:absolute;left:450px;top:320px;width:150px;font-size:26px;line-height:1.25;color:#F6F5F0;text-align:center"><b>1320</b></p>
+<p style="position:absolute;left:450px;top:484px;width:150px;font-size:26px;line-height:1.25;color:#13202E;text-align:center"><b>LR</b></p>
+<p style="position:absolute;left:610px;top:240px;width:150px;font-size:26px;line-height:1.25;color:#F6F5F0;text-align:center"><b>1380</b></p>
+<p style="position:absolute;left:610px;top:484px;width:150px;font-size:26px;line-height:1.25;color:#13202E;text-align:center"><b>LF</b></p>
+<p style="position:absolute;left:560px;top:163px;width:230px;font-size:24px;line-height:1.25;color:#13202E;text-align:right;font-weight:600">trung bình 1400</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Bộ trộn và động cơ · 88 · Nguồn: công thức motorMix()</p>
+<aside>Hãy tự tính bằng bốn công thức ở slide trước. Rồi kiểm tra trung bình: (1460 + 1440 + 1320 + 1380) ÷ 4 = 1400 — đúng bằng ga. Lệnh sửa chỉ chuyển lực đẩy giữa các động cơ; không bao giờ thêm hay bớt.</aside>
+</section>

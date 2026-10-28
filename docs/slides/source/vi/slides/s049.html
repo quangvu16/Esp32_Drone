@@ -1,0 +1,26 @@
+<section id="s049" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiến trúc</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Đầu vào: ai có thể lái drone</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Ứng dụng điện thoại (CRTP)</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Qua Wi-Fi UDP, Bluetooth Classic SPP hoặc BLE. Thắng khi kết nối còn sống.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Máy thu RC (SBUS)</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Tùy chọn. Dùng khi điện thoại im lặng. Luôn ở chế độ rate thủ công.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Cổng serial</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Cáp USB, để cài đặt trên bàn: link, sta, save, load, defaults, status.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Điện thoại kết nối và đang gửi → điện thoại lái. Ứng dụng tắt 0,5 s → SBUS tiếp quản nếu có máy thu; nếu không, failsafe dừng động cơ.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiến trúc · 49 · Nguồn: rx_ok / use_crtp trong loop()</p>
+<aside>Vì sao điện thoại thắng? Điện thoại gửi lệnh phong phú hơn (chế độ, cất cánh, hạ cánh). Vì sao giữ SBUS? Nó là lưới an toàn: nếu mất kết nối điện thoại, tay điều khiển RC thật vẫn lái được. Phần 8 trình bày cả hai giao thức, phần 9 giải thích mã quyết định đầu vào nào nắm quyền.</aside>
+</section>

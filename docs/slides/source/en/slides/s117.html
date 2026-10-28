@@ -1,0 +1,17 @@
+<section id="s117" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Modes and safety</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">One pre-arm check for every path</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">bool</span> armChecksOk(<span style="color:#F29E5C">const</span> char *who) {<br>#<span style="color:#F29E5C">if</span> VBAT_ARM_CHECK<br>&#160;&#160;<span style="color:#F29E5C">if</span> (vbat &lt; VBAT_CELLS * VBAT_CELL_CRIT) {&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// 3.3 V</span><br>&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// rate-limited message, at most once a second</span><br>&#160;&#160;&#160;&#160;Serial.printf("[ARM] %s refused: battery %.2f V\n", who, vbat);<br>&#160;&#160;&#160;&#160;crtpConsole("arm refused: low battery");<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">return</span> <span style="color:#F29E5C">false</span>;<br>&#160;&#160;}<br>#endif<br>&#160;&#160;<span style="color:#F29E5C">return</span> <span style="color:#F29E5C">true</span>;<br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Called by SBUS arming, CRTP thrust-up, ARM and TAKEOFF.</p>
+<p style="font-size:29px;line-height:1.4"><b>Why one function?</b> A new check added here protects every path at once.</p>
+<p style="font-size:29px;line-height:1.4">The message is rate-limited so a held stick cannot flood the console.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Modes and safety · 117 · Source: Esp32_drone.ino armChecksOk()</p>
+<aside>Before this function existed, each arming path had its own checks, and they drifted apart. Putting the rule in one place is a classic safety pattern. The who argument says which path asked, which helps when reading the serial log. Shortened from the sketch.</aside>
+</section>

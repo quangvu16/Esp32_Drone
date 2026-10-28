@@ -1,0 +1,16 @@
+<section id="s059" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Cảm biến</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Một lần đọc liên tiếp: 14 byte, mọi trục</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">void</span> mpuReadRaw() {<br>&#160;&#160;<span style="color:#F29E5C">uint8_t</span> buf[14];<br>&#160;&#160;mpuReadBurst(MPU_REG_ACCEL_XOUT, buf, 14);<br>&#160;&#160;raw_ax = (<span style="color:#F29E5C">int16_t</span>)(buf[0]&#160;&#160;&lt;&lt; 8 | buf[1]);<br>&#160;&#160;raw_ay = (<span style="color:#F29E5C">int16_t</span>)(buf[2]&#160;&#160;&lt;&lt; 8 | buf[3]);<br>&#160;&#160;raw_az = (<span style="color:#F29E5C">int16_t</span>)(buf[4]&#160;&#160;&lt;&lt; 8 | buf[5]);<br>&#160;&#160;/* buf[6..7] = temperature (skip) */<br>&#160;&#160;raw_gx = (<span style="color:#F29E5C">int16_t</span>)(buf[8]&#160;&#160;&lt;&lt; 8 | buf[9]);<br>&#160;&#160;raw_gy = (<span style="color:#F29E5C">int16_t</span>)(buf[10] &lt;&lt; 8 | buf[11]);<br>&#160;&#160;raw_gz = (<span style="color:#F29E5C">int16_t</span>)(buf[12] &lt;&lt; 8 | buf[13]);<br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Thanh ghi 0x3B…0x48 nằm liền nhau, nên một lần đọc lấy được tất cả.</p>
+<p style="font-size:29px;line-height:1.4"><b>Vì sao đọc một lượt?</b> Sáu giá trị cùng một thời điểm, và nhanh.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Cảm biến · 59 · Nguồn: mpuReadRaw()</p>
+<aside>Thứ tự trong bản đồ thanh ghi là gia tốc X, Y, Z, nhiệt độ, gyro X, Y, Z. Mỗi giá trị hai byte, byte cao trước. Nhiệt độ được đọc nhưng bỏ qua vì firmware không dùng.</aside>
+</section>

@@ -1,0 +1,17 @@
+<section id="s136" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Navigation</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Turning with the drone: two rotations</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> yaw_rel = (heading_deg - heading_ref_deg)<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;* NAV_HEADING_SIGN * DEG_TO_RAD;<br><span style="color:#8FA3B8">// body -&gt; launch (navUpdate)</span><br>ax_w = fwd * cy - left * sy;<br>ay_w = fwd * sy + left * cy;<br><span style="color:#8FA3B8">// launch -&gt; body (navSetpoints)</span><br>body_fwd&#160;&#160;=&#160;&#160;ux * cy + uy * sy;<br>body_left = -ux * sy + uy * cy;</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">The drone may yaw after launch. Acceleration is measured in the body, but position lives in the launch frame.</p>
+<p style="font-size:29px;line-height:1.4">One rotation goes body → launch, the other is its exact reverse.</p>
+<p style="font-size:29px;line-height:1.4"><b>NAV_HEADING_SIGN = −1</b> makes the gyro's heading direction match the left-positive frame.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Navigation · 136 · Source: Esp32_drone.ino navUpdate(), navSetpoints(); test/yawrot_test.cpp</p>
+<aside>Why a sign constant? heading_deg grows in the direction the gyro calls positive, but the launch frame measures angles from +x toward +y, which is to the left. If those two disagree, every rotation turns the wrong way. yawrot_test.cpp is built with the sign read straight from the sketch, so it tests the configuration that actually runs.</aside>
+</section>

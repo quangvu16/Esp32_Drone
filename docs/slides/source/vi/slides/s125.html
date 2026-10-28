@@ -1,0 +1,39 @@
+<section id="s125" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Chế độ và an toàn</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">CẮT ĐỘNG CƠ, từ đầu đến cuối</h2>
+</div>
+<div style="display:flex;gap:12px;align-items:stretch">
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Chạm</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">2 lần ở Fly, 1 lần ở Mission và Tune</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Ứng dụng gửi</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">port 7: 0x70 0x05 (EMERGENCY)</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Firmware</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">flightEmergency(): disarm, motorStop, pidReset</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Chế độ</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">về MANUAL, AUTO nghỉ</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Phản hồi</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">0x70 0x05 0x00 → ứng dụng báo đã dừng</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">EMERGENCY không có điều kiện. Đó là lệnh duy nhất luôn có tác dụng.</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Drone ở HOLD trôi về phía tường → chạm hai lần CẮT ĐỘNG CƠ → cánh dừng trong một vòng 4 ms sau khi gói tới.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Chế độ và an toàn · 125 · Nguồn: flightEmergency(); docs/USER_GUIDE.md</p>
+<aside>Vì sao hai lần chạm ở Fly? Màn hình Fly là nơi ngón tay bạn đặt, nên chạm nhầm một lần rất dễ; lần thứ hai xác nhận. Ở Mission và Tune bạn không lái bằng ngón cái, nên một lần là đủ. EMERGENCY được thực hiện ở mọi chế độ và trạng thái: không kiểm tra nào từ chối được nó.</aside>
+</section>

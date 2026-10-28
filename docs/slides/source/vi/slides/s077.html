@@ -1,0 +1,24 @@
+<section id="s077" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Điều khiển PID</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">D theo sai số, và tác dụng phụ của nó</h2>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#13202E">Cả hai giảm chấn chuyển động thật như nhau. Chúng chỉ khác khi setpoint nhảy.</p>
+<div style="display:flex;gap:32px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #1F7A4D">
+<h3 style="font-size:38px;font-weight:600;color:#1F7A4D">D theo sai số (firmware này)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">D = Kd × thay đổi của (gyro − setpoint)</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Đơn giản: một công thức</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Gạt cần đột ngột đổi setpoint → một xung trong một vòng (derivative kick)</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #B42318">
+<h3 style="font-size:38px;font-weight:600;color:#B42318">D theo phép đo (cách khác)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">D = Kd × thay đổi của riêng gyro</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Không có xung khi gạt cần</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Mã nhiều hơn chút; lựa chọn phổ biến ở hệ bay lớn</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Hỏi tại sao xung ở đây nhỏ: setpoint từ cần thay đổi mượt và đầu ra bị kẹp ±400.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Điều khiển PID · 77 · Nguồn: pidCompute()</p>
+<aside>Derivative kick: nếu phi công giật cần, setpoint nhảy trong một vòng, nên sai số nhảy, và D nhân bước nhảy đó với 18. Động cơ nhận một xung một vòng. Ở firmware này nó bị hạn chế vì cần SBUS di chuyển mượt, điện thoại gửi góc đi qua thành phần P tự cân bằng trước, và đầu ra bị kẹp. Đổi sang D theo phép đo là một bài tập hay.</aside>
+</section>

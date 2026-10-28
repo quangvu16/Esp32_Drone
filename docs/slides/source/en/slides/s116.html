@@ -1,0 +1,22 @@
+<section id="s116" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Modes and safety</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Arming from the phone: three rules</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Thrust low first</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">In MANUAL, thrust-up arms only after the app has shown thrust at zero. A phone that connects with the stick up cannot spin the props.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">ARM only from idle</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">ARM is refused in HOLD, FOLLOW or RTH, where motors would jump to hover thrust. Use TAKEOFF there.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">TAKEOFF arms safely</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">It checks the battery, sets the launch point and starts the ramp from zero.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Modes and safety · 116 · Source: Esp32_drone.ino armUpdate(), FC_CMD_ARM, flightTakeoff()</p>
+<aside>Each rule prevents a real accident: the first stops a surprise full-throttle start on reconnect; the second stops a jump to hover thrust on the bench; the third makes sure the only way into automatic flight starts from zero thrust. A reconnect also clears crtp_thrust_was_low, so it must see zero again.</aside>
+</section>

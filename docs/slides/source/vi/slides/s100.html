@@ -1,0 +1,17 @@
+<section id="s100" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Đầu vào</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Tìm khung và co giãn giá trị cần</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">while</span> (Serial2.available()) {<br>&#160;&#160;<span style="color:#F29E5C">uint8_t</span> c = Serial2.read();<br>&#160;&#160;<span style="color:#F29E5C">if</span> (sbus_idx == 0 &amp;&amp; c != 0x0F) continue;&#160;&#160;<span style="color:#8FA3B8">// wait for header</span><br>&#160;&#160;sbus_buf[sbus_idx++] = c;<br>&#160;&#160;<span style="color:#F29E5C">if</span> (sbus_idx &gt;= SBUS_FRAME_LEN) {<br>&#160;&#160;&#160;&#160;sbus_idx = 0;<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">if</span> (sbusFrameUsable(sbus_buf)) sbusDecode(sbus_buf);<br>&#160;&#160;}<br>}<br><span style="color:#8FA3B8">// in sbusDecode: 172..1811 -&gt; 1000..2000</span><br>rc[i] = constrain(map(sbus_raw[i], 172, 1811, 1000, 2000),<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;1000, 2000);</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>Không chặn</b>: chỉ đọc những gì đã tới, không bao giờ chờ.</p>
+<p style="font-size:29px;line-height:1.4"><b>map()</b> co giãn về dải 1000–2000 mà phần còn lại của mã dùng.</p>
+<p style="font-size:29px;line-height:1.4">CH5 thành công tắc đơn giản: trên 1024 → 2000, ngược lại 1000.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Đầu vào · 100 · Nguồn: sbusPoll(), sbusDecode()</p>
+<aside>Vì sao không bao giờ chờ? sbusPoll() chạy trong vòng 4 ms. Nếu nó chặn tới khi đủ một khung, vòng điều khiển sẽ đứng tới 14 ms. Thay vào đó nó lấy những byte đã sẵn và hoàn thành khung ở vòng sau. Đã rút gọn: mã thật dùng hằng SBUS_MIN và SBUS_MAX.</aside>
+</section>

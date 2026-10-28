@@ -1,0 +1,16 @@
+<section id="s015" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">How it flies</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Summary: which motors change for each move</h2>
+</div>
+<table style="font-size:30px;color:#13202E">
+<tr><th style="width:34%">Move</th><th style="width:22%">Faster</th><th style="width:22%">Slower</th><th style="width:22%">Stays the same</th></tr>
+<tr><td>Climb</td><td>all four</td><td>—</td><td>attitude</td></tr>
+<tr><td>Roll right</td><td>LF, LR</td><td>RF, RR</td><td>total thrust</td></tr>
+<tr><td>Pitch forward (nose down)</td><td>RR, LR</td><td>RF, LF</td><td>total thrust</td></tr>
+<tr><td>Yaw (CW pair faster)</td><td>RF, LR</td><td>RR, LF</td><td>total thrust</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Every move is “add here, take away there”. Only climbing changes all four the same way.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">How it flies · 15 · Source: Esp32_drone.ino motor mixing comment</p>
+<aside>Keep this table. Section 7 shows the same table written as four lines of code — the motor mixer. Every move is a plus on some motors and a minus on others.</aside>
+</section>

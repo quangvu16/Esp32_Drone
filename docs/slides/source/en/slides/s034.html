@@ -1,0 +1,16 @@
+<section id="s034" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Hardware</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">The pin map</h2>
+</div>
+<table style="font-size:30px;color:#13202E">
+<tr><th style="width:15%">Pin</th><th style="width:35%">Use</th><th style="width:15%">Pin</th><th style="width:35%">Use</th></tr>
+<tr><td>GPIO 15</td><td>Motor RF (front-right)</td><td>GPIO 18</td><td>SPI SCK</td></tr>
+<tr><td>GPIO 13</td><td>Motor RR (rear-right)</td><td>GPIO 19</td><td>SPI MISO</td></tr>
+<tr><td>GPIO 12</td><td>Motor LR (rear-left)</td><td>GPIO 23</td><td>SPI MOSI</td></tr>
+<tr><td>GPIO 14</td><td>Motor LF (front-left)</td><td>GPIO 5</td><td>MPU chip select</td></tr>
+<tr><td>GPIO 4</td><td>SBUS in (UART2 RX)</td><td>GPIO 36</td><td>Battery ADC</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Hardware · 34 · Source: Esp32_drone.ino #define PIN_*</p>
+<aside>These numbers come from the #define block at the top of the sketch, which matches the board schematic. If you build your own board, this is the first place to change. GPIO 36 is input-only on the ESP32, which suits the ADC.</aside>
+</section>

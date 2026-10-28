@@ -1,0 +1,16 @@
+<section id="s058" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Cảm biến</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Cài đặt cảm biến trong mpuInit()</h2>
+</div>
+<table style="font-size:26px;color:#13202E">
+<tr><th style="width:18%">Thanh ghi</th><th style="width:18%">Giá trị</th><th style="width:34%">Ý nghĩa</th><th style="width:30%">Vì sao</th></tr>
+<tr><td>PWR_MGMT_1</td><td>0x80 rồi 0x01</td><td>reset, rồi dùng xung PLL của gyro</td><td>khởi động sạch; xung ổn định</td></tr>
+<tr><td>SMPLRT_DIV</td><td>0x03</td><td>1 kHz ÷ (1+3) = 250 Hz</td><td>mỗi vòng một mẫu mới</td></tr>
+<tr><td>CONFIG</td><td>0x02</td><td>lọc thông thấp 92 Hz</td><td>cắt nhiễu rung động cơ</td></tr>
+<tr><td>GYRO_CFG</td><td>0x08</td><td>±500 °/s → 65,5 LSB mỗi °/s</td><td>đủ nhanh để lật, vẫn chi tiết</td></tr>
+<tr><td>ACCEL_CFG</td><td>0x10</td><td>±8 g → 4096 LSB mỗi g</td><td>dư dải cho va chạm</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Cảm biến · 58 · Nguồn: mpuInit(); bản đồ thanh ghi MPU-6500</p>
+<aside>Mỗi giá trị thanh ghi được chọn cho drone này. Hai hệ số tỷ lệ ở cột phải, 65,5 và 4096, phải khớp với mã đổi số thô ra đơn vị. Một lần không khớp từng gây sai số dẫn đường gấp 4 lần, và giờ có bài kiểm thử canh giữ.</aside>
+</section>

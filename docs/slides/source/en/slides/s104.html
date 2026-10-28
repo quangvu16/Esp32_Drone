@@ -1,0 +1,14 @@
+<section id="s104" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Radio inputs</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Three ways to carry CRTP</h2>
+</div>
+<table style="font-size:28px;color:#13202E">
+<tr><th style="width:20%">Transport</th><th style="width:52%">Details</th><th style="width:28%">Framing</th></tr>
+<tr><td>Wi-Fi UDP</td><td>drone 192.168.43.42, listens on 2390, replies to 2399</td><td>CRTP + checksum</td></tr>
+<tr><td>Bluetooth SPP</td><td>serial over Bluetooth Classic (Android)</td><td>CRTP + checksum</td></tr>
+<tr><td>Bluetooth LE</td><td>GATT writes and notifications (iPhone)</td><td>19-byte segments, no checksum</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Radio inputs · 104 · Source: Esp32_drone.ino TRANSPORT section</p>
+<aside>The CRTP layer never knows which transport is active: it calls linkSend() and receives through crtpReceiveFramed() or crtpReceiveRaw(). That separation is why adding BLE did not touch any flight code. BLE is limited to 20 bytes per write, so a 30-byte CRTP packet is split into two segments with a control byte.</aside>
+</section>

@@ -1,0 +1,21 @@
+<section id="s048" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Architecture</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Hard 250 Hz pacing</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#8FA3B8">// ---- hard 250 Hz pacing ----</span><br><span style="color:#F29E5C">while</span> (micros() - loop_timer &lt; LOOP_TIME_US) { /* spin */ }<br>loop_timer = micros();</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>Busy-wait</b>: the CPU spins until exactly 4 ms have passed since the last loop.</p>
+<p style="font-size:29px;line-height:1.4"><b>Why exact timing?</b> The gyro is integrated with a fixed dt of 0.004 s. A loop of the wrong length gives the wrong angle.</p>
+<p style="font-size:29px;line-height:1.4"><b>Wrap-safe</b>: unsigned subtraction still works when micros() overflows after ~71 minutes.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">The work takes 1.3 ms this loop → the spin lasts 2.7 ms. Next loop the work takes 2.1 ms → the spin lasts 1.9 ms. The period stays 4 ms.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Architecture · 48 · Source: Esp32_drone.ino end of loop()</p>
+<aside>Why not use delay()? delay() waits a fixed time no matter how long the loop work took, so the period would change with the workload. The busy-wait absorbs the variable work time. The cost: if the work ever takes longer than 4 ms, the loop runs late and dt is wrong for that loop.</aside>
+</section>

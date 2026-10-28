@@ -1,0 +1,24 @@
+<section id="s081" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">PID control</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">A real bug: the self-level sign</h2>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#13202E">One character, + or −, decided whether the drone could fly.</p>
+<div style="display:flex;gap:32px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #B42318">
+<h3 style="font-size:38px;font-weight:600;color:#B42318">Before (bug)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">roll_setpoint = sp_roll_rate + roll_level_adjust</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Tilted +5° → asks for +75 °/s: MORE tilt</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Positive feedback: the drone flipped</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #1F7A4D">
+<h3 style="font-size:38px;font-weight:600;color:#1F7A4D">After (fix)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">roll_setpoint = sp_roll_rate − roll_level_adjust</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Tilted +5° → asks for −75 °/s: back to level</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">test/level_test.cpp simulates both</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">level_test keeps the old formula as a negative control, so the test cannot pass by accident.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">PID control · 81 · Source: Esp32_drone.ino loop() comment; test/level_test.cpp</p>
+<aside>The story: the old code added the level term. With a perfect rate loop, any tilt commanded more tilt the same way — positive feedback — and the drone flipped within a fraction of a second of take-off. The fix is one character. The lesson is bigger: write a tiny simulation for every sign that matters, and keep the wrong version in the test to prove the test can fail.</aside>
+</section>

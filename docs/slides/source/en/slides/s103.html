@@ -1,0 +1,21 @@
+<section id="s103" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Radio inputs</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Framing and the checksum</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">uint8_t</span> crtpChecksum(<span style="color:#F29E5C">const</span> <span style="color:#F29E5C">uint8_t</span> *data, <span style="color:#F29E5C">size_t</span> len) {<br>&#160;&#160;<span style="color:#F29E5C">uint32_t</span> sum = 0;<br>&#160;&#160;<span style="color:#F29E5C">for</span> (<span style="color:#F29E5C">size_t</span> i = 0; i &lt; len; i++) sum += data[i];<br>&#160;&#160;<span style="color:#F29E5C">return</span> (<span style="color:#F29E5C">uint8_t</span>)(sum &amp; 0xFF);<br>}<br><span style="color:#8FA3B8">// on receive (UDP / SPP):</span><br><span style="color:#F29E5C">if</span> (crtpChecksum(data, len - 1) != data[len - 1]) <span style="color:#F29E5C">return</span>;<br>crtpDispatch(data, len - 1);<br>crtp_last_rx_ms = millis();&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// the link is alive</span></p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Over UDP and SPP, each packet ends with one checksum byte: the low 8 bits of the sum.</p>
+<p style="font-size:29px;line-height:1.4">A bad checksum → the packet is dropped silently.</p>
+<p style="font-size:29px;line-height:1.4">A good packet also refreshes <b>crtp_last_rx_ms</b>, used by the failsafe.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Packet 0x70 0x02 → sum 0x72 → checksum byte 0x72. Sent on the wire: 70 02 72.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Radio inputs · 103 · Source: Esp32_drone.ino crtpChecksum(), crtpReceiveFramed()</p>
+<aside>Why such a simple checksum? It catches most single-byte errors and costs almost nothing. UDP already has its own checksum, so this is mainly protection for the Bluetooth serial link. BLE packets arrive already framed by the BLE stack, so they skip this step.</aside>
+</section>

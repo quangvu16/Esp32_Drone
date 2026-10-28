@@ -1,0 +1,16 @@
+<section id="s074" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Điều khiển PID</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">pidCompute(): trục roll</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0">err = gyro_roll - roll_setpoint;<br>pid_i_mem_roll += pid_i_gain_roll * err;<br>pid_i_mem_roll = constrain(pid_i_mem_roll,<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;-I_TERM_LIMIT, I_TERM_LIMIT);<br>pid_p_roll = pid_p_gain_roll * err;<br>pid_i_roll = pid_i_mem_roll;<br>pid_d_roll = pid_d_gain_roll * (err - pid_last_roll_err);<br>pid_output_roll = pid_p_roll + pid_i_roll + pid_d_roll;<br>pid_last_roll_err = err;<br>pid_output_roll = constrain(pid_output_roll,<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;-PID_LIMIT, PID_LIMIT);</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Pitch và yaw lặp lại mười dòng này với hệ số riêng.</p>
+<p style="font-size:29px;line-height:1.4">P, I và D được lưu riêng để ứng dụng vẽ biểu đồ từng thành phần (nhóm log <b>pid</b>).</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Điều khiển PID · 74 · Nguồn: pidCompute()</p>
+<aside>Từng dòng: tính sai số, cộng vào bộ nhớ I và kẹp giới hạn, tính P, chép I, tính D từ thay đổi sai số, cộng lại, nhớ sai số cho vòng sau, và kẹp đầu ra. Để ý không có dt ở đâu cả: các hệ số đã gồm sẵn thời gian vòng 4 ms cố định.</aside>
+</section>

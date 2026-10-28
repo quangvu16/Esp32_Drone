@@ -1,0 +1,17 @@
+<section id="s051" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiến trúc</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Cấu hình nằm trong các #define</h2>
+</div>
+<table style="font-size:28px;color:#13202E">
+<tr><th style="width:38%">#define</th><th style="width:24%">Giá trị</th><th style="width:38%">Thay đổi gì</th></tr>
+<tr><td>LOOP_TIME_US</td><td>4000</td><td>chu kỳ vòng lặp (250 Hz)</td></tr>
+<tr><td>PID_ROLL_KP / KI / KD</td><td>1,3 / 0,04 / 18</td><td>hệ số roll mặc định</td></tr>
+<tr><td>MAX_TILT_DEG</td><td>25</td><td>góc nghiêng lệnh lớn nhất</td></tr>
+<tr><td>LEVEL_SENSITIVITY</td><td>15</td><td>tự cân bằng kéo về mạnh cỡ nào</td></tr>
+<tr><td>FAILSAFE_MS</td><td>500</td><td>im lặng bao lâu thì dừng động cơ</td></tr>
+<tr><td>VBAT_CELL_CRIT</td><td>3,30</td><td>điện áp cấm arm và tự hạ cánh</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiến trúc · 51 · Nguồn: khối #define</p>
+<aside>Vì sao dùng #define mà không dùng biến? Chúng cố định lúc biên dịch, không tốn RAM và nằm chung ở đầu file. Những giá trị cần đổi ngoài thực địa, như hệ số PID, được chép sang biến lúc khởi động để điện thoại chỉnh được.</aside>
+</section>

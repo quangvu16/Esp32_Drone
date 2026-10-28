@@ -1,0 +1,21 @@
+<section id="s107" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Radio inputs</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Parameters: the TOC and range checks</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0">{ "pid", "roll_kp", PT_FLOAT, 4, TOC_ACCESS_RW,<br>&#160;&#160;&amp;pid_p_gain_roll, 0.0f, 100.0f },<br>{ "flight", "takeoff_ms", PT_UINT16, 2, TOC_ACCESS_RW,<br>&#160;&#160;&amp;takeoff_ms, 100.0f, 20000.0f },<br><span style="color:#8FA3B8">// on write:</span><br><span style="color:#F29E5C">if</span> (!isfinite(v)) <span style="color:#F29E5C">return</span>;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// refused</span><br>v = paramClampF(e, v);&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// clamp into [lo, hi]</span></p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>TOC</b> = table of contents: the app downloads the list of names, types and access.</p>
+<p style="font-size:29px;line-height:1.4">Each read-write entry carries a <b>lo</b> and <b>hi</b> range.</p>
+<p style="font-size:29px;line-height:1.4">The reply echoes what was actually stored, so the app shows the truth.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">The app writes roll_kp = 1000 → stored as 100 (the hi limit) → the echo tells the app 100.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Radio inputs · 107 · Source: Esp32_drone.ino PARAM_TOC, paramStore()</p>
+<aside>Why validate? Before this fix, a NaN gain or a takeoff_ms of 0 from the app reached the flight code. takeoff_ms is a divisor in the take-off ramp, so 0 meant a divide by zero. Now every write is checked, and values loaded from flash are checked too (paramSanitizeAll).</aside>
+</section>

@@ -1,0 +1,16 @@
+<section id="s120" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Modes and safety</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Who is in control? Some scenarios</h2>
+</div>
+<table style="font-size:27px;color:#13202E">
+<tr><th style="width:44%">Situation</th><th style="width:16%">phone_ok</th><th style="width:16%">sbus_ok</th><th style="width:24%">Result</th></tr>
+<tr><td>Phone flying MANUAL, sending sticks</td><td>yes</td><td>—</td><td>phone flies</td></tr>
+<tr><td>Phone in AUTO hover, only log traffic</td><td>yes</td><td>—</td><td>phone flies (AUTO)</td></tr>
+<tr><td>Phone app closed, RC receiver fitted</td><td>no</td><td>yes</td><td>RC flies, manual rate</td></tr>
+<tr><td>Phone gone, no receiver</td><td>no</td><td>no</td><td>failsafe: motors stop</td></tr>
+<tr><td>RC transmitter off, receiver in failsafe</td><td>no</td><td>no (flag)</td><td>failsafe: motors stop</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Modes and safety · 120 · Source: Esp32_drone.ino loop()</p>
+<aside>Walk through each row with the code on slide 118. The last row is the one the SBUS byte-23 fix made work: before it, the receiver's failsafe frames looked healthy and sbus_ok stayed true.</aside>
+</section>

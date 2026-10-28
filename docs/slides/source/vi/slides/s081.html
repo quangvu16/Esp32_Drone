@@ -1,0 +1,24 @@
+<section id="s081" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Điều khiển PID</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Lỗi thật: dấu của tự cân bằng</h2>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#13202E">Một ký tự, + hay −, quyết định drone có bay được hay không.</p>
+<div style="display:flex;gap:32px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #B42318">
+<h3 style="font-size:38px;font-weight:600;color:#B42318">Trước (lỗi)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">roll_setpoint = sp_roll_rate + roll_level_adjust</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Nghiêng +5° → đòi +75 °/s: nghiêng THÊM</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Phản hồi dương: drone lật</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #1F7A4D">
+<h3 style="font-size:38px;font-weight:600;color:#1F7A4D">Sau (đã sửa)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">roll_setpoint = sp_roll_rate − roll_level_adjust</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Nghiêng +5° → đòi −75 °/s: về thăng bằng</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">test/level_test.cpp mô phỏng cả hai</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">level_test giữ công thức cũ làm đối chứng âm, nên bài kiểm thử không thể đỗ một cách tình cờ.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Điều khiển PID · 81 · Nguồn: chú thích loop(); test/level_test.cpp</p>
+<aside>Câu chuyện: mã cũ cộng thành phần cân bằng. Với vòng tốc độ hoàn hảo, mọi độ nghiêng lại đòi nghiêng thêm cùng chiều — phản hồi dương — và drone lật chỉ một phần giây sau khi cất cánh. Cách sửa chỉ là một ký tự. Bài học lớn hơn: viết một mô phỏng nhỏ cho mỗi dấu quan trọng, và giữ phiên bản sai trong bài kiểm thử để chứng minh bài kiểm thử có thể thất bại.</aside>
+</section>

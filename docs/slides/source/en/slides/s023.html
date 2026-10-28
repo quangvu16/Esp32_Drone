@@ -1,0 +1,26 @@
+<section id="s023" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Hardware</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">ESP32: the brain</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Two cores, up to 240 MHz</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Plenty of speed for a 250 Hz loop with floating-point maths.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Wi-Fi and Bluetooth built in</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">The phone connects directly — no extra radio chip.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Hardware helpers</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">SPI, UARTs, LEDC PWM and an ADC do the timing work in hardware.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Like a phone that is also its own router: it computes and talks without extra boxes.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Hardware · 23 · Source: Espressif ESP32 datasheet</p>
+<aside>Why an ESP32? One cheap chip gives the processor and both radios. The trade-off: Wi-Fi and Bluetooth stacks also use CPU time and can cause small timing jitter, which is one reason the loop uses a hard 4 ms pace.</aside>
+</section>

@@ -1,0 +1,23 @@
+<section id="s099" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Radio inputs</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">A real bug: reading the wrong byte</h2>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#13202E">Off by one byte, the failsafe flag was never seen.</p>
+<div style="display:flex;gap:32px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #B42318">
+<h3 style="font-size:38px;font-weight:600;color:#B42318">Before (bug)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Flags were read from byte 24, the footer</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Footer is always 0x00 → flags always look clear</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">A receiver in failsafe kept the motors running on stale sticks</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #1F7A4D">
+<h3 style="font-size:38px;font-weight:600;color:#1F7A4D">After (fix)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Flags read from byte 23</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Lost or failsafe frames are dropped</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">The 500 ms timeout then stops the motors; sbus_test.cpp pins it</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Radio inputs · 99 · Source: Esp32_drone.ino sbusFrameUsable(); test/sbus_test.cpp</p>
+<aside>Why is this so dangerous? A receiver that loses the transmitter usually keeps sending frames with the LAST stick positions and the failsafe flag set. If you never look at the flag, the drone flies on with whatever throttle the pilot last had, out of control. The fix also refuses to refresh sbus_last_frame_ms on a failsafe frame, so the normal timeout does the stopping.</aside>
+</section>

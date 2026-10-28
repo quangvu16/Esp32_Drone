@@ -1,0 +1,21 @@
+<section id="s057" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Motion sensor</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Talking to a register over SPI</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:25px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">uint8_t</span> mpuRead(<span style="color:#F29E5C">uint8_t</span> reg) {<br>&#160;&#160;mpuSelect();&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// CS low</span><br>&#160;&#160;SPI.transfer(reg | 0x80);&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// bit7 = 1 -&gt; read</span><br>&#160;&#160;<span style="color:#F29E5C">uint8_t</span> v = SPI.transfer(0x00);&#160;&#160;<span style="color:#8FA3B8">// clock the answer out</span><br>&#160;&#160;mpuDeselect();&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// CS high</span><br>&#160;&#160;<span style="color:#F29E5C">return</span> v;<br>}<br><span style="color:#8FA3B8">// write: reg &amp; 0x7F (bit7 = 0), then the value</span></p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>First byte</b> = register address. Its top bit says read (1) or write (0).</p>
+<p style="font-size:29px;line-height:1.4"><b>SPI is a swap</b>: to receive a byte you must send one, so we send 0x00.</p>
+<p style="font-size:29px;line-height:1.4"><b>CS low</b> starts the conversation; <b>CS high</b> ends it.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Read WHO_AM_I (register 0x75): send 0xF5 (0x75 | 0x80), then 0x00, and the sensor answers 0x70 for an MPU6500.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Motion sensor · 57 · Source: Esp32_drone.ino mpuRead(), mpuWrite()</p>
+<aside>This is the most basic driver code in the firmware. Every sensor feature — configuration, the WHO_AM_I check, reading data — is built from these two functions plus a burst read.</aside>
+</section>

@@ -1,0 +1,17 @@
+<section id="s089" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Bộ trộn và động cơ</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Các giới hạn bên trong bộ trộn</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">int16_t</span> t = constrain(throttle, RC_MIN, THROTTLE_MAX);<br><span style="color:#F29E5C">if</span> (t &gt; THROTTLE_ARM_MAX) {&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// above 1050</span><br>&#160;&#160;... four mixer lines ...<br>&#160;&#160;motor_rf = constrain(motor_rf, 1100, 2000);<br>&#160;&#160;...<br>} <span style="color:#F29E5C">else</span> {<br>&#160;&#160;motor_rf = motor_rr = motor_lr = motor_lf = 1000;<br>&#160;&#160;pidReset();&#160;&#160; <span style="color:#8FA3B8">// avoid I-term windup at idle</span><br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Ga bị giới hạn ở <b>1800</b> để chừa chỗ cho lệnh sửa.</p>
+<p style="font-size:29px;line-height:1.4">Mỗi động cơ nằm trong <b>1100</b> đến <b>2000</b> khi đang bay.</p>
+<p style="font-size:29px;line-height:1.4">Ở ga không tải (≤ 1050) động cơ dừng và bộ nhớ PID bị xóa.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Bộ trộn và động cơ · 89 · Nguồn: motorMix()</p>
+<aside>Vì sao dừng động cơ ở không tải thay vì chạy ở 1100? Khi kéo ga hết xuống, phi công mong cánh dừng, và drone đậu trên đất không nên chống lại mặt đất bằng lệnh sửa I. Khi ga vượt 1050, sàn 1100 giữ mọi cánh quay trên không.</aside>
+</section>

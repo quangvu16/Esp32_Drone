@@ -1,0 +1,44 @@
+<section id="s047" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Architecture</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">How data flows through one loop</h2>
+</div>
+<div style="display:flex;gap:12px;align-items:stretch">
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Inputs</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">SBUS sticks or phone CRTP</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Setpoints</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">flightSetpoints(): target angles + rates</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Self-level</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">angle error → rate setpoint</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">PID</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">rate error → correction</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Mixer</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">corrections → 4 motors</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">PWM</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">duty to MOSFETs</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Sensor data joins twice: angles at self-level, gyro rates at the PID.</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Stick right → sp_roll_rate +50 °/s → gyro says 0 → error −50 → PID output → right/left motors change → the drone starts to roll.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Architecture · 47 · Source: Esp32_drone.ino loop()</p>
+<aside>The sensor joins in two places: the filtered angle feeds the self-level step, and the gyro rate feeds the PID. Follow one example: the pilot pushes roll right, the setpoint becomes a roll rate, the PID sees the drone is not rolling yet, the mixer speeds up one side, and the drone rolls.</aside>
+</section>

@@ -1,0 +1,46 @@
+<section id="s102" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Đầu vào</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">CRTP: ngôn ngữ của điện thoại</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">CRTP: byte đầu tiên cho biết gói đi đâu.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">CRTP đến từ dự án Crazyflie; ứng dụng ESP-Drone nói giao thức này.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">4 bit cao của byte đầu chọn <b style="color:#B5501A">port</b>, 2 bit thấp chọn <b style="color:#2F6FA3">kênh</b>.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>crtpDispatch()</b> đọc port và gọi đúng handler.</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:24px 32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:26px;line-height:1.4">port = (byte >> 4) & 0x0F; kênh = byte & 0x03. Với 0x71: port 7, kênh 1.</p>
+</div>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Byte đầu CRTP: bit 7 đến 4 là port, bit 1 và 0 là kênh; giải mã ví dụ 0x30, 0x70, 0x71 và 0x25" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><rect x="684.0" y="60.0" width="84.0" height="84.0" rx="8" fill="#2F6FA3" stroke="none" stroke-width="0" opacity="0.8"/><rect x="592.0" y="60.0" width="84.0" height="84.0" rx="8" fill="#2F6FA3" stroke="none" stroke-width="0" opacity="0.8"/><rect x="500.0" y="60.0" width="84.0" height="84.0" rx="8" fill="#8FA3B8" stroke="none" stroke-width="0" opacity="0.8"/><rect x="408.0" y="60.0" width="84.0" height="84.0" rx="8" fill="#8FA3B8" stroke="none" stroke-width="0" opacity="0.8"/><rect x="316.0" y="60.0" width="84.0" height="84.0" rx="8" fill="#B5501A" stroke="none" stroke-width="0" opacity="0.8"/><rect x="224.0" y="60.0" width="84.0" height="84.0" rx="8" fill="#B5501A" stroke="none" stroke-width="0" opacity="0.8"/><rect x="132.0" y="60.0" width="84.0" height="84.0" rx="8" fill="#B5501A" stroke="none" stroke-width="0" opacity="0.8"/><rect x="40.0" y="60.0" width="84.0" height="84.0" rx="8" fill="#B5501A" stroke="none" stroke-width="0" opacity="0.8"/></svg>
+<p style="position:absolute;left:684px;top:86px;width:84px;font-size:28px;line-height:1.25;color:#F6F5F0;text-align:center;font-weight:600">0</p>
+<p style="position:absolute;left:592px;top:86px;width:84px;font-size:28px;line-height:1.25;color:#F6F5F0;text-align:center;font-weight:600">1</p>
+<p style="position:absolute;left:500px;top:86px;width:84px;font-size:28px;line-height:1.25;color:#F6F5F0;text-align:center;font-weight:600">2</p>
+<p style="position:absolute;left:408px;top:86px;width:84px;font-size:28px;line-height:1.25;color:#F6F5F0;text-align:center;font-weight:600">3</p>
+<p style="position:absolute;left:316px;top:86px;width:84px;font-size:28px;line-height:1.25;color:#F6F5F0;text-align:center;font-weight:600">4</p>
+<p style="position:absolute;left:224px;top:86px;width:84px;font-size:28px;line-height:1.25;color:#F6F5F0;text-align:center;font-weight:600">5</p>
+<p style="position:absolute;left:132px;top:86px;width:84px;font-size:28px;line-height:1.25;color:#F6F5F0;text-align:center;font-weight:600">6</p>
+<p style="position:absolute;left:40px;top:86px;width:84px;font-size:28px;line-height:1.25;color:#F6F5F0;text-align:center;font-weight:600">7</p>
+<p style="position:absolute;left:40px;top:156px;width:360px;font-size:24px;line-height:1.25;color:#B5501A;text-align:center">bit 7–4: <b>port</b> (dịch vụ)</p>
+<p style="position:absolute;left:408px;top:156px;width:176px;font-size:24px;line-height:1.25;color:#4A5568;text-align:center">3–2: link</p>
+<p style="position:absolute;left:592px;top:156px;width:176px;font-size:24px;line-height:1.25;color:#2F6FA3;text-align:center">1–0: <b>kênh</b></p>
+<p style="position:absolute;left:40px;top:250px;width:110px;font-size:28px;line-height:1.25;color:#13202E;text-align:left"><b>0x30</b></p>
+<p style="position:absolute;left:150px;top:250px;width:190px;font-size:28px;line-height:1.25;color:#4A5568;text-align:left">0011 0000</p>
+<p style="position:absolute;left:350px;top:250px;width:450px;font-size:26px;line-height:1.25;color:#13202E;text-align:left">port 3, kênh 0 → commander (cần lái)</p>
+<p style="position:absolute;left:40px;top:322px;width:110px;font-size:28px;line-height:1.25;color:#13202E;text-align:left"><b>0x70</b></p>
+<p style="position:absolute;left:150px;top:322px;width:190px;font-size:28px;line-height:1.25;color:#4A5568;text-align:left">0111 0000</p>
+<p style="position:absolute;left:350px;top:322px;width:450px;font-size:26px;line-height:1.25;color:#13202E;text-align:left">port 7, kênh 0 → điều khiển bay</p>
+<p style="position:absolute;left:40px;top:394px;width:110px;font-size:28px;line-height:1.25;color:#13202E;text-align:left"><b>0x71</b></p>
+<p style="position:absolute;left:150px;top:394px;width:190px;font-size:28px;line-height:1.25;color:#4A5568;text-align:left">0111 0001</p>
+<p style="position:absolute;left:350px;top:394px;width:450px;font-size:26px;line-height:1.25;color:#13202E;text-align:left">port 7, kênh 1 → dẫn đường</p>
+<p style="position:absolute;left:40px;top:466px;width:110px;font-size:28px;line-height:1.25;color:#13202E;text-align:left"><b>0x25</b></p>
+<p style="position:absolute;left:150px;top:466px;width:190px;font-size:28px;line-height:1.25;color:#4A5568;text-align:left">0010 0101</p>
+<p style="position:absolute;left:350px;top:466px;width:450px;font-size:26px;line-height:1.25;color:#13202E;text-align:left">port 2, kênh 1 → đọc tham số</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Đầu vào · 102 · Nguồn: phần CRTP; crtpDispatch()</p>
+<aside>Vì sao dùng lại giao thức có sẵn? Ứng dụng Android và iOS được xây từ thư viện client Crazyflie của Bitcraze, nên khớp chính xác bố cục byte của chúng nghĩa là ứng dụng chạy được mà không phải sửa. Chú thích trong sketch ghim mỗi bố cục với lớp Java mà nó lấy từ đó.</aside>
+</section>

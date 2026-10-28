@@ -1,0 +1,15 @@
+<section id="s084" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Điều khiển PID</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Hệ số mặc định và cách chỉnh</h2>
+</div>
+<table style="font-size:32px;color:#13202E">
+<tr><th style="width:16%">Trục</th><th style="width:12%">Kp</th><th style="width:12%">Ki</th><th style="width:12%">Kd</th><th style="width:48%">Dải trên điện thoại (P / I / D)</th></tr>
+<tr><td>Roll</td><td>1,3</td><td>0,04</td><td>18</td><td>0–100 / 0–20 / 0–200</td></tr>
+<tr><td>Pitch</td><td>1,3</td><td>0,04</td><td>18</td><td>0–100 / 0–20 / 0–200</td></tr>
+<tr><td>Yaw</td><td>4,0</td><td>0,02</td><td>0</td><td>0–100 / 0–20 / 0–200</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Thứ tự chỉnh: I = 0 → tăng P tới khi rung, giảm 30% → thêm D để hết nảy → thêm I để hết trôi → lưu.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Điều khiển PID · 84 · Nguồn: #define PID_*; dải trong PARAM_TOC</p>
+<aside>Thứ tự chỉnh hiệu quả cho phần lớn drone nhỏ: một, đặt I bằng 0; hai, tăng P tới khi bắt đầu rung nhanh, rồi giảm 30%; ba, tăng D tới khi drone hết nảy sau cú gạt cần nhanh; bốn, thêm I tới khi giữ thăng bằng không trôi; năm, lưu. Mỗi lần đổi một giá trị, và thử khi tháo cánh trước.</aside>
+</section>

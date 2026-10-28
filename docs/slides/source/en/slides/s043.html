@@ -1,0 +1,30 @@
+<section id="s043" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Architecture</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">What setup() does, in order</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">1</p>
+<p style="font-size:30px;line-height:1.35"><b>motorInit()</b> and <b>motorStop()</b> — motors off before anything else.</p>
+</div>
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">2</p>
+<p style="font-size:30px;line-height:1.35"><b>mpuInit()</b> — if WHO_AM_I is wrong, print a wiring hint and stop forever.</p>
+</div>
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">3</p>
+<p style="font-size:30px;line-height:1.35">ADC attenuation for the battery pin, then <b>sbusInit()</b>.</p>
+</div>
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">4</p>
+<p style="font-size:30px;line-height:1.35">Open NVS and <b>cfgLoad()</b> — saved PID gains and flight settings.</p>
+</div>
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">5</p>
+<p style="font-size:30px;line-height:1.35"><b>linkInit()</b> (Wi-Fi / Bluetooth), then <b>mpuCalibrateGyro()</b> and a first battery read.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Architecture · 43 · Source: Esp32_drone.ino setup()</p>
+<aside>Why motors first? At power-on the GPIO pins can float, and a floating MOSFET gate could spin a motor. Driving them to zero duty first is the safe default. Why calibrate the gyro last? The radio start-up takes time; calibrating last means the bias is measured closest to when you fly.</aside>
+</section>

@@ -1,0 +1,23 @@
+<section id="s066" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Motion sensor</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Why 0.996 and 0.004?</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">0.4%</p>
+<p style="font-size:30px;line-height:1.35">of the accelerometer per loop: small, so vibration barely shows</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">≈ 1 s</p>
+<p style="font-size:30px;line-height:1.35">time constant: 0.004 s ÷ 0.004 — how fast drift is pulled out</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">250</p>
+<p style="font-size:30px;line-height:1.35">loops per second, so the 0.4% nudges add up quickly</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Ask why: what would happen to these weights if the loop ran at 500 Hz?</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Motion sensor · 66 · Source: Esp32_drone.ino attitudeUpdate()</p>
+<aside>Trade-off: a bigger accelerometer weight, such as 0.02, removes drift faster but lets vibration into the angle. A smaller one, such as 0.001, is smoother but drifts for longer after a bump. Roughly one second is a common choice for small drones. If you change LOOP_TIME_US, the weights must change too, or the time constant moves.</aside>
+</section>

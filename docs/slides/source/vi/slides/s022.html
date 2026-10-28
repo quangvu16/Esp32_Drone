@@ -1,0 +1,32 @@
+<section id="s022" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Phần cứng</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Bo mạch trong một hình</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">Một chip ở giữa; mọi thứ khác cắm vào nó.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Đầu vào</b> (trái): cảm biến chuyển động qua SPI, máy thu RC tùy chọn qua UART, điện áp pin qua ADC.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Đầu ra</b> (phải): PWM tới bốn công tắc MOSFET, lái bốn động cơ.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Radio</b> (trên): điện thoại nói chuyện với ESP32 qua Wi-Fi hoặc Bluetooth.</p>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Sơ đồ khối: điện thoại nối radio tới ESP32; MPU6500 qua SPI và SBUS qua UART vào ESP32; PWM ra MOSFET và động cơ; pin cấp cho động cơ và mạch logic" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><defs><marker id="s022m13202E" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#13202E" stroke="none"/></marker><marker id="s022m2F6FA3" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2F6FA3" stroke="none"/></marker><marker id="s022mB5501A" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#B5501A" stroke="none"/></marker></defs><line x1="410.0" y1="84.0" x2="410.0" y2="196.0" stroke="#2F6FA3" stroke-width="4" stroke-linecap="round" stroke-dasharray="10 8" marker-end="url(#s022m2F6FA3)"/><line x1="220.0" y1="220.0" x2="286.0" y2="220.0" stroke="#13202E" stroke-width="4" stroke-linecap="round" marker-end="url(#s022m13202E)"/><line x1="220.0" y1="340.0" x2="286.0" y2="340.0" stroke="#13202E" stroke-width="4" stroke-linecap="round" marker-end="url(#s022m13202E)"/><line x1="530.0" y1="280.0" x2="596.0" y2="280.0" stroke="#B5501A" stroke-width="5" stroke-linecap="round" marker-end="url(#s022mB5501A)"/><line x1="700.0" y1="320.0" x2="700.0" y2="416.0" stroke="#B5501A" stroke-width="7" stroke-linecap="round" marker-end="url(#s022mB5501A)"/><line x1="220.0" y1="470.0" x2="596.0" y2="470.0" stroke="#B5501A" stroke-width="7" stroke-linecap="round" marker-end="url(#s022mB5501A)"/><line x1="410.0" y1="470.0" x2="410.0" y2="364.0" stroke="#13202E" stroke-width="3" stroke-linecap="round" marker-end="url(#s022m13202E)"/></svg>
+<p style="position:absolute;left:310px;top:14px;width:200px;height:70px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#EAF1F8;border:3px solid #2F6FA3;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">Ứng dụng<br>điện thoại</p>
+<p style="position:absolute;left:290px;top:200px;width:240px;height:160px;font-size:28px;line-height:1.2;color:#F6F5F0;text-align:center;background:#13202E;border:3px solid #13202E;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">ESP32<br>bộ não + radio</p>
+<p style="position:absolute;left:20px;top:180px;width:200px;height:80px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#FDFCF8;border:3px solid #13202E;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">MPU6500<br>gyro + gia tốc</p>
+<p style="position:absolute;left:20px;top:300px;width:200px;height:80px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#FDFCF8;border:3px solid #13202E;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">Máy thu SBUS<br>(tùy chọn)</p>
+<p style="position:absolute;left:20px;top:430px;width:200px;height:80px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#FBEFE6;border:3px solid #B5501A;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">Pin LiPo<br>1S</p>
+<p style="position:absolute;left:600px;top:240px;width:200px;height:80px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#FDFCF8;border:3px solid #13202E;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">4 × AO3416<br>MOSFETs</p>
+<p style="position:absolute;left:600px;top:420px;width:200px;height:80px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#FBEFE6;border:3px solid #B5501A;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">4 × 8520<br>động cơ</p>
+<p style="position:absolute;left:424px;top:118px;width:170px;font-size:24px;line-height:1.25;color:#2F6FA3;text-align:left;font-weight:600">Wi-Fi / BT</p>
+<p style="position:absolute;left:222px;top:178px;width:70px;font-size:24px;line-height:1.25;color:#13202E;text-align:left;font-weight:600">SPI</p>
+<p style="position:absolute;left:222px;top:298px;width:70px;font-size:24px;line-height:1.25;color:#13202E;text-align:left;font-weight:600">UART</p>
+<p style="position:absolute;left:534px;top:236px;width:66px;font-size:24px;line-height:1.25;color:#B5501A;text-align:left;font-weight:600">PWM</p>
+<p style="position:absolute;left:452px;top:424px;width:140px;font-size:24px;line-height:1.25;color:#B5501A;text-align:left;font-weight:600">nguồn</p>
+<p style="position:absolute;left:236px;top:380px;width:166px;font-size:24px;line-height:1.25;color:#4A5568;text-align:right">3.3 V + ADC</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Phần cứng · 22 · Nguồn: các #define chân trong Esp32_drone.ino</p>
+<aside>Dữ liệu đi từ cảm biến vào ESP32, và lệnh điều khiển đi từ ESP32 ra MOSFET và động cơ. Máy thu SBUS là đầu vào thêm tùy chọn ở GPIO4. Điện áp pin cũng được đo ở GPIO36.</aside>
+</section>

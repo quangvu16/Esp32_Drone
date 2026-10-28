@@ -1,0 +1,27 @@
+<section id="s115" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Chế độ và an toàn</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Giữ hướng trong HOLD và AUTO</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">Giữ hướng: luôn xoay theo đường ngắn.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Sai số hướng → tốc độ yaw: <b>2 °/s mỗi độ</b>, giới hạn 200 °/s.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Phép quấn</b> (±360 khi vượt ±180) chọn đường ngắn.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Hướng cần giữ được ghi lại khi vào HOLD hoặc lúc cất cánh.</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:24px 32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:26px;line-height:1.4">Giữ 10°, hướng 350° → herr = −340 → +360 = +20 → tốc độ yaw 40 °/s.</p>
+</div>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Vòng la bàn: drone ở 350 độ, hướng cần giữ 10 độ; cung cam ngắn 20 độ và cung xám dài 340 độ" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><defs><marker id="s115m8FA3B8" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#8FA3B8" stroke="none"/></marker><marker id="s115mB5501A" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#B5501A" stroke="none"/></marker></defs><circle cx="410.0" cy="290.0" r="200.0" fill="none" stroke="#8FA3B8" stroke-width="3"/><path d="M 374.6 89.1 A 204 204 0 0 1 445.4 89.1" fill="none" stroke="#B5501A" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#s115mB5501A)"/><path d="M 440.2 118.6 A 174 174 0 1 1 350.5 126.5" fill="none" stroke="#8FA3B8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#s115m8FA3B8)"/><circle cx="375.3" cy="93.0" r="14.0" fill="#13202E" stroke="none" stroke-width="0"/><circle cx="444.7" cy="93.0" r="14.0" fill="#B5501A" stroke="none" stroke-width="0"/></svg>
+<p style="position:absolute;left:130px;top:36px;width:220px;font-size:26px;line-height:1.25;color:#13202E;text-align:right">hiện tại <b>350°</b></p>
+<p style="position:absolute;left:470px;top:36px;width:220px;font-size:26px;line-height:1.25;color:#B5501A;text-align:left">giữ <b>10°</b></p>
+<p style="position:absolute;left:260px;top:220px;width:300px;font-size:26px;line-height:1.25;color:#B5501A;text-align:center">đường ngắn: <b>+20°</b><br>→ 40 °/s</p>
+<p style="position:absolute;left:260px;top:350px;width:300px;font-size:24px;line-height:1.25;color:#4A5568;text-align:center">đường dài: −340°<br>(không bao giờ đi)</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Chế độ và an toàn · 115 · Nguồn: flightSetpoints(), #define HEADING_KP</p>
+<aside>Vì sao cần quấn? Hướng nằm trên vòng tròn. Không quấn, drone ở 350 độ được bảo giữ 10 độ sẽ xoay 340 độ đường dài thay vì 20 độ đường ngắn. Hướng cần giữ được ghi lại khi vào HOLD hoặc khi cất cánh, nên drone giữ nguyên hướng nó đang nhìn.</aside>
+</section>

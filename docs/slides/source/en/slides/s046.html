@@ -1,0 +1,16 @@
+<section id="s046" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Architecture</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">loop() in twelve lines</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0">sbusPoll();&#160;&#160;linkPoll();&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// 1. receive</span><br><span style="color:#8FA3B8">// 2. decide who is in control, failsafe</span><br><span style="color:#F29E5C">if</span> (!rx_ok &amp;&amp; armed) { armed = <span style="color:#F29E5C">false</span>; motorStop(); }<br>armUpdate(now, use_crtp);&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// 3. arm / disarm</span><br>mpuReadRaw();&#160;&#160;attitudeUpdate();&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// 4. sense</span><br>navUpdate(...);&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// 5. dead reckoning</span><br>flightSetpoints(now, use_crtp, sbus_ok);&#160;&#160;<span style="color:#8FA3B8">// 6. want</span><br>roll_setpoint = sp_roll_rate - roll_level_adjust;<br>pidCompute();&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// 7. decide</span><br>motorMix(sp_throttle_us);&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// 8. mix</span><br>motorWrite(motor_rf, motor_rr, motor_lr, motor_lf);<br>batteryUpdate(); logUpdate(); telemetry(now);<br><span style="color:#F29E5C">while</span> (micros() - loop_timer &lt; LOOP_TIME_US) { }</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Shortened — the real loop has comments and checks between these lines.</p>
+<p style="font-size:29px;line-height:1.4"><b>Order matters</b>: safety checks come before sensing and control, so a lost link stops the motors in the same loop.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Architecture · 46 · Source: Esp32_drone.ino loop() (shortened)</p>
+<aside>Read this slide twice. Every later section zooms into one of these lines. The single most useful skill for this codebase is being able to say, for any variable, which numbered step changes it.</aside>
+</section>

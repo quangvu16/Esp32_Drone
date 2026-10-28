@@ -1,0 +1,21 @@
+<section id="s142" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiểm thử</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Bên trong level_test: một mô phỏng nhỏ</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">static</span> <span style="color:#F29E5C">float</span> simulate(<span style="color:#F29E5C">float</span> angle0, <span style="color:#F29E5C">float</span> sp_deg,<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#F29E5C">float</span> sign, <span style="color:#F29E5C">float</span> seconds) {<br>&#160;&#160;<span style="color:#F29E5C">float</span> angle = angle0;<br>&#160;&#160;<span style="color:#F29E5C">for</span> (<span style="color:#F29E5C">int</span> i = 0; i &lt; (<span style="color:#F29E5C">int</span>)(seconds / 0.004f); i++) {<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">float</span> err = angle - sp_deg;<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">float</span> adj = clampf(err * 15.0f, -200, 200);<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">float</span> gyro = 0.0f + sign * adj;&#160;&#160;<span style="color:#8FA3B8">// perfect rate loop</span><br>&#160;&#160;&#160;&#160;angle += gyro * 0.004f;<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">if</span> (fabsf(angle) &gt; 180.0f) <span style="color:#F29E5C">return</span> angle;&#160;&#160; <span style="color:#8FA3B8">// flipped</span><br>&#160;&#160;}<br>&#160;&#160;<span style="color:#F29E5C">return</span> angle;<br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Mô phỏng một trục ở 250 Hz với vòng tốc độ hoàn hảo.</p>
+<p style="font-size:29px;line-height:1.4"><b>sign −1</b> = firmware hiện tại → góc co về mục tiêu.</p>
+<p style="font-size:29px;line-height:1.4"><b>sign +1</b> = lỗi cũ → góc tăng và lật.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Bắt đầu ở +10°, mục tiêu 0°: sau 1 s với sign −1 → khoảng 0°. Với sign +1 → vượt 180°, lật.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiểm thử · 142 · Nguồn: Esp32_drone/test/level_test.cpp</p>
+<aside>Đây là ý tưởng kiểm thử hữu ích nhất của khóa: bạn không cần trình mô phỏng vật lý đầy đủ để bắt lỗi dấu. Mười dòng mô phỏng đúng vòng bạn quan tâm là đủ, và chạy trong vài micro giây. Đã rút gọn từ file.</aside>
+</section>

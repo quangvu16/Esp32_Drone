@@ -1,0 +1,21 @@
+<section id="s103" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Đầu vào</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Đóng khung và checksum</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">uint8_t</span> crtpChecksum(<span style="color:#F29E5C">const</span> <span style="color:#F29E5C">uint8_t</span> *data, <span style="color:#F29E5C">size_t</span> len) {<br>&#160;&#160;<span style="color:#F29E5C">uint32_t</span> sum = 0;<br>&#160;&#160;<span style="color:#F29E5C">for</span> (<span style="color:#F29E5C">size_t</span> i = 0; i &lt; len; i++) sum += data[i];<br>&#160;&#160;<span style="color:#F29E5C">return</span> (<span style="color:#F29E5C">uint8_t</span>)(sum &amp; 0xFF);<br>}<br><span style="color:#8FA3B8">// on receive (UDP / SPP):</span><br><span style="color:#F29E5C">if</span> (crtpChecksum(data, len - 1) != data[len - 1]) <span style="color:#F29E5C">return</span>;<br>crtpDispatch(data, len - 1);<br>crtp_last_rx_ms = millis();&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// the link is alive</span></p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Qua UDP và SPP, mỗi gói kết thúc bằng một byte checksum: 8 bit thấp của tổng.</p>
+<p style="font-size:29px;line-height:1.4">Checksum sai → gói bị bỏ im lặng.</p>
+<p style="font-size:29px;line-height:1.4">Gói tốt cũng cập nhật <b>crtp_last_rx_ms</b>, được failsafe dùng.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Gói 0x70 0x02 → tổng 0x72 → byte checksum 0x72. Trên đường truyền: 70 02 72.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Đầu vào · 103 · Nguồn: crtpChecksum(), crtpReceiveFramed()</p>
+<aside>Vì sao checksum đơn giản vậy? Nó bắt được phần lớn lỗi một byte và gần như không tốn gì. UDP đã có checksum riêng, nên đây chủ yếu bảo vệ đường Bluetooth nối tiếp. Gói BLE đến đã được ngăn xếp BLE đóng khung, nên bỏ qua bước này.</aside>
+</section>

@@ -1,0 +1,19 @@
+<section id="s044" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiến trúc</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Bản đồ của sketch</h2>
+</div>
+<table style="font-size:27px;color:#13202E">
+<tr><th style="width:24%">Khu vực</th><th style="width:52%">Các hàm chính</th><th style="width:24%">Phần khóa học</th></tr>
+<tr><td>#define cấu hình</td><td>chân, tần số, hệ số, giới hạn</td><td>3, 4</td></tr>
+<tr><td>MPU6500</td><td>mpuInit, mpuReadRaw, mpuCalibrateGyro</td><td>5</td></tr>
+<tr><td>SBUS</td><td>sbusInit, sbusDecode, sbusPoll</td><td>8</td></tr>
+<tr><td>Truyền dẫn + CRTP</td><td>linkInit, linkPoll, crtpDispatch, các handler</td><td>8</td></tr>
+<tr><td>Động cơ + pin</td><td>motorInit, usToDuty, motorWrite, batteryUpdate</td><td>3, 7</td></tr>
+<tr><td>PID + tư thế</td><td>pidCompute, attitudeUpdate</td><td>5, 6</td></tr>
+<tr><td>Dẫn đường</td><td>navUpdate, navSetpoints</td><td>10</td></tr>
+<tr><td>Chế độ + arm</td><td>flightSetpoints, armUpdate, motorMix</td><td>6, 7, 9</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiến trúc · 44 · Nguồn: các tiêu đề khu vực trong sketch</p>
+<aside>Sketch được sắp đại khái từ phần cứng lên: cấu hình, driver, giao thức, điều khiển, rồi chế độ bay và vòng lặp ở cuối cùng. Khi tìm trong file, hãy tìm theo các tên hàm này.</aside>
+</section>

@@ -1,0 +1,23 @@
+<section id="s061" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Cảm biến</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Từ số đếm thô sang đơn vị thật</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">65,5</p>
+<p style="font-size:30px;line-height:1.35">số đếm mỗi °/s của gyro (dải ±500 °/s)</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">4096</p>
+<p style="font-size:30px;line-height:1.35">số đếm mỗi g của gia tốc kế (dải ±8 g)</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">0,004 s</p>
+<p style="font-size:30px;line-height:1.35">dt: một vòng, dùng để đổi tốc độ thành góc</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Ví dụ: gyro thô 655 → 10 °/s. Trong một vòng 4 ms đó là 0,04°.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Cảm biến · 61 · Nguồn: #define GYRO_SCALE, NAV_ACC_LSB_PER_G</p>
+<aside>Ví dụ: giá trị gyro thô 655 nghĩa là 655 ÷ 65,5 = 10 °/s. Nằm phẳng, raw_az đọc khoảng 4096, tức 1 g. GYRO_SCALE trong mã, 0,0000611, là 1 ÷ 65,5 × 0,004: số độ đi được trong một vòng cho mỗi số đếm thô.</aside>
+</section>

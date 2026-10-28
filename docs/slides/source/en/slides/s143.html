@@ -1,0 +1,18 @@
+<section id="s143" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Testing</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">What sbus_test checks</h2>
+</div>
+<table style="font-size:27px;color:#13202E">
+<tr><th style="width:40%">Case</th><th style="width:20%">Flags byte 23</th><th style="width:18%">Footer</th><th style="width:22%">Expected</th></tr>
+<tr><td>normal frame</td><td>0x00</td><td>0x00</td><td>accepted</td></tr>
+<tr><td>digital ch17/18 bits set</td><td>0x03</td><td>0x00</td><td>accepted</td></tr>
+<tr><td>SBUS2 footer</td><td>0x00</td><td>0x14</td><td>accepted</td></tr>
+<tr><td>receiver failsafe</td><td>0x08</td><td>0x00</td><td>rejected</td></tr>
+<tr><td>frame lost</td><td>0x04</td><td>0x00</td><td>rejected</td></tr>
+<tr><td>misaligned footer / bad header</td><td>—</td><td>0x55 / —</td><td>rejected</td></tr>
+<tr><td>old byte-24 check (negative control)</td><td>0x08</td><td>0x00</td><td>wrongly accepted</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Testing · 143 · Source: Esp32_drone/test/sbus_test.cpp</p>
+<aside>Notice the good cases are tested as carefully as the bad ones. A fix that rejected every SBUS2 frame would also make the drone unflyable, just in a different way. The last row proves the test would have caught the original bug.</aside>
+</section>

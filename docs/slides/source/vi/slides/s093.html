@@ -1,0 +1,16 @@
+<section id="s093" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Bộ trộn và động cơ</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Mọi chỗ động cơ bị dừng</h2>
+</div>
+<table style="font-size:30px;color:#13202E">
+<tr><th style="width:40%">Ở đâu</th><th style="width:60%">Vì sao</th></tr>
+<tr><td>setup()</td><td>trạng thái an toàn trước khi mọi thứ khởi động</td></tr>
+<tr><td>Failsafe trong loop()</td><td>không có đầu vào sống trong 500 ms</td></tr>
+<tr><td>flightEmergency()</td><td>CẮT ĐỘNG CƠ từ ứng dụng — luôn được thực hiện</td></tr>
+<tr><td>Cuối hạ cánh AUTO</td><td>đường dốc xong → disarm</td></tr>
+<tr><td>DISARM, hạ ga, gạt cần disarm</td><td>phi công yêu cầu</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Bộ trộn và động cơ · 93 · Nguồn: các chỗ gọi motorStop()</p>
+<aside>Tất cả đều gọi motorStop(), ghi 1000 cho cả bốn động cơ: duty bằng 0. Phần lớn còn xóa bộ nhớ PID bằng pidReset(), để lần arm sau bắt đầu sạch. Bài tập hữu ích: tìm motorStop trong sketch và đối chiếu với bảng này.</aside>
+</section>

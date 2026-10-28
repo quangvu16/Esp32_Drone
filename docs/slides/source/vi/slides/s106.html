@@ -1,0 +1,17 @@
+<section id="s106" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Đầu vào</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Các port CRTP được dùng</h2>
+</div>
+<table style="font-size:28px;color:#13202E">
+<tr><th style="width:12%">Port</th><th style="width:18%">Tên</th><th style="width:16%">Xử lý?</th><th style="width:54%">Dùng cho</th></tr>
+<tr><td>0</td><td>console</td><td>chỉ gửi</td><td>tin nhắn chữ tới ứng dụng (pin yếu, từ chối arm)</td></tr>
+<tr><td>2</td><td>params</td><td>có</td><td>đọc và ghi giá trị chỉnh được</td></tr>
+<tr><td>3</td><td>commander</td><td>có</td><td>gói cần điều khiển ở MANUAL</td></tr>
+<tr><td>5</td><td>logging</td><td>có</td><td>truyền telemetry, tối đa 3 khối</td></tr>
+<tr><td>7</td><td>generic</td><td>có</td><td>kênh 0 điều khiển bay, kênh 1 dẫn đường</td></tr>
+<tr><td>4, 15</td><td>memory, link</td><td>bỏ qua</td><td>bo mạch này không cần</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Đầu vào · 106 · Nguồn: #define CRTP_PORT_*, crtpDispatch()</p>
+<aside>Port lạ rơi vào “default: break”, nên tính năng ứng dụng mà firmware không hỗ trợ đơn giản là không làm gì. Port 7 là phần mở rộng riêng cho drone này: mọi thứ về chế độ, cất cánh và hạ cánh đi qua nó.</aside>
+</section>

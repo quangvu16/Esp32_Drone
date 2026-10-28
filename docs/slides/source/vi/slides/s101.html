@@ -1,0 +1,15 @@
+<section id="s101" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Đầu vào</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Arm bằng tay điều khiển RC</h2>
+</div>
+<table style="font-size:29px;color:#13202E">
+<tr><th style="width:18%">Thao tác</th><th style="width:18%">Ga</th><th style="width:46%">Cần yaw hoặc CH5</th><th style="width:18%">Giữ</th></tr>
+<tr><td>Arm</td><td>dưới 1050</td><td>yaw phải (trên 1700) hoặc CH5 cao</td><td>1 s</td></tr>
+<tr><td>Disarm</td><td>dưới 1050</td><td>yaw trái (dưới 1300)</td><td>1 s</td></tr>
+<tr><td>Disarm (công tắc)</td><td>bất kỳ</td><td>CH5 hạ thấp, khi đã thấy dùng công tắc</td><td>1 s</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Mọi cách arm đều cần pin từ 3,3 V trở lên (armChecksOk).</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Đầu vào · 101 · Nguồn: armUpdate(), #define YAW_ARM_THRESHOLD</p>
+<aside>Vì sao phải giữ một giây? Chạm nhẹ cần không được làm arm. Vì sao ga thấp? Để động cơ không nhảy lên mức cao ngay lúc arm. Arm cũng chạy armChecksOk(), nên pin dưới 3,3 V sẽ bị từ chối.</aside>
+</section>

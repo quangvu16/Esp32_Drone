@@ -1,0 +1,21 @@
+<section id="s052" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Architecture</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Saving settings: NVS flash</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">void</span> cfgSave() {<br>&#160;&#160;<span style="color:#F29E5C">float</span> g[9] = { pid_p_gain_roll, ... };&#160;&#160; <span style="color:#8FA3B8">// 9 gains</span><br>&#160;&#160;<span style="color:#F29E5C">uint16_t</span> f[3] = { hover_thrust, takeoff_ms, land_ms };<br>&#160;&#160;nvs.putBytes("pid",&#160;&#160;g, sizeof(g));<br>&#160;&#160;nvs.putBytes("fcfg", f, sizeof(f));<br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>NVS</b> = non-volatile storage: a small key-value store in the ESP32 flash.</p>
+<p style="font-size:29px;line-height:1.4"><b>Raw floats</b>: a read-back is byte-identical to what was written — no rounding.</p>
+<p style="font-size:29px;line-height:1.4"><b>Refused while armed</b>: erasing flash stalls both cores for milliseconds.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Tune roll_kp to 1.5 on the phone, land, press Save → it survives the next power-off.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Architecture · 52 · Source: Esp32_drone.ino cfgSave(), cfgLoad(), FC_CMD_SAVE</p>
+<aside>Why refuse SAVE while armed? A flash erase can pause the CPU for several milliseconds, longer than one 4 ms loop. In the air, a missed loop means a missed correction. cfgLoad() also clamps the loaded values, so a corrupted save cannot load an absurd gain.</aside>
+</section>

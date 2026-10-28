@@ -1,0 +1,17 @@
+<section id="s053" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Architecture</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Link profiles: how the phone connects</h2>
+</div>
+<table style="font-size:29px;color:#13202E">
+<tr><th style="width:8%">#</th><th style="width:52%">Profile</th><th style="width:40%">Good for</th></tr>
+<tr><td>0</td><td>Wi-Fi access point (drone is the hotspot)</td><td>default; simplest</td></tr>
+<tr><td>1</td><td>Wi-Fi station (joins your router)</td><td>phone stays on home Wi-Fi</td></tr>
+<tr><td>2</td><td>Bluetooth Classic SPP</td><td>Android phones</td></tr>
+<tr><td>3</td><td>Bluetooth Low Energy</td><td>iPhone (no SPP on iOS)</td></tr>
+<tr><td>4</td><td>Wi-Fi AP + BLE</td><td>two ways in at once</td></tr>
+<tr><td>5</td><td>Wi-Fi station + BLE</td><td>router plus BLE backup</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Architecture · 53 · Source: Esp32_drone.ino #define LINK_MODE_*</p>
+<aside>The profile is stored in NVS and applied after a reboot. Change it with the serial command “link n” or the app's LINK command, both refused while armed. Why a reboot? Bringing radios up and down at run time is fragile; a clean start is reliable.</aside>
+</section>

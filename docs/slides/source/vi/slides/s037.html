@@ -1,0 +1,30 @@
+<section id="s037" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Phần cứng</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Đường đi của nguồn điện</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">Một viên pin cấp ba nhánh. Độ dày đường = dòng điện.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Động cơ</b> lấy phần lớn dòng, thẳng từ pin.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Mạch logic</b> cần 3,3 V ổn định, nên đi qua ổn áp.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Cầu chia</b> giúp firmware theo dõi điện áp.</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:24px 32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:26px;line-height:1.4">Tăng ga hết cỡ: pin sụt 3,9 → 3,6 V trong chốc lát; ESP32 vẫn thấy 3,3 V ổn định.</p>
+</div>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Một viên pin chia ba nhánh: đường dày tới động cơ, đường vừa tới ổn áp 3,3 vôn, đường mảnh tới cầu chia điện áp" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><defs><marker id="s037m13202E" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#13202E" stroke="none"/></marker><marker id="s037m2F6FA3" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2F6FA3" stroke="none"/></marker><marker id="s037mB5501A" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#B5501A" stroke="none"/></marker></defs><path d="M 200 275 L 380 275 L 380 85 L 552 85" fill="none" stroke="#B5501A" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#s037mB5501A)"/><line x1="380.0" y1="275.0" x2="552.0" y2="275.0" stroke="#13202E" stroke-width="6" stroke-linecap="round" marker-end="url(#s037m13202E)"/><path d="M 380 275 L 380 475 L 552 475" fill="none" stroke="#2F6FA3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#s037m2F6FA3)"/></svg>
+<p style="position:absolute;left:20px;top:230px;width:180px;height:90px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#FBEFE6;border:3px solid #B5501A;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">LiPo 1S<br>3,0–4,2 V</p>
+<p style="position:absolute;left:560px;top:40px;width:240px;height:90px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#FBEFE6;border:3px solid #B5501A;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">AO3416 → động cơ</p>
+<p style="position:absolute;left:560px;top:230px;width:240px;height:90px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#FDFCF8;border:3px solid #13202E;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">Ổn áp 3,3 V → ESP32 + MPU</p>
+<p style="position:absolute;left:560px;top:430px;width:240px;height:90px;font-size:24px;line-height:1.2;color:#13202E;text-align:center;background:#EAF1F8;border:3px solid #2F6FA3;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">Cầu chia → GPIO 36</p>
+<p style="position:absolute;left:396px;top:36px;width:160px;font-size:24px;line-height:1.25;color:#B5501A;text-align:left;font-weight:600">dòng lớn</p>
+<p style="position:absolute;left:396px;top:226px;width:160px;font-size:24px;line-height:1.25;color:#13202E;text-align:left;font-weight:600">3,3 V ổn định</p>
+<p style="position:absolute;left:396px;top:426px;width:160px;font-size:24px;line-height:1.25;color:#2F6FA3;text-align:left;font-weight:600">dòng rất nhỏ</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Phần cứng · 37</p>
+<aside>Động cơ lấy phần lớn dòng, trực tiếp từ pin. Phần logic cần 3,3 V ổn định nên đi qua bộ ổn áp. Khi động cơ kéo mạnh, điện áp pin sụt — vì thế phép đo điện áp phải được lọc.</aside>
+</section>

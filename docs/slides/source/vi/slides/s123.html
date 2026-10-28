@@ -1,0 +1,27 @@
+<section id="s123" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Chế độ và an toàn</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Số xấu không bao giờ tới động cơ</h2>
+</div>
+<p style="font-size:34px;line-height:1.4;color:#13202E">Mọi giá trị từ bên ngoài đều được kiểm tra trước khi dùng.</p>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Gói commander</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">NaN, vô cực hoặc góc vô lý → bỏ qua.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Ghi tham số</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">NaN bị từ chối; còn lại kẹp vào dải TOC.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Lực đẩy hover</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">kẹp trong 8000 – 55000 từ SET_HOVER, TAKEOFF và flash.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Flash lúc khởi động</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">hệ số đã lưu không hữu hạn → khôi phục toàn bộ mặc định.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Chế độ và an toàn · 123 · Nguồn: crtpHandleCommander(), paramStore(), paramSanitizeAll()</p>
+<aside>Vì sao nhiều kiểm tra vậy? Dữ liệu từ điện thoại, đường radio hay bộ nhớ flash có thể bị hỏng, hoặc đơn giản là sai do lỗi ứng dụng. Vòng bay tin tuyệt đối vào đầu vào của nó, nên kiểm tra phải xảy ra ở rìa, nơi dữ liệu đi vào. Gọi là kiểm tra ở biên.</aside>
+</section>

@@ -1,0 +1,17 @@
+<section id="s140" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Testing</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Five test programs that run on your PC</h2>
+</div>
+<table style="font-size:30px;color:#13202E">
+<tr><th style="width:24%">Test</th><th style="width:76%">What it proves</th></tr>
+<tr><td>frame_test</td><td>phone targets land in the same frame the dead reckoning uses</td></tr>
+<tr><td>yawrot_test</td><td>body ↔ launch rotations turn the right way, with the sketch's sign</td></tr>
+<tr><td>logcfg_test</td><td>log-block set-up survives retransmissions</td></tr>
+<tr><td>level_test</td><td>self-level pulls back toward the target and never flips</td></tr>
+<tr><td>sbus_test</td><td>lost and failsafe frames are rejected; good ones are accepted</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Run them all with: <b>sh Esp32_drone/test/run.sh</b> — about 100 “ok” lines when everything passes.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Testing · 140 · Source: Esp32_drone/test/</p>
+<aside>Why test on a PC? No drone, no props, no batteries, and a result in about a second. These tests do not try to cover everything. They cover the lines that were once wrong and that are easy to get wrong again: signs, frames and protocol edge cases. Every one keeps the old, buggy version as a negative control.</aside>
+</section>

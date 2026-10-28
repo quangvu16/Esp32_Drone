@@ -1,0 +1,21 @@
+<section id="s090" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Bộ trộn và động cơ</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">usToDuty(): từ 1000–2000 sang 0–1023</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">inline</span> <span style="color:#F29E5C">uint16_t</span> usToDuty(<span style="color:#F29E5C">int16_t</span> us) {<br>&#160;&#160;<span style="color:#F29E5C">if</span> (us &lt;= 1000) <span style="color:#F29E5C">return</span> 0;<br>&#160;&#160;<span style="color:#F29E5C">if</span> (us &gt;= 2000) <span style="color:#F29E5C">return</span> MOTOR_PWM_MAX;&#160;&#160; <span style="color:#8FA3B8">// 1023</span><br>&#160;&#160;<span style="color:#F29E5C">return</span> (<span style="color:#F29E5C">uint16_t</span>)(((<span style="color:#F29E5C">uint32_t</span>)(us - 1000)<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;* MOTOR_PWM_MAX) / 1000);<br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Mã nghĩ theo “µs” như ESC của drone lớn, rồi đổi ở bước cuối.</p>
+<p style="font-size:29px;line-height:1.4"><b>Vì sao giữ 1000–2000?</b> Con số quen thuộc, và cùng bộ trộn vẫn dùng được nếu bạn đổi sang ESC.</p>
+<p style="font-size:29px;line-height:1.4">Ép kiểu uint32_t để phép nhân không tràn 16 bit.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">1500 → (500 × 1023) ÷ 1000 = 511 → khoảng 50% duty. 1100 → 102 → 10% duty, mức tối thiểu khi arm.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Bộ trộn và động cơ · 90 · Nguồn: usToDuty()</p>
+<aside>Đây là một đường thẳng: 1000 ứng với duty 0% và 2000 ứng với 100%. Hai dòng đầu xử lý giá trị ngoài dải, nên thanh ghi PWM không bao giờ nhận số vô lý.</aside>
+</section>

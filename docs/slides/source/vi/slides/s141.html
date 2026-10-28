@@ -1,0 +1,17 @@
+<section id="s141" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiểm thử</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Các kiểm tra trong run.sh: bài kiểm thử không thể lỗi thời</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0">check() {<br>&#160;&#160;<span style="color:#F29E5C">if</span> ! grep -qF "$1" "$sketch"; then<br>&#160;&#160;&#160;&#160;echo "STALE TEST: '$1' is no longer in Esp32_drone.ino"<br>&#160;&#160;&#160;&#160;exit 1<br>&#160;&#160;fi<br>}<br>check 'roll_setpoint&#160;&#160;= sp_roll_rate&#160;&#160;- roll_level_adjust;'<br>check '<span style="color:#F29E5C">if</span> (f[23] &amp; 0x08) <span style="color:#F29E5C">return</span> <span style="color:#F29E5C">false</span>;'<br>check 'tgt_y = n * sa - e * ca;'</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Bài kiểm thử chép công thức từ sketch, vì sketch không biên dịch được trên máy tính.</p>
+<p style="font-size:29px;line-height:1.4">Bản chép có thể lỗi thời âm thầm. <b>check</b> báo lỗi to nếu đúng dòng đó bị đổi.</p>
+<p style="font-size:29px;line-height:1.4">Kiểm tra thêm: giới hạn chế độ, thang gia tốc kế, NAV_HEADING_SIGN.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiểm thử · 141 · Nguồn: Esp32_drone/test/run.sh</p>
+<aside>Vì sao không biên dịch sketch thật cho máy tính? Nó phụ thuộc thư viện Arduino, Wi-Fi và Bluetooth. Chép vài dòng toán thuần đơn giản hơn nhiều, và kiểm tra này làm bản chép đáng tin: nếu bạn đổi một dòng được canh, run.sh bảo bạn cập nhật bài kiểm thử trước.</aside>
+</section>

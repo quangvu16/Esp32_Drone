@@ -1,0 +1,21 @@
+<section id="s132" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Dẫn đường</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Bỏ trọng lực</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> ax_b = raw_ax / NAV_ACC_LSB_PER_G * G;&#160;&#160; <span style="color:#8FA3B8">// m/s²</span><br><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> ay_b = raw_ay / NAV_ACC_LSB_PER_G * G;<br><span style="color:#8FA3B8">// gravity seen by the tilted sensor</span><br><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> gx_g = -G * sin(roll) * cos(pitch);<br><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> gy_g = +G * sin(pitch);<br><span style="color:#F29E5C">float</span> fwd&#160;&#160;= (ay_b - gy_g) * NAV_FWD_SIGN;<br><span style="color:#F29E5C">float</span> left = (ax_b - gx_g) * NAV_LEFT_SIGN;</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Drone nghiêng cảm nhận một phần trọng lực trên các trục ngang, kể cả khi đứng yên.</p>
+<p style="font-size:29px;line-height:1.4">Góc nghiêng từ phần 5 cho biết bao nhiêu; trừ nó đi.</p>
+<p style="font-size:29px;line-height:1.4">Phần còn lại là gia tốc ngang thật.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Chúc 5° về trước, không di chuyển: ay_b ≈ 9,81 × sin 5° = 0,85 m/s². Trừ gy_g = 0,85 → fwd = 0.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Dẫn đường · 132 · Nguồn: navUpdate()</p>
+<aside>Đã rút gọn: sketch tính sin và cos một lần vào sg, cg, st, ct. Đây là chỗ ước lượng tư thế và dẫn đường gặp nhau: sai 1 độ ở góc nghiêng để lại khoảng 0,17 m/s² gia tốc giả — lớn hơn nhiều so với độ lệch ở slide trước.</aside>
+</section>

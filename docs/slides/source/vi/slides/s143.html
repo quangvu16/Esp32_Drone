@@ -1,0 +1,18 @@
+<section id="s143" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiểm thử</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">sbus_test kiểm tra những gì</h2>
+</div>
+<table style="font-size:27px;color:#13202E">
+<tr><th style="width:40%">Trường hợp</th><th style="width:20%">Byte cờ 23</th><th style="width:18%">Byte cuối</th><th style="width:22%">Mong đợi</th></tr>
+<tr><td>khung bình thường</td><td>0x00</td><td>0x00</td><td>nhận</td></tr>
+<tr><td>bật bit kênh số 17/18</td><td>0x03</td><td>0x00</td><td>nhận</td></tr>
+<tr><td>byte cuối SBUS2</td><td>0x00</td><td>0x14</td><td>nhận</td></tr>
+<tr><td>máy thu failsafe</td><td>0x08</td><td>0x00</td><td>loại</td></tr>
+<tr><td>mất khung</td><td>0x04</td><td>0x00</td><td>loại</td></tr>
+<tr><td>byte cuối lệch / đầu khung sai</td><td>—</td><td>0x55 / —</td><td>loại</td></tr>
+<tr><td>kiểm tra byte 24 cũ (đối chứng âm)</td><td>0x08</td><td>0x00</td><td>nhận sai</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiểm thử · 143 · Nguồn: Esp32_drone/test/sbus_test.cpp</p>
+<aside>Để ý các trường hợp tốt được kiểm tra kỹ như trường hợp xấu. Một bản sửa loại mọi khung SBUS2 cũng làm drone không bay được, chỉ theo cách khác. Dòng cuối chứng minh bài kiểm thử đã bắt được lỗi gốc.</aside>
+</section>

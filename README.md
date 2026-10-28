@@ -14,7 +14,7 @@ PROTOCOL.md        the wire protocol, in full
 ESP-Drone-Android/ Android client
 ESP-Drone-iOS/     iOS client
 tools/pid-tune/    desktop PID auto-tuner (Python)
-docs/              install guide, pilot's guide, diagrams, board schematic
+docs/              install guide, pilot's guide, course slides, diagrams, board schematic
 ```
 
 **Want to get flying?**
@@ -24,6 +24,11 @@ docs/              install guide, pilot's guide, diagrams, board schematic
 2. **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** — the pilot's guide: every
    screen, CUT MOTORS, arming, failsafe, low battery, and a first-flight
    checklist. **Tiếng Việt:** [docs/USER_GUIDE.vi.md](docs/USER_GUIDE.vi.md).
+
+**New to drones?** [docs/slides](docs/slides/README.md) — a 150-slide course on
+how the drone flies, every part on the board, and the firmware line by line
+([PDF](docs/slides/ESP32_Drone_Course_EN.pdf) ·
+[bản tiếng Việt](docs/slides/ESP32_Drone_Course_VI.pdf)).
 
 Start with **[PROTOCOL.md](PROTOCOL.md)** for the wire format. It is the
 authoritative reference for framing, the parameter and log TOCs, the
