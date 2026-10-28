@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fly-screen palette (redesign). High-contrast light theme for daylight use.
+     Blue = normal actions, amber = ARMED only, red = CUT MOTORS only. -->
+<resources>
+    <color name="fly_ground">#F3F4F1</color>
+    <color name="fly_surface">#FFFFFF</color>
+    <color name="fly_ink">#15181C</color>
+    <color name="fly_muted">#4A525A</color>
+    <color name="fly_line">#D5D9D4</color>
+    <color name="fly_control">#C9CEC8</color>
+    <color name="fly_track">#E7EAE5</color>
+    <color name="fly_accent">#1F5FBF</color>
+    <color name="fly_danger">#B3261E</color>
+    <color name="fly_armed">#F2A900</color>
+    <color name="fly_warn">#B26A00</color>
+    <color name="fly_ok">#1E6B37</color>
+</resources>

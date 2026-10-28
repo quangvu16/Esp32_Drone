@@ -5,7 +5,14 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -18,12 +25,17 @@ import se.bitcraze.crazyflie.lib.param.Param;
 
 /**
  * Auto-tune of one axis' rate-PID gains while the drone sits on a stand with the props
- * spinning. Port of the balance tuner's AutoTuner trial framework with exactly four
- * optimizers:
+ * spinning. Port of the balance tuner's AutoTuner trial framework (itself ml_tune.py):
  *
  * <ul>
  *   <li>{@link Method#ML} - Bayesian optimisation: a Gaussian process over the tried
  *       gains learns log(1 + cost), the next trial maximises expected improvement.</li>
+ *   <li>{@link Method#NEURAL} - deep-learning surrogate: an {@link MlpEnsemble} learns the
+ *       cost, the next trial minimises its lower confidence bound.</li>
+ *   <li>{@link Method#RL} - PGPE policy gradient over the gains themselves.</li>
+ *   <li>{@link Method#CMA_ES}, {@link Method#PSO}, {@link Method#GENETIC},
+ *       {@link Method#DIFFERENTIAL_EVOLUTION}, {@link Method#SPSA} - the evolutionary /
+ *       direct-search baselines of ml_tune.py, so the UI can compare against them.</li>
  *   <li>{@link Method#TWIDDLE} - coordinate descent: +-25 % on one gain at a time
  *       (x1.3 after a win, x0.6 otherwise, below 4 % = converged), wins re-measured so
  *       noise cannot win.</li>
@@ -32,6 +44,10 @@ import se.bitcraze.crazyflie.lib.param.Param;
  *   <li>{@link Method#RANDOM} - Latin-hypercube samples: the baseline the others must
  *       beat.</li>
  * </ul>
+ *
+ * <p>Every search method but TWIDDLE reports like ML does: the tried set with the lowest
+ * GP-*predicted* cost wins, so a lucky trial never wins on its own. The GP is fitted over
+ * every trial anyway and draws the model window ({@link ModelView}).
  *
  * Every trial waits for the drone to be level on its stand, applies the candidate gains,
  * settles, measures a window at 20 Hz and scores it with {@link #costOf}. A trial that
@@ -47,19 +63,51 @@ public class AutoTuner {
     private static final String LOG_TAG = "Crazyflie-AutoTuner";
 
     private static final double COST_CAP = 300.0;
-    /** Tip-over threshold for the drone on its stand, in degrees of roll or pitch. */
-    private static final float TIP_DEG = 30f;
+    /**
+     * Tip-over threshold for the drone on its stand, in degrees of roll or pitch. The
+     * firmware's MAX_TILT_DEG (25), so a run scores the same here and in tools/pid-tune.
+     */
+    private static final float TIP_DEG = 25f;
     /** Upright window for {@link #waitUpright}: within 15 deg for 1.5 s. */
     private static final float UPRIGHT_DEG = 15f;
 
-    /** The four optimizers; the hints are shown under the method picker. */
+    /**
+     * The 9 PID gains, the multiplicative gains of ml_tune.py's GAINS: the trial log records
+     * all of them so {@link #seed} can match a past row's untuned gains within 10 %.
+     */
+    private static final String[] PID_GAINS = {
+            "pid.roll_kp", "pid.roll_ki", "pid.roll_kd",
+            "pid.pitch_kp", "pid.pitch_ki", "pid.pitch_kd",
+            "pid.yaw_kp", "pid.yaw_ki", "pid.yaw_kd",
+    };
+    private static final String LOG_HEADER = "trial,stage"
+            + ",pid.roll_kp,pid.roll_ki,pid.roll_kd"
+            + ",pid.pitch_kp,pid.pitch_ki,pid.pitch_kd"
+            + ",pid.yaw_kp,pid.yaw_ki,pid.yaw_kd"
+            + ",cost,fell,angle_mean,angle_std,rate_rms,motor_rms,ctrl,sat";
+
+    /** The optimizers; the hints are shown under the method picker. */
     public enum Method {
         ML("ML (Bayesian)", 2.0, "ml",
                 "Gaussian process + expected improvement. Fewest trials; the default."),
-        TWIDDLE("Twiddle", 3.0, "twiddle",
-                "One gain at a time, wins re-measured. Simple, stays close to the start."),
+        NEURAL("Neural (deep ensemble)", 2.0, "neural",
+                "5 small neural nets learn the cost; tries the lowest confidence bound."),
+        RL("RL (policy gradient)", 2.0, "rl",
+                "PGPE: a Gaussian policy over the gains, 2 trials per update."),
+        CMA_ES("CMA-ES", 2.0, "cma-es",
+                "Evolution strategy that learns the step size and gain correlations."),
+        DIFFERENTIAL_EVOLUTION("Differential evolution", 2.0, "de",
+                "Population search, DE/rand/1/bin. Needs 30+ trials."),
+        PSO("Particle swarm (PSO)", 2.0, "pso",
+                "Swarm search. Needs 30+ trials."),
+        GENETIC("Genetic algorithm", 2.0, "ga",
+                "Selection, crossover, mutation, elitism. Needs 30+ trials."),
         NELDER_MEAD("Nelder-Mead", 2.0, "nelder-mead",
                 "Downhill simplex: local, no model, sensitive to noise."),
+        SPSA("SPSA", 2.0, "spsa",
+                "Noisy gradient from 2 trials per step (extremum-seeking style). Local."),
+        TWIDDLE("Twiddle", 3.0, "twiddle",
+                "One gain at a time, wins re-measured. Simple, stays close to the start."),
         RANDOM("Random (baseline)", 2.0, "random",
                 "Latin-hypercube samples: what the others must beat.");
 
@@ -83,8 +131,8 @@ public class AutoTuner {
      * @param nudge  kept for structural parity with the reference; the drone has no wheels
      *               to nudge, so trials measure the drone as it sits on its stand
      * @param trimAngle0 kept for parity; a quad has no balance-angle trim
-     * @param learn  kept for parity; cross-run history seeding is not ported (the trials
-     *               of the current run already feed the model)
+     * @param learn  cross-run history seeding: trial rows of the log whose other gains match
+     *               the current ones (within 10 %) seed the model as unit-cube points
      */
     public static class Config {
         public final Method method;
@@ -115,10 +163,19 @@ public class AutoTuner {
         /** Trial {@code trialNo} ran with {@code candidates}; live status for the panel. */
         void onTrial(int trialNo, float[] candidates, double cost);
 
+        /** The model after that trial (ml_tune.py's {@code post("trial", ...)}), for ModelView. */
+        void onModel(Report report);
+
         void onDone(Report report);
     }
 
-    /** The result of a run: best cost, best gains and every trial that was tried. */
+    /**
+     * The result of a run: best cost, best gains and every trial that was tried. Posted after
+     * every trial as well (via {@link Listener#onModel}), where the trailing fields carry the
+     * model window: ml_tune.py's {@code post("trial", ...)} payload ({@code gp, space, X, Y,
+     * own, fell_mask, best_x}) plus the predicted-cost grid ModelView draws. {@code bestGains}
+     * is that payload's {@code best}; {@code reason} is null on the per-trial reports.
+     */
     public static class Report {
         public final Method method;
         public final String reason;
@@ -127,9 +184,35 @@ public class AutoTuner {
         public final float[] bestGains;
         public final List<float[]> history;
         public final List<Double> historyCosts;
+        public final int n;
+        public final int total;
+        public final double cost;
+        public final boolean fell;
+        public final String[] names;
+        public final float[] tried;
+        public final Double bestPred;
+        public final Space space;
+        /** Unit-cube points the model was fitted on. */
+        public final List<double[]> xs;
+        /** Their costs (in cost units, not log). */
+        public final double[] costs;
+        /** False for points seeded from earlier runs. */
+        public final boolean[] own;
+        public final boolean[] fellMask;
+        public final double[] bestX;
+        public final GaussianProcess model;
+        /** Predicted cost over the tuned gains (see ModelView); null when there is no model. */
+        public final int gridN;
+        public final double[] grid;
+        public final double[] gridLo;
+        public final double[] gridHi;
 
         Report(Method method, String reason, int trialsRun, double bestCost, float[] bestGains,
-               List<float[]> history, List<Double> historyCosts) {
+               List<float[]> history, List<Double> historyCosts, int n, int total, double cost,
+               boolean fell, String[] names, float[] tried, Double bestPred, Space space,
+               List<double[]> xs, double[] costs, boolean[] own, boolean[] fellMask,
+               double[] bestX, GaussianProcess model, int gridN, double[] grid,
+               double[] gridLo, double[] gridHi) {
             this.method = method;
             this.reason = reason;
             this.trialsRun = trialsRun;
@@ -137,6 +220,24 @@ public class AutoTuner {
             this.bestGains = bestGains;
             this.history = history;
             this.historyCosts = historyCosts;
+            this.n = n;
+            this.total = total;
+            this.cost = cost;
+            this.fell = fell;
+            this.names = names;
+            this.tried = tried;
+            this.bestPred = bestPred;
+            this.space = space;
+            this.xs = xs;
+            this.costs = costs;
+            this.own = own;
+            this.fellMask = fellMask;
+            this.bestX = bestX;
+            this.model = model;
+            this.gridN = gridN;
+            this.grid = grid;
+            this.gridLo = gridLo;
+            this.gridHi = gridHi;
         }
     }
 
@@ -204,8 +305,9 @@ public class AutoTuner {
      *       place of the robot's wheel-speed RMS.</li>
      *   <li>{@code saturatedShare}: fraction of samples where motor.m1 sits on its rail
      *       (&gt;= 1990 or &lt;= 1010).</li>
-     *   <li>The wheel-encoder travel term and the fall cost of the reference are dropped
-     *       entirely.</li>
+     *   <li>The wheel-encoder travel term is dropped entirely. The reference's fall cost is
+     *       not part of this pure window score; {@link #measure} applies it, because it
+     *       needs to know how much of the trial was lost.</li>
      * </ul>
      */
     public static Metrics costOf(float[] angle, float[] rate, float[] motorM1, float[] control, int n) {
@@ -279,6 +381,8 @@ public class AutoTuner {
     private float[] mTried;    // what the last trial really ran with
     private float[] mBest;
     private double mBestCost = Double.POSITIVE_INFINITY;
+    private Double mBestPred;  // the model's predicted cost at the best point
+    private double mLastCost;  // the trial the current report was built after
 
     private int mK;                                // trials completed
     private boolean mLastBad;                      // the last trial tipped the drone
@@ -291,9 +395,17 @@ public class AutoTuner {
     private GaussianProcess mGp;
     private double[] mBestX;
 
-    public AutoTuner(Config cfg, Param param, Listener listener) {
+    // state of the searchOther() optimisers
+    private int mD;
+    private double[] mX0;
+
+    private final File mLogFile;
+    private PrintWriter mLog;
+
+    public AutoTuner(Config cfg, Param param, File logFile, Listener listener) {
         mCfg = cfg;
         mParam = param;
+        mLogFile = logFile;
         mListener = listener;
     }
 
@@ -531,7 +643,16 @@ public class AutoTuner {
             motor[i] = t.motorM1;
             control[i] = t.control;
         }
-        return costOf(angle, rate, motor, control, n);
+        Metrics m = costOf(angle, rate, motor, control, n);
+        if (mLastBad) {
+            // The reference's fall cost: without it a short pre-tip window can outscore a
+            // clean full trial and the model learns to tip. Same currency as everything
+            // else, so a fall is simply "much worse".
+            double survived = (double) badAt / Math.max(frames.size(), 1) * mCfg.trialS;
+            m = new Metrics(m.angleMean, m.angleStd, m.rateRms, m.motorRms, m.controlEffort,
+                    m.saturatedShare, 100.0 + 10.0 * (mCfg.trialS - survived));
+        }
+        return m;
     }
 
     /** Wait level with the last parameters, switch to p, measure, record. */
@@ -545,6 +666,7 @@ public class AutoTuner {
         Log.i(LOG_TAG, String.format(Locale.US,
                 "trial %d [%s] cost %.3f (angle sd %.3f, rate rms %.3f, motor rms %.3f, ctrl %.3f, sat %.3f)",
                 mK, stage, m.cost, m.angleStd, m.rateRms, m.motorRms, m.controlEffort, m.saturatedShare));
+        logTrial(stage, m);
         if (mLastBad) {
             apply(mBest);
             waitUpright(true);
@@ -565,7 +687,7 @@ public class AutoTuner {
 
     // ------------------------------------------------------------- model bookkeeping
 
-    /** Search box around the current gains. */
+    /** Search box around the current gains, seeded with matching past trials. */
     private void begin(double factor) {
         mSpace = new Space(mCfg.ids, mParams, factor);
         StringBuilder sb = new StringBuilder(mCfg.method.tag);
@@ -573,11 +695,62 @@ public class AutoTuner {
             sb.append(sb.length() == mCfg.method.tag.length() ? ":" : "+").append(n);
         }
         mStage = sb.toString();
+        seed();
     }
 
-    /** evaluate() plus the model bookkeeping. */
+    /**
+     * Past trials taken with the same other gains, as unit-cube points (ml_tune.py's seed):
+     * rows of the trial log whose gains outside the tuned set match the current ones within
+     * 10 %. The reference's angle0-within-1-deg check has no counterpart here (the drone's
+     * gains are all multiplicative).
+     */
+    private void seed() {
+        if (!mCfg.learn) {
+            return;
+        }
+        double[] now = gainSnapshot();
+        if (now == null) {
+            return;
+        }
+        int[] tunedIdx = new int[mCfg.ids.size()];
+        for (int j = 0; j < tunedIdx.length; j++) {
+            tunedIdx[j] = indexOfGain(mCfg.ids.get(j));
+            if (tunedIdx[j] < 0) {
+                return;                      // not a PID gain: nothing to match rows against
+            }
+        }
+        for (double[] row : readHistory(mLogFile)) {
+            boolean match = true;
+            for (int i = 0; i < PID_GAINS.length && match; i++) {
+                if (!contains(tunedIdx, i)
+                        && Math.abs(row[i] - now[i]) > 0.1 * Math.max(Math.abs(now[i]), 1e-6)) {
+                    match = false;
+                }
+            }
+            if (!match) {
+                continue;
+            }
+            double[] vals = new double[tunedIdx.length];
+            for (int j = 0; j < vals.length; j++) {
+                vals[j] = row[tunedIdx[j]];
+            }
+            double[] x = mSpace.toUnit(vals);
+            if (x != null) {
+                mXs.add(x);
+                mYs.add(toY(row[PID_GAINS.length]));
+                mOwn.add(Boolean.FALSE);
+                mBadMask.add(Boolean.FALSE);
+            }
+        }
+        if (!mXs.isEmpty()) {
+            status("Learned from " + mXs.size() + " past trials");
+        }
+    }
+
+    /** evaluate() plus the model bookkeeping and the model report. */
     private TrialResult trial(float[] p, double[] x) {
         TrialResult r = evaluate(mStage, p);
+        mLastCost = r.cost;
         // the firmware may clamp/round: learn what was really applied
         double[] u = mSpace.toUnit(toDoubles(mTried));
         if (u == null) {
@@ -595,6 +768,7 @@ public class AutoTuner {
                 chooseBestMl(mGp);
             } else {
                 mBestX = mSpace.toUnit(toDoubles(mBest));
+                mBestPred = mBestCost == Double.POSITIVE_INFINITY ? null : mBestCost;
             }
         }
         final int trialNo = mK;
@@ -606,6 +780,15 @@ public class AutoTuner {
                 mListener.onTrial(trialNo, candidates, cost);
             }
         });
+        if (mGp != null) {
+            final Report report = buildReport(null);
+            mMain.post(new Runnable() {
+                @Override
+                public void run() {
+                    mListener.onModel(report);
+                }
+            });
+        }
         return r;
     }
 
@@ -625,6 +808,7 @@ public class AutoTuner {
         if (jBest >= 0) {
             mBestX = mXs.get(jBest);
             mBestCost = Math.expm1(mYs.get(jBest));
+            mBestPred = Math.expm1(bestMean);
             double[] x = mBestX;
             for (int q = 0; q < mBest.length; q++) {
                 mBest[q] = (float) mSpace.value(q, x[q]);
@@ -836,6 +1020,533 @@ public class AutoTuner {
         }
     }
 
+    // ------------------------------------------------------------- the other searches
+    // ml_tune.py's SearchTuner and subclasses: each search*() is an endless loop over
+    // unit-cube points and f() throws Budget when the trials are used up.
+
+    private void searchOther() {
+        begin(mCfg.range);
+        mD = mCfg.ids.size();
+        mX0 = mSpace.toUnit(toDoubles(mParams));
+        if (mX0 == null) {
+            mX0 = new double[mD];
+            Arrays.fill(mX0, 0.5);
+        }
+        try {
+            switch (mCfg.method) {
+                case NEURAL:
+                    searchNeural();
+                    break;
+                case RL:
+                    searchPolicyGradient();
+                    break;
+                case CMA_ES:
+                    searchCmaes();
+                    break;
+                case PSO:
+                    searchPso();
+                    break;
+                case GENETIC:
+                    searchGenetic();
+                    break;
+                case DIFFERENTIAL_EVOLUTION:
+                    searchDifferentialEvolution();
+                    break;
+                case SPSA:
+                    searchSpsa();
+                    break;
+                default:
+                    break;
+            }
+        } catch (Budget ignored) {
+        }
+    }
+
+    /** Population for the evolutionary methods: 4 + 2 per gain, but at least 3 generations. */
+    private int popSize() {
+        return Math.max(4, Math.min(4 + 2 * mD, (mCfg.trials - mK) / 3));
+    }
+
+    private List<double[]> firstPopulation(int n) {
+        List<double[]> out = new ArrayList<>();
+        out.add(mX0.clone());
+        out.addAll(latinHypercube(n - 1, mD));
+        return out;
+    }
+
+    /** Neural surrogate: an MlpEnsemble; the next trial minimises mean - 1.5 x member spread. */
+    private void searchNeural() {
+        for (double[] x : firstPopulation(Math.max(1, mD + 3 - mXs.size()))) {
+            f(x);
+        }
+        while (true) {
+            MlpEnsemble net = new MlpEnsemble(mXs.toArray(new double[0][]), toDoubleArray(mYs), mRng);
+            List<double[]> cand = new ArrayList<>(3600);
+            for (int i = 0; i < 3000; i++) {
+                cand.add(randomX(mD));
+            }
+            if (mBestX != null) {
+                for (int i = 0; i < 600; i++) {
+                    double[] b = new double[mD];
+                    for (int j = 0; j < mD; j++) {
+                        b[j] = Math.max(0.0, Math.min(1.0, mBestX[j] + 0.07 * mRng.nextGaussian()));
+                    }
+                    cand.add(b);
+                }
+            }
+            double[][] ms = net.predict(cand.toArray(new double[0][]));
+            int pick = 0;
+            double bestLcb = Double.POSITIVE_INFINITY;
+            for (int i = 0; i < cand.size(); i++) {
+                double lcb = ms[0][i] - 1.5 * ms[1][i];
+                if (lcb < bestLcb) {
+                    bestLcb = lcb;
+                    pick = i;
+                }
+            }
+            f(cand.get(pick));
+        }
+    }
+
+    /**
+     * Reinforcement learning, episodic: PGPE (Sehnke et al. 2010), policy-gradient over the
+     * gains. The policy is a Gaussian over the unit cube; each step plays mean +- eps (one
+     * trial each, reward = -score) and moves the mean towards the better one and the widths
+     * towards what paid off.
+     */
+    private void searchPolicyGradient() {
+        double[] mu = mX0.clone();
+        double[] sig = new double[mD];
+        Arrays.fill(sig, 0.15);
+        List<Double> rewards = new ArrayList<>();
+        while (true) {
+            double[] eps = new double[mD];
+            double[] plus = new double[mD];
+            double[] minus = new double[mD];
+            for (int j = 0; j < mD; j++) {
+                eps[j] = sig[j] * mRng.nextGaussian();
+                plus[j] = mu[j] + eps[j];
+                minus[j] = mu[j] - eps[j];
+            }
+            double rPlus = -f(plus);
+            double rMinus = -f(minus);
+            rewards.add(rPlus);
+            rewards.add(rMinus);
+            double scale = Math.max(stdOf(rewards), 0.05);
+            double base = rewards.size() > 2
+                    ? meanOf(rewards.subList(0, rewards.size() - 2)) : (rPlus + rMinus) / 2;
+            for (int j = 0; j < mD; j++) {
+                mu[j] = clamp01(mu[j]
+                        + clamp(0.5 * eps[j] * (rPlus - rMinus) / (2 * scale), -0.15, 0.15));
+                sig[j] = clamp(sig[j] + 0.1 * ((rPlus + rMinus) / 2 - base) / scale
+                        * (eps[j] * eps[j] - sig[j] * sig[j]) / sig[j], 0.03, 0.3);
+            }
+        }
+    }
+
+    /** CMA-ES, (mu/mu_w, lambda), sigma0 0.2 of the box; the clipped steps are learned from. */
+    private void searchCmaes() {
+        int d = mD;
+        int lam = 4 + (int) (3 * Math.log(d));
+        int mu = lam / 2;
+        double[] w = new double[mu];
+        double wSum = 0;
+        for (int i = 0; i < mu; i++) {
+            w[i] = Math.log(mu + 0.5) - Math.log(i + 1.0);
+            wSum += w[i];
+        }
+        for (int i = 0; i < mu; i++) {
+            w[i] /= wSum;
+        }
+        double wSq = 0;
+        for (double v : w) {
+            wSq += v * v;
+        }
+        double mueff = 1 / wSq;
+        double cc = (4 + mueff / d) / (d + 4 + 2 * mueff / d);
+        double cs = (mueff + 2) / (d + mueff + 5);
+        double c1 = 2 / ((d + 1.3) * (d + 1.3) + mueff);
+        double cmu = Math.min(1 - c1, 2 * (mueff - 2 + 1 / mueff) / ((d + 2.0) * (d + 2.0) + mueff));
+        double damps = 1 + 2 * Math.max(0, Math.sqrt((mueff - 1) / (d + 1)) - 1) + cs;
+        double chi = Math.sqrt(d) * (1 - 1.0 / (4 * d) + 1.0 / (21.0 * d * d));
+        double[] m = mX0.clone();
+        double sigma = 0.2;
+        double[][] cov = new double[d][d];
+        for (int i = 0; i < d; i++) {
+            cov[i][i] = 1.0;
+        }
+        double[] pc = new double[d];
+        double[] ps = new double[d];
+        int gen = 0;
+        while (true) {
+            gen++;
+            Eigen eigen = symmetricEigen(cov);
+            double[] sd = new double[d];
+            for (int i = 0; i < d; i++) {
+                sd[i] = Math.sqrt(Math.max(eigen.values[i], 1e-12));
+            }
+            double[][] xsGen = new double[lam][d];
+            double[][] steps = new double[lam][d];
+            for (int k = 0; k < lam; k++) {
+                double[] z = new double[d];
+                for (int i = 0; i < d; i++) {
+                    z[i] = mRng.nextGaussian();
+                }
+                for (int i = 0; i < d; i++) {
+                    double y = 0;
+                    for (int j = 0; j < d; j++) {
+                        y += eigen.vectors[i][j] * sd[j] * z[j];
+                    }
+                    xsGen[k][i] = clamp01(m[i] + sigma * y);
+                }
+                for (int i = 0; i < d; i++) {
+                    steps[k][i] = (xsGen[k][i] - m[i]) / sigma;   // clipped steps are learned from
+                }
+            }
+            double[] scores = new double[lam];
+            for (int k = 0; k < lam; k++) {
+                scores[k] = f(xsGen[k]);
+            }
+            Integer[] order = new Integer[lam];
+            for (int k = 0; k < lam; k++) {
+                order[k] = k;
+            }
+            final double[] fs = scores;
+            Arrays.sort(order, new Comparator<Integer>() {
+                @Override
+                public int compare(Integer a, Integer b) {
+                    return Double.compare(fs[a], fs[b]);
+                }
+            });
+            double[] yw = new double[d];
+            for (int i = 0; i < d; i++) {
+                double s = 0;
+                for (int r = 0; r < mu; r++) {
+                    s += w[r] * steps[order[r]][i];
+                }
+                yw[i] = s;
+            }
+            for (int i = 0; i < d; i++) {
+                m[i] += sigma * yw[i];
+            }
+            double[] bt = new double[d];                 // B^T yw
+            for (int j = 0; j < d; j++) {
+                double s = 0;
+                for (int i = 0; i < d; i++) {
+                    s += eigen.vectors[i][j] * yw[i];
+                }
+                bt[j] = s;
+            }
+            double[] whitened = new double[d];           // B diag(1/D) B^T yw
+            for (int i = 0; i < d; i++) {
+                double s = 0;
+                for (int j = 0; j < d; j++) {
+                    s += eigen.vectors[i][j] * bt[j] / sd[j];
+                }
+                whitened[i] = s;
+            }
+            double psSq = 0;
+            for (int i = 0; i < d; i++) {
+                ps[i] = (1 - cs) * ps[i] + Math.sqrt(cs * (2 - cs) * mueff) * whitened[i];
+                psSq += ps[i] * ps[i];
+            }
+            double psNorm = Math.sqrt(psSq);
+            boolean hs = psNorm / Math.sqrt(1 - Math.pow(1 - cs, 2.0 * gen))
+                    < (1.4 + 2.0 / (d + 1)) * chi;
+            for (int i = 0; i < d; i++) {
+                pc[i] = (1 - cc) * pc[i] + (hs ? Math.sqrt(cc * (2 - cc) * mueff) : 0.0) * yw[i];
+            }
+            double keep = hs ? 0.0 : cc * (2 - cc);
+            double[][] old = cov;
+            cov = new double[d][d];
+            for (int i = 0; i < d; i++) {
+                for (int j = 0; j < d; j++) {
+                    double s = (1 - c1 - cmu) * old[i][j] + c1 * (pc[i] * pc[j] + keep * old[i][j]);
+                    for (int r = 0; r < mu; r++) {
+                        s += cmu * w[r] * steps[order[r]][i] * steps[order[r]][j];
+                    }
+                    cov[i][j] = s;
+                }
+            }
+            sigma = Math.min(0.5, sigma * Math.exp(cs / damps * (psNorm / chi - 1)));
+        }
+    }
+
+    /** Particle swarm: inertia 0.6, c1 = c2 = 1.5, speed <= 0.2 per step. */
+    private void searchPso() {
+        int n = popSize();
+        List<double[]> pos = firstPopulation(n);
+        double[][] vel = new double[n][mD];
+        for (int j = 0; j < n; j++) {
+            for (int q = 0; q < mD; q++) {
+                vel[j][q] = 0.05 * mRng.nextGaussian();
+            }
+        }
+        double[][] pBest = new double[n][mD];
+        for (int j = 0; j < n; j++) {
+            pBest[j] = pos.get(j).clone();
+        }
+        double[] pFit = new double[n];
+        Arrays.fill(pFit, Double.POSITIVE_INFINITY);
+        while (true) {
+            for (int j = 0; j < n; j++) {
+                double fx = f(pos.get(j));
+                if (fx < pFit[j]) {
+                    pBest[j] = pos.get(j).clone();
+                    pFit[j] = fx;
+                }
+            }
+            int g = 0;
+            for (int j = 1; j < n; j++) {
+                if (pFit[j] < pFit[g]) {
+                    g = j;
+                }
+            }
+            for (int j = 0; j < n; j++) {
+                for (int q = 0; q < mD; q++) {
+                    vel[j][q] = clamp(0.6 * vel[j][q]
+                            + 1.5 * mRng.nextDouble() * (pBest[j][q] - pos.get(j)[q])
+                            + 1.5 * mRng.nextDouble() * (pBest[g][q] - pos.get(j)[q]), -0.2, 0.2);
+                    pos.get(j)[q] = clamp01(pos.get(j)[q] + vel[j][q]);
+                }
+            }
+        }
+    }
+
+    /** Real-coded GA: tournament of 2, BLX-0.3 crossover, Gaussian mutation, elitism. */
+    private void searchGenetic() {
+        int n = popSize();
+        List<double[]> pop = firstPopulation(n);
+        double[] fit = new double[n];
+        for (int i = 0; i < n; i++) {
+            fit[i] = f(pop.get(i));
+        }
+        double mutation = Math.max(1.0 / mD, 0.3);
+        while (true) {
+            final double[] pf = fit;
+            Comparator<Integer> byFit = new Comparator<Integer>() {
+                @Override
+                public int compare(Integer x, Integer y) {
+                    return Double.compare(pf[x], pf[y]);
+                }
+            };
+            int elite = 0;
+            for (int i = 1; i < n; i++) {
+                if (fit[i] < fit[elite]) {
+                    elite = i;
+                }
+            }
+            double eliteFit = fit[elite];
+            List<double[]> kids = new ArrayList<>();
+            kids.add(pop.get(elite).clone());
+            while (kids.size() < n) {
+                int a1 = mRng.nextInt(n);
+                int b1 = mRng.nextInt(n);
+                double[] p1 = pop.get(byFit.compare(a1, b1) < 0 ? a1 : b1);
+                int a2 = mRng.nextInt(n);
+                int b2 = mRng.nextInt(n);
+                double[] p2 = pop.get(byFit.compare(a2, b2) < 0 ? a2 : b2);
+                double[] child = new double[mD];
+                for (int j = 0; j < mD; j++) {
+                    double lo = Math.min(p1[j], p2[j]);
+                    double hi = Math.max(p1[j], p2[j]);
+                    double span = hi - lo;
+                    child[j] = lo - 0.3 * span + mRng.nextDouble() * 1.6 * span;
+                    if (mRng.nextDouble() < mutation) {
+                        child[j] += 0.1 * mRng.nextGaussian();
+                    }
+                }
+                kids.add(clip(child));
+            }
+            pop = kids;
+            for (int i = 0; i < n; i++) {
+                fit[i] = i == 0 ? eliteFit : f(kids.get(i));
+            }
+        }
+    }
+
+    /** Differential evolution, DE/rand/1/bin, F 0.7, CR 0.9, greedy replacement. */
+    private void searchDifferentialEvolution() {
+        int n = popSize();
+        List<double[]> pop = firstPopulation(n);
+        double[] fit = new double[n];
+        for (int i = 0; i < n; i++) {
+            fit[i] = f(pop.get(i));
+        }
+        while (true) {
+            for (int j = 0; j < n; j++) {
+                List<Integer> others = new ArrayList<>();
+                for (int i = 0; i < n; i++) {
+                    if (i != j) {
+                        others.add(i);
+                    }
+                }
+                Collections.shuffle(others, mRng);
+                double[] a = pop.get(others.get(0));
+                double[] b = pop.get(others.get(1));
+                double[] c = pop.get(others.get(2));
+                int forced = mRng.nextInt(mD);
+                double[] u = new double[mD];
+                for (int q = 0; q < mD; q++) {
+                    u[q] = clamp01(q == forced || mRng.nextDouble() < 0.9
+                            ? a[q] + 0.7 * (b[q] - c[q]) : pop.get(j)[q]);
+                }
+                double fu = f(u);
+                if (fu < fit[j]) {
+                    pop.set(j, u);
+                    fit[j] = fu;
+                }
+            }
+        }
+    }
+
+    /** SPSA: two trials at x +- c delta give a gradient estimate; gain-scheduled steps downhill. */
+    private void searchSpsa() {
+        double[] x = mX0.clone();
+        double a = 0;
+        boolean aSet = false;
+        final double aStab = 2.0;
+        int iter = 0;
+        while (true) {
+            double ck = 0.12 / Math.pow(iter + 1.0, 0.101);
+            double[] delta = new double[mD];
+            double[] plus = new double[mD];
+            double[] minus = new double[mD];
+            for (int j = 0; j < mD; j++) {
+                delta[j] = mRng.nextBoolean() ? 1.0 : -1.0;
+                plus[j] = x[j] + ck * delta[j];
+                minus[j] = x[j] - ck * delta[j];
+            }
+            double diff = f(plus) - f(minus);
+            double[] g = new double[mD];
+            double gMax = 0;
+            for (int j = 0; j < mD; j++) {
+                g[j] = diff / (2 * ck) * delta[j];
+                gMax = Math.max(gMax, Math.abs(g[j]));
+            }
+            if (!aSet) {                     // first step moves ~0.1 of the box
+                a = 0.1 * Math.pow(aStab + 1, 0.602) / Math.max(gMax, 1e-6);
+                aSet = true;
+            }
+            double ak = a / Math.pow(iter + 1 + aStab, 0.602);
+            for (int j = 0; j < mD; j++) {
+                x[j] = clamp01(x[j] - clamp(ak * g[j], -0.15, 0.15));
+            }
+            iter++;
+        }
+    }
+
+    /** Eigenvalues and eigenvectors (as columns) of a small symmetric matrix, cyclic Jacobi. */
+    private static class Eigen {
+        final double[] values;
+        final double[][] vectors;
+
+        Eigen(double[] values, double[][] vectors) {
+            this.values = values;
+            this.vectors = vectors;
+        }
+    }
+
+    private static Eigen symmetricEigen(double[][] m) {
+        int n = m.length;
+        double[][] a = new double[n][n];
+        double[][] v = new double[n][n];
+        for (int i = 0; i < n; i++) {
+            a[i] = m[i].clone();
+            v[i][i] = 1.0;
+        }
+        for (int sweep = 0; sweep < 50; sweep++) {
+            double off = 0;
+            for (int p = 0; p < n; p++) {
+                for (int q = p + 1; q < n; q++) {
+                    off += a[p][q] * a[p][q];
+                }
+            }
+            if (off < 1e-22) {
+                break;
+            }
+            for (int p = 0; p < n; p++) {
+                for (int q = p + 1; q < n; q++) {
+                    if (Math.abs(a[p][q]) < 1e-300) {
+                        continue;
+                    }
+                    double theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+                    double t = (theta >= 0 ? 1.0 : -1.0)
+                            / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+                    double cs = 1 / Math.sqrt(t * t + 1);
+                    double sn = t * cs;
+                    for (int k = 0; k < n; k++) {
+                        double kp = a[k][p];
+                        double kq = a[k][q];
+                        a[k][p] = cs * kp - sn * kq;
+                        a[k][q] = sn * kp + cs * kq;
+                    }
+                    for (int k = 0; k < n; k++) {
+                        double pk = a[p][k];
+                        double qk = a[q][k];
+                        a[p][k] = cs * pk - sn * qk;
+                        a[q][k] = sn * pk + cs * qk;
+                    }
+                    for (int k = 0; k < n; k++) {
+                        double kp = v[k][p];
+                        double kq = v[k][q];
+                        v[k][p] = cs * kp - sn * kq;
+                        v[k][q] = sn * kp + cs * kq;
+                    }
+                }
+            }
+        }
+        double[] values = new double[n];
+        for (int i = 0; i < n; i++) {
+            values[i] = a[i][i];
+        }
+        return new Eigen(values, v);
+    }
+
+    private static double meanOf(List<Double> a) {
+        double s = 0;
+        for (double v : a) {
+            s += v;
+        }
+        return s / a.size();
+    }
+
+    /** Population std, as numpy's np.std. */
+    private static double stdOf(List<Double> a) {
+        double mu = meanOf(a);
+        double s = 0;
+        for (double v : a) {
+            s += (v - mu) * (v - mu);
+        }
+        return Math.sqrt(s / a.size());
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    private static double clamp01(double v) {
+        return Math.max(0.0, Math.min(1.0, v));
+    }
+
+    private static boolean contains(int[] a, int v) {
+        for (int x : a) {
+            if (x == v) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int indexOfGain(String name) {
+        for (int i = 0; i < PID_GAINS.length; i++) {
+            if (PID_GAINS[i].equals(name)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     /** One trial at unit-cube point x; returns its score toY(cost). */
     private double f(double[] x) {
         if (mK >= mCfg.trials) {
@@ -930,6 +1641,7 @@ public class AutoTuner {
         try {
             mParams = readStartValues();
             mBest = mParams.clone();
+            openLog();
             status("Waiting for the drone to be level on its stand");
             waitUpright(false);
             status("Running");
@@ -943,8 +1655,11 @@ public class AutoTuner {
                 case NELDER_MEAD:
                     searchNelderMead();
                     break;
-                default:
+                case RANDOM:
                     searchRandom();
+                    break;
+                default:
+                    searchOther();
                     break;
             }
         } catch (Stopped e) {
@@ -955,6 +1670,10 @@ public class AutoTuner {
             reason = "error: " + e;
             Log.e(LOG_TAG, "auto-tune failed", e);
         } finally {
+            if (mLog != null) {
+                mLog.close();
+                mLog = null;
+            }
             if (mBest != null) {
                 try {
                     apply(mBest);
@@ -971,6 +1690,114 @@ public class AutoTuner {
             });
         }
     }
+
+    /**
+     * The trial log (autotune-format CSV) is appended every run and read back by {@link #seed}
+     * on the next one. A log that cannot be opened only costs the history seeding.
+     */
+    private void openLog() {
+        if (mLogFile == null) {
+            return;
+        }
+        try {
+            boolean fresh = !mLogFile.exists() || mLogFile.length() == 0;
+            mLog = new PrintWriter(new FileWriter(mLogFile, true));
+            if (fresh) {
+                mLog.println(LOG_HEADER);
+            }
+        } catch (IOException e) {
+            Log.w(LOG_TAG, "cannot write the trial log " + mLogFile + ": " + e);
+            mLog = null;
+        }
+    }
+
+    /** Append one trial to the CSV {@link #openLog} opened (columns match {@link #LOG_HEADER}). */
+    private void logTrial(String stage, Metrics m) {
+        if (mLog == null) {
+            return;
+        }
+        double[] gains = gainSnapshot();
+        StringBuilder sb = new StringBuilder();
+        sb.append(mK).append(',').append(stage);
+        for (int i = 0; i < PID_GAINS.length; i++) {
+            sb.append(',');
+            if (gains != null) {
+                sb.append(String.format(Locale.US, "%.5g", gains[i]));
+            }
+        }
+        sb.append(String.format(Locale.US, ",%.3f,%s,%.4g,%.4g,%.4g,%.4g,%.4g,%.4g",
+                m.cost, mLastBad, m.angleMean, m.angleStd, m.rateRms, m.motorRms,
+                m.controlEffort, m.saturatedShare));
+        mLog.println(sb);
+        mLog.flush();
+    }
+
+    /** The 9 PID gains as the drone currently has them, or null if any cannot be read. */
+    private double[] gainSnapshot() {
+        double[] out = new double[PID_GAINS.length];
+        for (int i = 0; i < out.length; i++) {
+            try {
+                Number v = mParam.getValue(PID_GAINS[i]);
+                if (v == null) {
+                    return null;
+                }
+                out[i] = v.doubleValue();
+            } catch (RuntimeException e) {
+                return null;              // the value map can be empty mid-connect
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Rows of an existing trial log: the 9 gains then the cost. A row that does not parse is
+     * skipped rather than failing the read — a hand-edited or truncated log must not stop a
+     * run, only cost it some history.
+     */
+    private static List<double[]> readHistory(File f) {
+        List<double[]> out = new ArrayList<>();
+        if (f == null) {
+            return out;
+        }
+        try (BufferedReader r = new BufferedReader(new FileReader(f))) {
+            String line;
+            boolean first = true;
+            while ((line = r.readLine()) != null) {
+                if (first) {
+                    first = false;        // LOG_HEADER
+                    continue;
+                }
+                String[] c = line.split(",", -1);
+                if (c.length < PID_GAINS.length + 2) {
+                    continue;
+                }
+                double[] row = new double[PID_GAINS.length + 1];
+                boolean ok = true;
+                for (int i = 0; i < PID_GAINS.length && ok; i++) {
+                    try {
+                        row[i] = Double.parseDouble(c[2 + i]);
+                    } catch (NumberFormatException e) {
+                        ok = false;
+                    }
+                }
+                if (!ok) {
+                    continue;
+                }
+                try {
+                    row[PID_GAINS.length] = Double.parseDouble(c[2 + PID_GAINS.length]);
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+                out.add(row);
+            }
+        } catch (IOException e) {
+            Log.w(LOG_TAG, "cannot read the trial log " + f + ": " + e);
+        }
+        return out;
+    }
+
+    /** Cells along one axis of {@link Report#grid}. */
+    private static final int GRID_N = 41;
 
     private Report buildReport(String reason) {
         List<float[]> history = new ArrayList<>();
@@ -990,7 +1817,52 @@ public class AutoTuner {
         }
         float[] bestGains = mBest != null ? mBest.clone() : new float[0];
         double bestCost = mBestCost == Double.POSITIVE_INFINITY ? Double.NaN : mBestCost;
-        return new Report(mCfg.method, reason, mK, bestCost, bestGains, history, historyCosts);
+
+        int n = mXs.size();
+        double[] costs = new double[n];
+        boolean[] own = new boolean[n];
+        boolean[] fellMask = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            costs[i] = Math.expm1(mYs.get(i));          // cost units, not log
+            own[i] = mOwn.get(i);
+            fellMask[i] = mBadMask.get(i);
+        }
+
+        // The predicted-cost grid ModelView draws: only meaningful over 1 or 2 gains.
+        int d = mSpace == null ? 0 : mSpace.names.length;
+        int gridN = 0;
+        double[] grid = null;
+        double[] gridLo = null;
+        double[] gridHi = null;
+        if (mGp != null && (d == 1 || d == 2)) {
+            gridN = GRID_N;
+            gridLo = new double[d];
+            gridHi = new double[d];
+            for (int j = 0; j < d; j++) {
+                gridLo[j] = mSpace.value(j, 0.0);
+                gridHi[j] = mSpace.value(j, 1.0);
+            }
+            int cells = d == 1 ? GRID_N : GRID_N * GRID_N;
+            grid = new double[cells];
+            double[] x = new double[d];
+            for (int i = 0; i < cells; i++) {
+                if (d == 1) {
+                    x[0] = (double) i / (GRID_N - 1);
+                } else {
+                    x[0] = (double) (i % GRID_N) / (GRID_N - 1);
+                    x[1] = (double) (i / GRID_N) / (GRID_N - 1);
+                }
+                grid[i] = Math.expm1(mGp.predict(x)[0]);
+            }
+        }
+
+        return new Report(mCfg.method, reason, mK, bestCost, bestGains, history, historyCosts,
+                mK, mCfg.trials, mLastCost, mLastBad,
+                mSpace != null ? mSpace.names : new String[0],
+                mTried != null ? mTried.clone() : new float[0],
+                mBestPred, mSpace, new ArrayList<>(mXs), costs, own, fellMask,
+                mBestX != null ? mBestX.clone() : null, mGp,
+                gridN, grid, gridLo, gridHi);
     }
 
     /**

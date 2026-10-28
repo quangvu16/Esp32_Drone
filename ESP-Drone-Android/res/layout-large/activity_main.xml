@@ -1,203 +1,464 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fly screen (redesign stage 2).
+     header = sections · link · battery · mode · ARMED · CUT MOTORS, always visible
+     body   = left stick | FlightModePanel (mode, Takeoff/Land, numbers, More) | right stick
+     More   = a panel over the right side for everything not needed every second.
+     The LED ring / headlight / buzzer buttons live in More and stay hidden unless the
+     drone reports that hardware (this board has none). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent" >
+    android:layout_height="match_parent"
+    android:background="@color/fly_ground"
+    android:orientation="vertical">
 
-    <!-- HEADER start -->
-    <ImageView
-        android:id="@+id/battery_icon"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_battery_std_black_18dp"
-        android:labelFor="@+id/battery_text"
-        android:layout_marginLeft="10dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginRight="0dp"
-        android:layout_marginEnd="0dp"
-        android:layout_marginTop="5dp"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:contentDescription="@string/batteryIconContentDescription"/>
+    <!-- HEADER -->
+    <LinearLayout
+        android:id="@+id/fly_header"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="@color/fly_surface"
+        android:elevation="1dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
 
-    <TextView
-        android:id="@+id/battery_text"
-        android:layout_width="35dp"
-        android:layout_height="wrap_content"
-        android:text="@string/battery_text"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textAlignment="viewEnd"
-        android:gravity="end"
-        android:layout_alignBottom="@+id/battery_icon"
-        android:layout_toRightOf="@+id/battery_icon"
-        android:layout_toEndOf="@+id/battery_icon" />
-
-    <ImageView
-        android:id="@+id/linkQuality_icon"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_wifi_tethering_black_18dp"
-        android:labelFor="@+id/linkQuality_text"
-        android:layout_marginLeft="5dp"
-        android:layout_marginStart="5dp"
-        android:layout_marginRight="2dp"
-        android:layout_marginEnd="2dp"
-        android:layout_alignBottom="@+id/battery_icon"
-        android:layout_toRightOf="@+id/battery_text"
-        android:layout_toEndOf="@+id/battery_text"
-        android:contentDescription="@string/linkQualityIconContentDescription"/>
-
-    <TextView
-        android:id="@+id/linkQuality_text"
-        android:layout_width="35dp"
-        android:layout_height="wrap_content"
-        android:text="@string/linkQuality_text"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textAlignment="viewEnd"
-        android:gravity="end"
-        android:layout_alignBottom="@+id/linkQuality_icon"
-        android:layout_toRightOf="@+id/linkQuality_icon"
-        android:layout_toEndOf="@+id/linkQuality_icon" />
-
-
-
-    <ImageButton
-        android:id="@+id/imageButton_connect"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_toLeftOf="@+id/imageButton_settings"
-        android:layout_toStartOf="@+id/imageButton_settings"
-        android:layout_marginBottom="5dp"
-        android:layout_marginLeft="10dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginRight="6dp"
-        android:layout_marginEnd="6dp"
-        android:layout_marginTop="5dp"
-        android:background="@drawable/custom_button"
-        android:src="@drawable/ic_action_import_export"
-        android:elevation="2dp"
-        android:contentDescription="@string/menu_connect_ContentDescription"/>
-
-    <ImageButton
-        android:id="@+id/imageButton_settings"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentEnd="true"
-        android:layout_marginBottom="5dp"
-        android:layout_marginLeft="6dp"
-        android:layout_marginStart="6dp"
-        android:layout_marginRight="10dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginTop="5dp"
-        android:background="@drawable/custom_button"
-        android:src="@drawable/ic_action_settings_light"
-        android:elevation="2dp"
-        android:contentDescription="@string/menu_preferences_ContentDescription"/>
-
-    <!-- HEADER end -->
-
-    <ImageButton
-        android:id="@+id/button_ledRing"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginLeft="6dp"
-        android:layout_marginRight="6dp"
-        android:layout_alignBottom="@+id/button_headLight"
-        android:layout_toLeftOf="@id/button_headLight"
-        android:layout_toStartOf="@id/button_headLight"
-        android:background="@drawable/custom_button_action"
-        android:src="@drawable/ic_led_ring"
-        android:elevation="2dp"
-        android:onClick="switchLedRingEffect"
-        android:contentDescription="@string/button_ledring_contentDescription"/>
-
-    <ImageButton
-        android:id="@+id/button_headLight"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginLeft="6dp"
-        android:layout_marginRight="6dp"
-        android:layout_below="@+id/imageButton_settings"
-        android:layout_centerHorizontal="true"
-        android:background="@drawable/custom_button_action"
-        android:src="@drawable/ic_headlight"
-        android:elevation="2dp"
-        android:onClick="toggleHeadlight"
-        android:contentDescription="@string/button_headlight_contentDescription"/>
-
-    <ImageButton
-        android:id="@+id/button_buzzerSound"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginLeft="6dp"
-        android:layout_marginRight="6dp"
-        android:layout_alignBottom="@+id/button_headLight"
-        android:layout_toRightOf="@id/button_headLight"
-        android:layout_toEndOf="@id/button_headLight"
-        android:background="@drawable/custom_button_action"
-        android:src="@drawable/ic_volume_up_black"
-        android:elevation="2dp"
-        android:onClick="playBuzzerSound"
-        android:contentDescription="@string/button_buzzer_contentDescription"/>
-
-    <se.bitcraze.crazyfliecontrol2.FlightDataView
-        android:id="@+id/flightdataview"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:layout_centerHorizontal="true"
-        android:layout_below="@+id/button_buzzerSound" />
-
-    <ScrollView
-        android:id="@+id/console_scrollView"
-        android:layout_width="180dp"
-        android:layout_height="200dp"
-        android:layout_centerHorizontal="true"
-        android:layout_below="@+id/flightdataview"
-        android:layout_marginTop="25dp"
-        android:scrollbars="vertical"
-        android:fillViewport="true">
-
-        <TextView
-            android:id="@+id/console_textView"
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="10dp"
-            android:background="@drawable/stroke_bg"
-            android:padding="2dp"
-            android:gravity="top"/>
-    </ScrollView>
+            android:background="@drawable/bg_fly_track"
+            android:orientation="horizontal"
+            android:padding="2dp">
 
-    <com.MobileAnarchy.Android.Widgets.Joystick.JoystickView
-        android:id="@+id/joystick_left"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_below="@+id/flightdataview"
-        android:gravity="bottom"
-        android:layout_toLeftOf="@+id/console_scrollView"
-        android:layout_toStartOf="@+id/console_scrollView"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tab_fly"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Fly"
+                android:textColor="@color/fly_ink"
+                android:textStyle="bold"
+                app:backgroundTint="@color/fly_surface" />
 
-    <com.MobileAnarchy.Android.Widgets.Joystick.JoystickView
-        android:id="@+id/joystick_right"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_below="@+id/flightdataview"
-        android:gravity="bottom"
-        android:layout_toRightOf="@+id/console_scrollView"
-        android:layout_toEndOf="@+id/console_scrollView"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tab_mission"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Mission" />
 
-    <ImageButton
-        android:id="@+id/joystick_left_hlock"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@id/joystick_left"
-        android:layout_alignStart="@id/joystick_left"
-        android:layout_alignLeft="@id/joystick_left"
-        android:layout_marginStart="16dp"
-        android:layout_marginLeft="16dp"
-        android:background="@drawable/custom_button_seledted"
-        android:src="@drawable/ic_horizontal" />
-</RelativeLayout>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tab_tune"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Tune" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tab_setup"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Setup" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/linkQuality_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/linkQualityIconContentDescription"
+                android:labelFor="@+id/linkQuality_text"
+                android:src="@drawable/ic_wifi_tethering_black_18dp" />
+
+            <TextView
+                android:id="@+id/linkQuality_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:maxLines="1"
+                android:text="@string/linkQuality_text"
+                android:textColor="@color/fly_ink"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:id="@+id/battery_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:contentDescription="@string/batteryIconContentDescription"
+                android:labelFor="@+id/battery_text"
+                android:src="@drawable/ic_battery_std_black_18dp" />
+
+            <TextView
+                android:id="@+id/battery_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:fontFamily="monospace"
+                android:maxLines="1"
+                android:text="— V"
+                android:textColor="@color/fly_ink"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/fly_mode_chip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:background="@drawable/bg_fly_chip_mode"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="4dp"
+                android:text="MANUAL"
+                android:textColor="@color/fly_ink"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/fly_armed_chip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_fly_chip_disarmed"
+                android:paddingStart="10dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="4dp"
+                android:text="DISARMED"
+                android:textColor="@color/fly_muted"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Kept for the connect/disconnect logic in MainActivity; the visible
+             entry points are Connect on the "not connected" card and Disconnect in More. -->
+        <ImageButton
+            android:id="@+id/imageButton_connect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/custom_button"
+            android:contentDescription="@string/menu_connect_ContentDescription"
+            android:src="@drawable/ic_action_import_export"
+            android:visibility="gone" />
+
+        <ImageButton
+            android:id="@+id/imageButton_settings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/custom_button"
+            android:contentDescription="@string/menu_preferences_ContentDescription"
+            android:src="@drawable/ic_action_settings_light"
+            android:visibility="gone" />
+
+        <!-- Same name, colour, icon and corner as on every other screen. Tap twice. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_emergency"
+            style="@style/Fly.Button.Danger"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="12dp"
+            android:contentDescription="Cut motors, tap twice"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="CUT MOTORS"
+            app:icon="@drawable/ic_btn_cut_motors" />
+    </LinearLayout>
+
+    <!-- BODY -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+
+                <com.MobileAnarchy.Android.Widgets.Joystick.JoystickView
+                    android:id="@+id/joystick_left"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="bottom" />
+
+                <ImageButton
+                    android:id="@+id/joystick_left_hlock"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="12dp"
+                    android:background="@drawable/custom_button_seledted"
+                    android:contentDescription="Lock left stick horizontal axis"
+                    android:src="@drawable/ic_horizontal"
+                    android:tooltipText="Lock left stick horizontal axis" />
+            </FrameLayout>
+
+            <se.bitcraze.crazyfliecontrol2.FlightModePanel
+                android:id="@+id/flightmodepanel"
+                android:layout_width="360dp"
+                android:layout_height="match_parent" />
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+
+                <com.MobileAnarchy.Android.Widgets.Joystick.JoystickView
+                    android:id="@+id/joystick_right"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="bottom" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- MORE panel -->
+        <ScrollView
+            android:id="@+id/fly_more_panel"
+            android:layout_width="420dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:background="@color/fly_surface"
+            android:elevation="8dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:accessibilityHeading="true"
+                        android:text="More"
+                        android:textColor="@color/fly_ink"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <ImageButton
+                        android:id="@+id/fly_more_close"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:contentDescription="Close More panel"
+                        android:src="@drawable/ic_btn_clear"
+                        android:tooltipText="Close" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:labelFor="@+id/seek_hover_thrust"
+                        android:text="Hover thrust — used by Takeoff and Hold"
+                        android:textColor="@color/fly_muted"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/text_hover_thrust"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="30000"
+                        android:textColor="@color/fly_ink"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/seek_hover_thrust"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:max="47000" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/text_tilt_status"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Tilt control: steer by tilting the phone. Off until you switch it on."
+                        android:textColor="@color/fly_muted"
+                        android:textSize="12sp" />
+
+                    <ToggleButton
+                        android:id="@+id/toggle_tilt_control"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="8dp"
+                        android:textOff="Tilt: OFF"
+                        android:textOn="TILT ON" />
+                </LinearLayout>
+
+                <!-- Bench controls. In flight, Takeoff arms and Land / CUT MOTORS disarm. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_arm"
+                        style="@style/Fly.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="Arm"
+                        app:icon="@drawable/ic_btn_arm" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_disarm"
+                        style="@style/Fly.Button.Outline"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:text="Disarm"
+                        app:icon="@drawable/ic_btn_disarm" />
+                </LinearLayout>
+
+                <!-- Deck accessories: shown only when the drone reports the hardware. -->
+                <LinearLayout
+                    android:id="@+id/fly_deck_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageButton
+                        android:id="@+id/button_ledRing"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/custom_button_action"
+                        android:contentDescription="@string/button_ledring_contentDescription"
+                        android:onClick="switchLedRingEffect"
+                        android:src="@drawable/ic_led_ring"
+                        android:visibility="gone" />
+
+                    <ImageButton
+                        android:id="@+id/button_headLight"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/custom_button_action"
+                        android:contentDescription="@string/button_headlight_contentDescription"
+                        android:onClick="toggleHeadlight"
+                        android:src="@drawable/ic_headlight"
+                        android:visibility="gone" />
+
+                    <ImageButton
+                        android:id="@+id/button_buzzerSound"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/custom_button_action"
+                        android:contentDescription="@string/button_buzzer_contentDescription"
+                        android:onClick="playBuzzerSound"
+                        android:src="@drawable/ic_volume_up_black"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="STICK OUTPUT"
+                    android:textColor="@color/fly_muted"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <se.bitcraze.crazyfliecontrol2.FlightDataView
+                    android:id="@+id/flightdataview"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="DRONE LOG"
+                    android:textColor="@color/fly_muted"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <ScrollView
+                    android:id="@+id/console_scrollView"
+                    android:layout_width="match_parent"
+                    android:layout_height="100dp"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/bg_fly_log"
+                    android:fillViewport="true"
+                    android:scrollbars="vertical">
+
+                    <TextView
+                        android:id="@+id/console_textView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:gravity="top"
+                        android:padding="6dp"
+                        android:textColor="@color/fly_track"
+                        android:textSize="11sp" />
+                </ScrollView>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/fly_disconnect"
+                    style="@style/Fly.Button.Outline"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="10dp"
+                    android:text="Disconnect"
+                    app:icon="@drawable/ic_btn_wifi" />
+
+                <TextView
+                    android:id="@+id/text_hardware_limits"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="This board has only a motion sensor: Hold keeps a thrust level, not a height, and map position is estimated."
+                    android:textColor="@color/fly_muted"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
+</LinearLayout>

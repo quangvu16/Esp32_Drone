@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- GPS mission planning / navigation screen (landscape). Strings are hardcoded on purpose:
      strings.xml is owned by the stock app and must not grow entries for this screen. -->
+<!-- Buttons: flight commands carry an icon AND a label (a wrong guess there can drop or
+     arm the drone); routine tools are icon-only with a contentDescription + tooltip.
+     CUT MOTORS is in the shared header, in the same place as on every other screen. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
+
+    <include
+        android:id="@+id/gpsnav_header"
+        layout="@layout/view_fly_header" />
 
     <TextView
         android:id="@+id/gpsnav_status"
@@ -62,29 +70,32 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <Button
+                <ImageButton
                     android:id="@+id/gpsnav_wp_up"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:text="Up"
-                    android:textSize="11sp" />
+                    android:contentDescription="Move waypoint up"
+                    android:src="@drawable/ic_btn_up"
+                    android:tooltipText="Move waypoint up" />
 
-                <Button
+                <ImageButton
                     android:id="@+id/gpsnav_wp_down"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:text="Down"
-                    android:textSize="11sp" />
+                    android:contentDescription="Move waypoint down"
+                    android:src="@drawable/ic_btn_down"
+                    android:tooltipText="Move waypoint down" />
 
-                <Button
+                <ImageButton
                     android:id="@+id/gpsnav_wp_remove"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:text="Remove"
-                    android:textSize="11sp" />
+                    android:contentDescription="Remove waypoint"
+                    android:src="@drawable/ic_btn_delete"
+                    android:tooltipText="Remove waypoint" />
             </LinearLayout>
 
             <LinearLayout
@@ -92,21 +103,23 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <Button
+                <ImageButton
                     android:id="@+id/gpsnav_load"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:text="Load"
-                    android:textSize="11sp" />
+                    android:contentDescription="Load mission file"
+                    android:src="@drawable/ic_btn_open"
+                    android:tooltipText="Load mission file" />
 
-                <Button
+                <ImageButton
                     android:id="@+id/gpsnav_save"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:text="Save"
-                    android:textSize="11sp" />
+                    android:contentDescription="Save mission file"
+                    android:src="@drawable/ic_btn_save"
+                    android:tooltipText="Save mission file" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
@@ -125,51 +138,17 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/gpsnav_mission"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Mission"
-            android:textSize="11sp" />
+            android:orientation="vertical">
 
-        <Button
-            android:id="@+id/gpsnav_goto"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Go to here"
-            android:textSize="11sp" />
-
-        <Button
-            android:id="@+id/gpsnav_rtl"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="RTL"
-            android:textSize="11sp" />
-
-        <Button
-            android:id="@+id/gpsnav_pause"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Pause"
-            android:textSize="11sp" />
-
-        <Button
-            android:id="@+id/gpsnav_stop"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Stop"
-            android:textSize="11sp" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
+            <!-- Fly: the sequence a flight actually follows, left to right. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
         <Button
             android:id="@+id/gpsnav_launch"
@@ -177,7 +156,85 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Launch"
-            android:textSize="11sp" />
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_takeoff"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+
+        <Button
+            android:id="@+id/gpsnav_mission"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Mission"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_mission"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+
+        <Button
+            android:id="@+id/gpsnav_goto"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Go to here"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_goto"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+
+        <Button
+            android:id="@+id/gpsnav_pause"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Pause"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_pause"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+
+        <Button
+            android:id="@+id/gpsnav_stop"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="End mission"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_end"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+            </LinearLayout>
+
+            <!-- Come back / come down, then the map tools. The two toggles keep their
+                 text because the text IS the state ("Map: satellite", "Tap: add WP"). -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/gpsnav_rtl"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Return home"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_home"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
 
         <Button
             android:id="@+id/gpsnav_land"
@@ -185,7 +242,12 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Land"
-            android:textSize="11sp" />
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_land"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
 
         <Button
             android:id="@+id/gpsnav_map_type"
@@ -193,7 +255,12 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Map: satellite"
-            android:textSize="11sp" />
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_layers"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
 
         <Button
             android:id="@+id/gpsnav_tap_mode"
@@ -201,17 +268,10 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Tap: add WP"
-            android:textSize="11sp" />
+            android:textAllCaps="false"
+            android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
 
-        <Button
-            android:id="@+id/gpsnav_panic"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="#B71C1C"
-            android:text="PANIC"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

@@ -56,6 +56,8 @@
 		AB12CD34000000000000006F /* ChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34000000000000000B /* ChartView.swift */; };
 		AB12CD340000000000000070 /* PidTuneViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34000000000000000C /* PidTuneViewController.swift */; };
 		AB12CD340000000000000071 /* AutoTuner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34000000000000000D /* AutoTuner.swift */; };
+		AB12CD340000000000000076 /* MlpEnsemble.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD340000000000000012 /* MlpEnsemble.swift */; };
+		AB12CD340000000000000077 /* ModelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD340000000000000013 /* ModelView.swift */; };
 		AB12CD340000000000000072 /* TiltControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34000000000000000E /* TiltControl.swift */; };
 		AB12CD340000000000000073 /* GpsNavCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34000000000000000F /* GpsNavCore.swift */; };
 		AB12CD340000000000000074 /* GpsNavViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD340000000000000010 /* GpsNavViewController.swift */; };
@@ -135,6 +137,8 @@
 		AB12CD34000000000000000B /* ChartView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChartView.swift; sourceTree = "<group>"; };
 		AB12CD34000000000000000C /* PidTuneViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PidTuneViewController.swift; sourceTree = "<group>"; };
 		AB12CD34000000000000000D /* AutoTuner.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AutoTuner.swift; sourceTree = "<group>"; };
+		AB12CD340000000000000012 /* MlpEnsemble.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MlpEnsemble.swift; sourceTree = "<group>"; };
+		AB12CD340000000000000013 /* ModelView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ModelView.swift; sourceTree = "<group>"; };
 		AB12CD34000000000000000E /* TiltControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TiltControl.swift; sourceTree = "<group>"; };
 		AB12CD34000000000000000F /* GpsNavCore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GpsNavCore.swift; sourceTree = "<group>"; };
 		AB12CD340000000000000010 /* GpsNavViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GpsNavViewController.swift; sourceTree = "<group>"; };
@@ -250,6 +254,8 @@
 				AB12CD34000000000000000B /* ChartView.swift */,
 				AB12CD34000000000000000C /* PidTuneViewController.swift */,
 				AB12CD34000000000000000D /* AutoTuner.swift */,
+				AB12CD340000000000000012 /* MlpEnsemble.swift */,
+				AB12CD340000000000000013 /* ModelView.swift */,
 				AB12CD34000000000000000E /* TiltControl.swift */,
 				AB12CD34000000000000000F /* GpsNavCore.swift */,
 				AB12CD340000000000000010 /* GpsNavViewController.swift */,
@@ -482,6 +488,8 @@
 				AB12CD34000000000000006F /* ChartView.swift in Sources */,
 				AB12CD340000000000000070 /* PidTuneViewController.swift in Sources */,
 				AB12CD340000000000000071 /* AutoTuner.swift in Sources */,
+				AB12CD340000000000000076 /* MlpEnsemble.swift in Sources */,
+				AB12CD340000000000000077 /* ModelView.swift in Sources */,
 				AB12CD340000000000000072 /* TiltControl.swift in Sources */,
 				AB12CD340000000000000073 /* GpsNavCore.swift in Sources */,
 				AB12CD340000000000000074 /* GpsNavViewController.swift in Sources */,

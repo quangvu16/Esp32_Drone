@@ -28,6 +28,7 @@ final class PidTuneViewController: UIViewController {
     private let angleChart = ChartView()
     private let controllerChart = ChartView()
     private let termsChart = ChartView()
+    private let modelView = ModelView()
 
     private let editorsStack = UIStackView()
     private var editorRows: [ParamEditorRow] = []
@@ -46,6 +47,10 @@ final class PidTuneViewController: UIViewController {
     private var tuner: AutoTuner?
     private var tunerHoldStart: Date?
     private var listener: ((LogSample) -> Void)?
+
+    /// Set by the Fly screen: opens another section after this screen closes.
+    var onSwitchSection: ((AppSection) -> Void)?
+    private var sectionHeader: SectionHeader?
 
     /// Param TOC ids we drive (PROTOCOL.md §3): 9 PID gains + 3 flight + nav.kp.
     private struct TuneParam {
@@ -109,9 +114,23 @@ final class PidTuneViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        title = "PID Tune"
+        title = "Tune"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .done, target: self, action: #selector(close))
+        let header = SectionHeader(host: self, selected: .tune, telemetry: telemetry, twoTapCut: false) { [weak self] in
+            self?.panicStop()
+        }
+        header.leaveGuard = { [weak self] in
+            (self?.tuner?.isRunning ?? false)
+                ? "Auto-tune is running. Stop it or use CUT MOTORS before switching."
+                : nil
+        }
+        header.prepareToLeave = { [weak self] in
+            self?.tuner?.stop()
+        }
+        header.onSwitch = onSwitchSection
+        header.install()
+        sectionHeader = header
 
         let scroll = UIScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
@@ -136,7 +155,8 @@ final class PidTuneViewController: UIViewController {
         // Axis picker + pause
         axisControl.selectedSegmentIndex = 0
         axisControl.addTarget(self, action: #selector(axisChanged), for: .valueChanged)
-        pauseButton.setTitle("Pause", for: .normal)
+        // Chart pause is routine and reversible: icon-only, words in the VoiceOver label.
+        pauseButton.applyLabel(nil, symbol: "pause.fill", accessibilityText: "Pause charts")
         pauseButton.addTarget(self, action: #selector(togglePause), for: .touchUpInside)
         let topRow = UIStackView(arrangedSubviews: [axisControl, pauseButton])
         topRow.axis = .horizontal
@@ -154,6 +174,17 @@ final class PidTuneViewController: UIViewController {
         stack.addArrangedSubview(chartBlock(title: "Controller output", chart: controllerChart))
         stack.addArrangedSubview(chartBlock(title: "PID terms (P / I / D)", chart: termsChart))
 
+        // The auto-tune model (ModelView.kt): trial costs + the model's
+        // predicted cost over the tuned gains. Sized 1.15x wide, as on Android.
+        let modelLabel = UILabel()
+        modelLabel.text = "Auto-tune model"
+        modelLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        modelView.heightAnchor.constraint(equalTo: modelView.widthAnchor, multiplier: 1.15).isActive = true
+        let modelBlock = UIStackView(arrangedSubviews: [modelLabel, modelView])
+        modelBlock.axis = .vertical
+        modelBlock.spacing = 4
+        stack.addArrangedSubview(modelBlock)
+
         // Editors
         let editHeader = UILabel()
         editHeader.text = "Parameters"
@@ -166,9 +197,10 @@ final class PidTuneViewController: UIViewController {
         rebuildEditors()
 
         // Save / Load / Defaults
-        saveButton.setTitle("Save gains", for: .normal)
-        loadButton.setTitle("Load gains", for: .normal)
-        defaultsButton.setTitle("Restore defaults", for: .normal)
+        // These write to / read from the drone's flash, not a phone file, so they keep text.
+        saveButton.applyLabel("Save gains", symbol: "tray.and.arrow.down", font: .systemFont(ofSize: 15))
+        loadButton.applyLabel("Load gains", symbol: "tray.and.arrow.up", font: .systemFont(ofSize: 15))
+        defaultsButton.applyLabel("Restore defaults", symbol: nil, font: .systemFont(ofSize: 15))
         saveButton.addTarget(self, action: #selector(saveGains), for: .touchUpInside)
         loadButton.addTarget(self, action: #selector(loadGains), for: .touchUpInside)
         defaultsButton.addTarget(self, action: #selector(restoreDefaults), for: .touchUpInside)
@@ -201,24 +233,23 @@ final class PidTuneViewController: UIViewController {
         safetyLabel.text = """
         SAFETY — read before starting.
         The props WILL spin during a trial. Secure the drone on a stand or hold it tethered.
-        One axis at a time. Stop halts the tuner AND cuts the motors.
+        One axis at a time. CUT MOTORS halts the tuner AND cuts the motors.
         """
         stack.addArrangedSubview(safetyLabel)
 
-        startTuneButton.setTitle("Hold to confirm — start auto-tune", for: .normal)
-        startTuneButton.setTitleColor(.white, for: .normal)
+        setStartTuneLabel("Hold to confirm — start auto-tune")
         startTuneButton.backgroundColor = .systemOrange
-        startTuneButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
         startTuneButton.layer.cornerRadius = 10
         startTuneButton.heightAnchor.constraint(equalToConstant: 52).isActive = true
         startTuneButton.addTarget(self, action: #selector(startTuneDown), for: .touchDown)
         startTuneButton.addTarget(self, action: #selector(startTuneUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         stack.addArrangedSubview(startTuneButton)
 
-        stopTuneButton.setTitle("STOP — halt tuner + cut motors", for: .normal)
-        stopTuneButton.setTitleColor(.white, for: .normal)
+        // Same name, colour and icon as CUT MOTORS on the flight and GPS screens.
+        stopTuneButton.applyLabel("CUT MOTORS — stop tuner", symbol: "exclamationmark.triangle.fill",
+                                  accessibilityText: "Cut motors and stop the tuner",
+                                  font: .systemFont(ofSize: 16, weight: .bold), color: .white)
         stopTuneButton.backgroundColor = .systemRed
-        stopTuneButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
         stopTuneButton.layer.cornerRadius = 10
         stopTuneButton.heightAnchor.constraint(equalToConstant: 52).isActive = true
         stopTuneButton.addTarget(self, action: #selector(panicStop), for: .touchUpInside)
@@ -338,6 +369,18 @@ final class PidTuneViewController: UIViewController {
         if let p = sample[pName], let i = sample[iName], let d = sample[dName] {
             termsChart.add([Float(p), Float(i), Float(d)])
         }
+        // Feed the tuner the same frame the charts just drew. The level angles
+        // are not in the tune block; they ride the status block, and
+        // `telemetry` has already folded this sample in by the time a listener
+        // runs — so the tip check sees the newest roll/pitch.
+        if let tuner = tuner, let angle = sample[a.angleLogName] {
+            tuner.ingest(TuneSample(
+                angle: angle,
+                motorMicros: [sample["motor.m1"] ?? AutoTuner.motorCentre],
+                controller: sample[a.controllerLogName] ?? 0,
+                roll: telemetry.value("stabilizer.roll") ?? 0,
+                pitch: telemetry.value("stabilizer.pitch") ?? 0))
+        }
         updateStats()
     }
 
@@ -385,7 +428,8 @@ final class PidTuneViewController: UIViewController {
         angleChart.paused = paused
         controllerChart.paused = paused
         termsChart.paused = paused
-        pauseButton.setTitle(paused ? "Resume" : "Pause", for: .normal)
+        pauseButton.applyLabel(nil, symbol: paused ? "play.fill" : "pause.fill",
+                               accessibilityText: paused ? "Resume charts" : "Pause charts")
     }
 
     @objc private func methodChanged() {
@@ -450,7 +494,7 @@ final class PidTuneViewController: UIViewController {
 
     @objc private func startTuneDown() {
         tunerHoldStart = Date()
-        startTuneButton.setTitle("KEEP HOLDING…", for: .normal)
+        setStartTuneLabel("KEEP HOLDING…")
         // A 1.5 s hold is the two-step against accidental taps.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self = self, let t0 = self.tunerHoldStart else { return }
@@ -462,12 +506,17 @@ final class PidTuneViewController: UIViewController {
 
     @objc private func startTuneUp() {
         tunerHoldStart = nil
-        startTuneButton.setTitle("Hold to confirm — start auto-tune", for: .normal)
+        setStartTuneLabel("Hold to confirm — start auto-tune")
+    }
+
+    private func setStartTuneLabel(_ text: String) {
+        startTuneButton.applyLabel(text, symbol: "play.fill",
+                                   font: .systemFont(ofSize: 16, weight: .bold), color: .white)
     }
 
     private func confirmStart() {
         tunerHoldStart = nil
-        startTuneButton.setTitle("Hold to confirm — start auto-tune", for: .normal)
+        setStartTuneLabel("Hold to confirm — start auto-tune")
 
         // Never start while disarmed without asking.
         let armed = (telemetry.value("flight.armed") ?? 0) > 0.5
@@ -502,8 +551,18 @@ final class PidTuneViewController: UIViewController {
         let a = axis
         let method = TuneMethod(rawValue: methodControl.selectedSegmentIndex) ?? .ml
 
-        // Starting gains come from the editors (the drone's current values).
-        let start = editorRows.prefix(3).map(\.value)
+        // Starting gains come from the editors (the drone's current values) —
+        // the three rows for THIS axis. `prefix(3)` would always hand over
+        // roll's gains and then write them into pid.pitch_* or pid.yaw_*.
+        let start = a.gainParamIds.compactMap { id -> Double? in
+            guard let i = tuneParams.firstIndex(where: { $0.id == id }),
+                  i < editorRows.count else { return nil }
+            return editorRows[i].value
+        }
+        guard start.count == 3 else {
+            tuneStatusLabel.text = "Cannot start — no editor rows for \(a.title)."
+            return
+        }
         var cfg = AutoTuner.Config(axis: a, method: method,
                                    trials: 12,
                                    trialSeconds: 3.0,
@@ -532,7 +591,7 @@ final class PidTuneViewController: UIViewController {
         generator.notificationOccurred(.error)
         startTuneButton.isEnabled = true
         stopTuneButton.isEnabled = false
-        tuneStatusLabel.text = "STOPPED — emergency sent, motors cut."
+        tuneStatusLabel.text = "CUT MOTORS sent — motors off, tuner halted."
     }
 }
 
@@ -544,12 +603,17 @@ extension PidTuneViewController: AutoTuner.Listener {
     }
 
     func tunerTrial(_ report: AutoTuner.TrialReport) {
+        modelView.report = report
         let cand = report.candidate.map { String(format: "%.4g", $0) }.joined(separator: ", ")
         let best = report.best.map { String(format: "%.4g", $0) }.joined(separator: ", ")
+        // Twiddle has no best until both starting trials are in, and a run whose
+        // samples never landed in the search box has none at all.
+        let bestCost = report.bestCost.isFinite
+            ? String(format: "%.3f", report.bestCost) : "—"
         tuneStatusLabel.text = String(
-            format: "trial %d/%d  cost %.3f\nbest %.3f [%@]\ntried [%@]",
+            format: "trial %d/%d  cost %.3f\nbest %@ [%@]\ntried [%@]",
             report.n, report.total, report.cost,
-            report.bestCost, best, cand)
+            bestCost, best, cand)
     }
 
     func tunerFinished(reason: String, start: [Double]?, result: [Double]?) {

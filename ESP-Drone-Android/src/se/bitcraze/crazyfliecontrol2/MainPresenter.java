@@ -137,12 +137,14 @@ public class MainPresenter {
             mainActivity.showToastie("Disconnected");
             mainActivity.setConnectionButtonDisconnected();
             mainActivity.disableButtonsAndResetBatteryLevel();
+            DroneSession.clearStatus();
             stopLogConfigs(mDefaultLogConfig);
         }
 
         @Override
         public void linkQualityUpdated(final int quality) {
             mainActivity.setLinkQualityText(quality + "%");
+            DroneSession.setLinkQuality(quality + "%");
         }
     };
 
@@ -417,8 +419,25 @@ public class MainPresenter {
             super.logDataReceived(logConfig, data, timestamp);
 
             if ("Standard".equals(logConfig.getName())) {
-                final float battery = (float) data.get("pm.vbat");
-                mainActivity.setBatteryLevel(battery);
+                Number vbat = data.get("pm.vbat");
+                if (vbat != null) {
+                    mainActivity.setBatteryLevel(vbat.floatValue());
+                    DroneSession.setBattery(vbat.floatValue());
+                }
+                // Flight status for the Fly screen header (mode chip, ARMED) and numbers.
+                Number mode = data.get("flight.mode");
+                Number armed = data.get("flight.armed");
+                if (mode != null && armed != null) {
+                    DroneSession.setStatus(vbat == null ? -1f : vbat.floatValue(),
+                            mode.intValue(), armed.intValue() != 0);
+                    Number autoState = data.get("flight.auto_state");
+                    Number roll = data.get("stabilizer.roll");
+                    Number pitch = data.get("stabilizer.pitch");
+                    mainActivity.setFlightStatus(mode.intValue(), armed.intValue() != 0,
+                            autoState == null ? 0 : autoState.intValue(),
+                            roll == null ? 0f : roll.floatValue(),
+                            pitch == null ? 0f : pitch.floatValue());
+                }
             }
             for (Map.Entry<String, Number> entry : data.entrySet()) {
                 Log.d(LOG_TAG, "\t Name: " + entry.getKey() + ", data: " + entry.getValue());
@@ -428,8 +447,15 @@ public class MainPresenter {
     };
 
     private LogConfig createDefaultLogConfig() {
-        LogConfig logConfigStandard = new LogConfig("Standard", 1000);
+        // 4 Hz is quick enough that ARMED shows within a glance of arming.
+        // 15 bytes of values: well inside the firmware's 25-byte block budget.
+        LogConfig logConfigStandard = new LogConfig("Standard", 250);
         logConfigStandard.addVariable("pm.vbat", VariableType.FLOAT);
+        logConfigStandard.addVariable("flight.mode", VariableType.UINT8_T);
+        logConfigStandard.addVariable("flight.armed", VariableType.UINT8_T);
+        logConfigStandard.addVariable("flight.auto_state", VariableType.UINT8_T);
+        logConfigStandard.addVariable("stabilizer.roll", VariableType.FLOAT);
+        logConfigStandard.addVariable("stabilizer.pitch", VariableType.FLOAT);
         return logConfigStandard;
     }
 
