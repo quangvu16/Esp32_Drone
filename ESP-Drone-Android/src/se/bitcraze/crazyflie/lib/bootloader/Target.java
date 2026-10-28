@@ -39,6 +39,7 @@ public class Target {
     private int mFlashPages;
     private int mStartPage;
     private String mCpuId; //12 bytes
+    // 12 byte
     private Object mData;
 
     public Target(int id) {
@@ -54,7 +55,9 @@ public class Target {
 
     public void parseData(byte[] data) {
          // tab = struct.unpack("BBHHHH", pk.data[0:10])
+         // (Python: giải mã pk.data[0:10] theo định dạng "BBHHHH")
         // 2 byte offset
+        // lệch 2 byte
         ByteBuffer bb = ByteBuffer.wrap(data, 2, data.length-2).order(ByteOrder.LITTLE_ENDIAN);
         this.mPageSize = bb.getShort();
         this.mBufferPages = bb.getShort();
@@ -62,10 +65,13 @@ public class Target {
         this.mStartPage = bb.getShort();
 
         // cpuid = struct.unpack("B" * 12, pk.data[10:22])
+        // (Python: giải mã 12 byte cpuid từ pk.data[10:22])
         //TODO: self.targets[target_id].addr = target_id
+        // TODO: gán addr của target bằng target_id
 
         int cpuIdSize = 12;
         // Concatenate CPU ID
+        // Nối các byte thành chuỗi CPU ID
         StringBuffer sb = new StringBuffer();
         sb.append(String.format("%02X", bb.get()));
         for (int i = 1; i < cpuIdSize; i++) {
@@ -111,6 +117,7 @@ public class Target {
     }
 
     // Method is used by tests!
+    // Phương thức này được dùng trong các bài kiểm thử!
     public int getAvailableFlash() {
         return ((this.mFlashPages - this.mStartPage) * this.mPageSize / 1024);
     }
@@ -119,6 +126,7 @@ public class Target {
     public String toString() {
         String ret = "";
         //ret += "Target info: {} (0x{:X})\n".format(TargetTypes.to_string(self.id), self.id)
+        // (dòng Python tương đương bị chú thích)
         ret += "Target info: "+ TargetTypes.toString(this.mId) + String.format(" (0x%02X)\n", this.mId);
         ret += "Flash pages: " + this.mFlashPages + " | Page size: " + this.mPageSize + " | Buffer pages: " + this.mBufferPages + " | Start page: " + this.mStartPage + "\n";
         ret += getAvailableFlash() + " KBytes of flash available for firmware image.";

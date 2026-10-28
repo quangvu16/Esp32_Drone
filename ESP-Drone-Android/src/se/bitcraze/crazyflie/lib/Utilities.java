@@ -32,6 +32,8 @@ public class Utilities {
     /**
      * Returns byte array as comma separated string
      * (for debugging purposes)
+     * Trả về mảng byte dưới dạng chuỗi phân tách bằng dấu phẩy
+     * (cho mục đích gỡ lỗi)
      *
      * @param data
      * @return
@@ -56,6 +58,7 @@ public class Utilities {
 
     /**
      * Strip bytes of the beginning of an array
+     * Cắt bỏ các byte ở phần đầu của một mảng
      *
      * @param array
      * @param offset

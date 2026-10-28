@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Adapter class for LogListener
+ * Lớp adapter cho LogListener
  */
 public abstract class LogAdapter implements LogListener {
 

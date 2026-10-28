@@ -39,12 +39,17 @@ import se.bitcraze.crazyflie.lib.toc.VariableType;
 
 /**
  * Represents a log configuration that contains different {@link LogVariable}s.
+ * Đại diện cho một cấu hình log chứa nhiều {@link LogVariable} khác nhau.
  *
  * TODO: deal with maximum number of variables per log config
+ * TODO: xử lý số lượng biến tối đa cho mỗi cấu hình log
  * <br/>
  * NOTE: LogConfig is a pure data structure that can not interact directly with the crazyflie,
  * that's why it does not contain the following methods: create(), start(), stop(), delete().
  * These methods are contained in the Logg class instead.<br/>
+ * NOTE: LogConfig là một cấu trúc dữ liệu thuần túy, không thể tương tác trực tiếp với crazyflie,
+ * vì vậy nó không chứa các phương thức sau: create(), start(), stop(), delete().
+ * Các phương thức đó nằm trong lớp Logg.<br/>
  *
  */
 public class LogConfig {
@@ -62,6 +67,7 @@ public class LogConfig {
 
     /**
      * Create a log configuration
+     * Tạo một cấu hình log
      *
      * @param name
      * @param periodInMs
@@ -73,6 +79,7 @@ public class LogConfig {
 
     /**
      * Create a log configuration with the default period of 100ms
+     * Tạo một cấu hình log với chu kỳ mặc định 100ms
      *
      * @param name
      */
@@ -82,9 +89,12 @@ public class LogConfig {
 
     /**
      * Add a log variable to the log configuration (if it does not exist already)
+     * Thêm một biến log vào cấu hình log (nếu chưa tồn tại)
      *
      * @param name Complete name of the variable in the form group.name
+     * @param name Tên đầy đủ của biến theo dạng group.name
      * @param type Type of the variable
+     * @param type Kiểu của biến
      */
     public void addVariable(String name, VariableType type){
         LogVariable newLogVariable = new LogVariable(name, type);
@@ -95,8 +105,10 @@ public class LogConfig {
 
     /**
      * Add a log variable to the log configuration (if it does not exist already)
+     * Thêm một biến log vào cấu hình log (nếu chưa tồn tại)
      *
      * @param name Complete name of the variable in the form group.name
+     * @param name Tên đầy đủ của biến theo dạng group.name
      */
     public void addVariable(String name){
         LogVariable newLogVariable = new LogVariable(name);
@@ -107,10 +119,14 @@ public class LogConfig {
 
     /**
      * Add a raw memory position to the log configuration (if it does not exist already)
+     * Thêm một vị trí vùng nhớ thô vào cấu hình log (nếu chưa tồn tại)
      *
      * @param name Arbitrary name of the variable
+     * @param name Tên tùy ý của biến
      * @param type Type of the variable
+     * @param type Kiểu của biến
      * @param address The address of the data
+     * @param address Địa chỉ của dữ liệu
      */
     public void addMemory(String name, VariableType type, int address) {
         LogVariable newLogVariable = new LogVariable(name, type, LogVariable.MEM_TYPE, address);
@@ -121,8 +137,10 @@ public class LogConfig {
 
     /**
      * Returns all log variables of the log configuration as list
+     * Trả về mọi biến log của cấu hình log dưới dạng danh sách
      *
      * @return list of log variables
+     * @return danh sách các biến log
      */
     public List<LogVariable> getLogVariables(){
         return this.logVariables;
@@ -130,8 +148,10 @@ public class LogConfig {
 
     /**
      * Returns the name of the log configuration
+     * Trả về tên của cấu hình log
      *
      * @return the name of the log configuration
+     * @return tên của cấu hình log
      */
     public String getName() {
         return mName;
@@ -139,6 +159,7 @@ public class LogConfig {
 
     /**
      * Sets the name of the log configuration
+     * Đặt tên cho cấu hình log
      *
      * @param name
      */
@@ -148,8 +169,10 @@ public class LogConfig {
 
     /**
      * Returns the ID of the log configuration
+     * Trả về ID của cấu hình log
      *
      * @return the ID of the log configuration
+     * @return ID của cấu hình log
      */
     public int getId() {
         return mId;
@@ -157,6 +180,7 @@ public class LogConfig {
 
     /**
      * Sets the ID of the log configuration
+     * Đặt ID cho cấu hình log
      *
      * @param id
      */
@@ -166,8 +190,10 @@ public class LogConfig {
 
     /**
      * Returns the period in milliseconds
+     * Trả về chu kỳ tính bằng mili giây
      *
      * @return the period in milliseconds
+     * @return chu kỳ tính bằng mili giây
      */
     public int getPeriodInMs() {
         return mPeriodInMs;
@@ -175,6 +201,7 @@ public class LogConfig {
 
     /**
      * Sets the period in milliseconds
+     * Đặt chu kỳ tính bằng mili giây
      *
      * @param periodInMs
      */
@@ -224,6 +251,7 @@ public class LogConfig {
 
     /**
      * Unpack received logging data so it represent real values according to the configuration in the entry
+     * Giải nén dữ liệu log nhận được để biểu diễn các giá trị thật theo cấu hình trong mục
      * @return
      */
     // def unpack_log_data(self, log_data, timestamp):
@@ -234,8 +262,10 @@ public class LogConfig {
             Number parsedValue = logVariable.getVariableType().parse(logVariablesRaw);
             logDataMap.put(logVariable.getName(), parsedValue);
             //TODO: write to logger?
+            //TODO: có cần ghi ra logger không?
         }
         //TODO: timestamps and callback
+        //TODO: timestamp và callback
         return logDataMap;
         /*
         ret_data = {}

@@ -40,6 +40,7 @@ import com.espressif.espdrone.android.R;
 
 /**
  * Compound component that groups together flight data UI elements
+ * Thành phần tổng hợp gom các phần tử UI dữ liệu bay lại với nhau
  *
  */
 public class FlightDataView extends LinearLayout {

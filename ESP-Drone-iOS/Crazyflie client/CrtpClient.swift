@@ -5,17 +5,27 @@
 //  The CRTP receive path and client state machine. Everything above the
 //  transport talks to this class: TOC fetch, parameter read/write, log block
 //  setup and telemetry decode, flight-control and navigation commands.
+//  Đường nhận CRTP và máy trạng thái của client. Mọi thứ phía trên tầng truyền
+//  đều giao tiếp với lớp này: nạp TOC, đọc/ghi tham số, thiết lập khối log và
+//  giải mã dữ liệu từ xa, lệnh điều khiển bay và điều hướng.
 //
 //  Reliability model (the drone side is written to tolerate it):
 //  unacknowledged requests are retransmitted every 500 ms, so every handler
 //  must be idempotent and a repeated reply must not corrupt state. Pending
 //  requests are matched against inbound packets; a match retires the request,
 //  a duplicate reply finds no pending entry and is handled as a repeat.
+//  Mô hình tin cậy (phía firmware drone được viết để chịu được mô hình này):
+//  các yêu cầu chưa có ack được gửi lại mỗi 500 ms, nên mọi hàm xử lý phải
+//  idempotent và một câu trả lời lặp lại không được làm hỏng trạng thái. Các
+//  yêu cầu đang chờ được khớp với gói tin vào; khớp thì loại yêu cầu khỏi danh
+//  sách chờ, một câu trả lời trùng lặp không tìm thấy mục chờ nào và được xử
+//  lý như một lần lặp lại.
 //
 
 import Foundation
 
 /// One outstanding request, retransmitted until its reply arrives.
+/// Một yêu cầu đang chờ, được gửi lại cho đến khi nhận được câu trả lời.
 private final class PendingRequest {
     let packet: Data
     let matches: (CrtpPacket) -> Bool
@@ -34,6 +44,7 @@ private final class PendingRequest {
 }
 
 /// Transport-agnostic CRTP endpoint for the ESP32 drone.
+/// Điểm cuối CRTP độc lập với tầng truyền, dùng cho drone ESP32.
 final class CrtpClient {
 
     // MARK: - Subsystems
@@ -50,6 +61,7 @@ final class CrtpClient {
     var onFlightAck: ((UInt8, UInt8) -> Void)?       // (cmd, status)
     var onNavAck: ((UInt8, UInt8) -> Void)?          // (cmd, status)
     var onParamValue: ((UInt8, CrtpValue) -> Void)?  // (id, value) from read/write echoes
+                                                     // (id, value) từ phần echo của lệnh đọc/ghi
     var onConnectionEvent: ((String) -> Void)?
 
     private let driver: CrtpDriver
@@ -58,6 +70,7 @@ final class CrtpClient {
     private var resendTimer: DispatchSourceTimer?
 
     /// The firmware retransmission cadence from the Android client (500 ms).
+    /// Chu kỳ gửi lại của firmware theo Android client (500 ms).
     private let resendInterval: TimeInterval = 0.5
     private let maxRetries = 6
 
@@ -86,11 +99,13 @@ final class CrtpClient {
     // MARK: - Sending
 
     /// Fire-and-forget send (commander packets).
+    /// Gửi không chờ phản hồi (các gói tin commander).
     func send(_ packet: CrtpPacket) {
         driver.sendPacket(CrtpChecksum.append(to: packet.raw), callback: nil)
     }
 
     /// Sends and retransmits every 500 ms until `matches` sees its reply.
+    /// Gửi và gửi lại mỗi 500 ms cho đến khi `matches` thấy được câu trả lời.
     func sendReliable(_ packet: CrtpPacket,
                       matches: @escaping (CrtpPacket) -> Bool,
                       onAck: (() -> Void)? = nil,
@@ -120,6 +135,8 @@ final class CrtpClient {
 
     /// Retires every pending request matching the inbound packet. Runs before
     /// dispatch so a reply stops its own retransmissions first.
+    /// Loại mọi yêu cầu đang chờ khớp với gói tin vào. Chạy trước khi phân
+    /// phối để một câu trả lời ngừng việc gửi lại của chính nó trước.
     private func retire(matching packet: CrtpPacket) {
         let matched = pending.filter { $0.matches(packet) }
         pending.removeAll { $0.matches(packet) }
@@ -145,6 +162,7 @@ final class CrtpClient {
             handleGeneric(packet)
         case .commander:
             break                                // the drone never sends setpoints
+                                                 // drone không bao giờ gửi setpoint
         }
     }
 
@@ -168,6 +186,7 @@ final class CrtpClient {
             }
         case .read, .write:
             // <id><value LE>, echoed on the same channel
+            // <id><value LE>, được echo lại trên cùng channel
             let payload = packet.payload
             guard payload.count >= 2 else { return }
             let id = payload[payload.startIndex]
@@ -223,6 +242,8 @@ final class CrtpClient {
 
     /// Starts both TOC walks. Safe to call again — a completed fetcher is
     /// skipped and an in-flight one just keeps going.
+    /// Bắt đầu hai lượt duyệt TOC. Gọi lại vẫn an toàn — fetcher đã hoàn
+    /// thành bị bỏ qua, fetcher đang chạy thì cứ tiếp tục.
     func fetchTocs() {
         queue.async {
             self.startFetch(self.paramToc, port: .params)
@@ -233,6 +254,7 @@ final class CrtpClient {
     private func startFetch(_ fetcher: TocFetcher, port: CrtpPort) {
         guard fetcher.state == .idle else { return }
         // Channel 0 — the CRTP header byte is (port << 4) | channel.
+        // Channel 0 — byte header CRTP là (port << 4) | channel.
         sendReliable(CrtpPacket(port: port, channel: 0, payload: TocFetcher.infoRequest),
                      matches: { p in p.port == port && p.channel == 0 && p.payload.first == 1 },
                      onGiveUp: { [weak self] in
@@ -250,6 +272,8 @@ final class CrtpClient {
                      onGiveUp: { [weak self] in
                          // A missing id is never answered (§2); treat it as a hole
                          // and keep walking rather than stalling the fetch.
+                         // Một id bị thiếu sẽ không bao giờ được trả lời (§2); coi nó
+                         // như một lỗ trống và cứ tiếp tục duyệt thay vì làm nghẽn việc nạp.
                          self?.queue.async {
                              if fetcher.state == .fetchingElements, fetcher.nextId == id {
                                  if let next = fetcher.handle(payload: Data([0, id])) {
@@ -267,6 +291,7 @@ final class CrtpClient {
     // MARK: - Parameters (§3)
 
     /// Reads one parameter; the value arrives via `onParamValue`.
+    /// Đọc một tham số; giá trị đến qua `onParamValue`.
     func readParam(id: UInt8) {
         let packet = CrtpPacket(port: .params, channel: ParamChannel.read.rawValue, payload: Data([id]))
         sendReliable(packet,
@@ -277,6 +302,7 @@ final class CrtpClient {
     }
 
     /// Writes one parameter; the drone echoes the stored value via `onParamValue`.
+    /// Ghi một tham số; drone echo lại giá trị đã lưu qua `onParamValue`.
     func writeParam(id: UInt8, value: CrtpValue) {
         var payload = Data([id])
         payload.append(value.encoded)
@@ -289,6 +315,7 @@ final class CrtpClient {
     }
 
     /// Reads every parameter in the TOC (drives the editor's "robot:" labels).
+    /// Đọc mọi tham số trong TOC (cung cấp dữ liệu cho nhãn "robot:" của trình chỉnh sửa).
     func readAllParams() {
         for id in 0..<paramToc.toc.count {
             readParam(id: id)
@@ -296,6 +323,7 @@ final class CrtpClient {
     }
 
     /// Convenience for the typed parameter table in PROTOCOL.md §3.
+    /// Hàm tiện lợi cho bảng tham số có kiểu trong PROTOCOL.md §3.
     func writeFloat(group: String, name: String, _ value: Float) {
         guard let element = paramToc.toc.element(group: group, name: name) else { return }
         writeParam(id: element.id, value: .float(value))
@@ -310,6 +338,8 @@ final class CrtpClient {
 
     /// Creates a block on the drone and registers it locally once acked.
     /// Variables are checked against the 25-byte value budget first.
+    /// Tạo một khối log trên drone và đăng ký cục bộ khi đã có ack.
+    /// Các biến được kiểm tra với ngân sách 25 byte giá trị trước.
     func createBlock(id: UInt8, variables: [LogVariable],
                      periodMs: Int = 100,
                      onDone: ((Bool, LogClient.ReplyError) -> Void)? = nil) {
@@ -412,6 +442,7 @@ final class CrtpClient {
     }
 
     /// Always honoured by the firmware — props off now.
+    /// Firmware luôn thực hiện lệnh này — tắt cánh quạt ngay lập tức.
     func emergency() {
         sendFlight(.emergency)
     }
@@ -429,6 +460,7 @@ final class CrtpClient {
     func loadGains() { sendFlight(.load) }
 
     /// Stores the transport profile; the board reboots in ~1.5 s (§8).
+    /// Lưu hồ sơ của tầng truyền; bo mạch khởi động lại trong ~1,5 s (§8).
     func setLinkProfile(_ mode: UInt8) {
         sendFlight(.link, args: Data([mode]))
     }
@@ -453,6 +485,7 @@ final class CrtpClient {
     }
 
     /// Target offset from the launch point, north/east metres (§9).
+    /// Độ lệch của mục tiêu so với điểm cất cánh, theo mét hướng bắc/đông (§9).
     func sendNavTarget(north: Float, east: Float) {
         var args = Data()
         withUnsafeBytes(of: north.bitPattern.littleEndian) { args.append(contentsOf: $0) }
@@ -466,6 +499,8 @@ final class CrtpClient {
 
     /// Compass bearing of the nose at launch — the one frame the drone cannot
     /// measure itself (no magnetometer).
+    /// Phương hướng của mũi drone khi cất cánh theo la bàn — tham chiếu duy
+    /// nhất mà drone không thể tự đo (không có từ kế).
     func sendNavAlign(alphaDegrees: Float) {
         var args = Data()
         withUnsafeBytes(of: alphaDegrees.bitPattern.littleEndian) { args.append(contentsOf: $0) }

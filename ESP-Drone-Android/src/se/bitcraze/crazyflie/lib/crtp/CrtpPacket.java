@@ -35,16 +35,21 @@ import java.util.Arrays;
  * Packet of data which can be sent/received from/to the Crazyflie. All packet
  * implementations must be immutable to avoid issues with modifying packets via
  * references, e.g. in a send queue.
+ * Gói tin dữ liệu có thể gửi/nhận tới/từ Crazyflie. Mọi gói tin phải
+ * bất biến để tránh sự cố khi sửa gói tin qua tham chiếu, ví dụ trong
+ * hàng đợi gửi.
  */
 public class CrtpPacket {
 
     /**
      * Byte order used when serializing/deserializing packets.
+     * Thứ tự byte dùng khi tuần tự hóa/giải tuần tự hóa gói tin.
      */
     public static final ByteOrder BYTE_ORDER = ByteOrder.LITTLE_ENDIAN;
 
     /**
      * NULL packet. Header is 0xFF without any data.
+     * Gói tin NULL. Header là 0xFF, không kèm dữ liệu.
      */
     public static final CrtpPacket NULL_PACKET = new CrtpPacket((byte) 0xff, new byte[0]) {
         @Override
@@ -83,6 +88,7 @@ public class CrtpPacket {
         }
 
         //TODO: change order of parameters according to python cflib?
+        //TODO: đổi thứ tự tham số theo python cflib?
         public Header(int channel, CrtpPort port){
             this.mChannel = channel;
             this.mPort = port;
@@ -146,9 +152,12 @@ public class CrtpPacket {
 
     /**
      * Create a new packet.
+     * Tạo một gói tin mới.
      *
      * @param channel channel to set in the header.
+     * @param channel kênh cần đặt trong header.
      * @param port port to set in the header.
+     * @param port cổng cần đặt trong header.
      */
     public CrtpPacket(int channel, CrtpPort port) {
         this.mPacketHeader = new Header(channel, port);
@@ -158,9 +167,12 @@ public class CrtpPacket {
 
     /**
      * Create a new packet.
+     * Tạo một gói tin mới.
      *
      * @param packetHeader header of the packet.
+     * @param packetHeader header của gói tin.
      * @param packetPayload payload of the packet.
+     * @param packetPayload phần dữ liệu của gói tin.
      */
     public CrtpPacket(byte packetHeader, byte[] packetPayload) {
         this.mPacketHeader = new Header(packetHeader);
@@ -170,6 +182,7 @@ public class CrtpPacket {
 
     /**
      * Create a new packet.
+     * Tạo một gói tin mới.
      *
      * @param packetData
      */
@@ -181,8 +194,10 @@ public class CrtpPacket {
 
     /**
      * Get the header of the packet.
+     * Lấy header của gói tin.
      *
      * @return the header of the packet.
+     * @return header của gói tin.
      */
     public byte getHeaderByte() {
         return mPacketHeader.getByte();
@@ -190,8 +205,10 @@ public class CrtpPacket {
 
     /**
      * Get the header of the packet.
+     * Lấy header của gói tin.
      *
      * @return the header of the packet.
+     * @return header của gói tin.
      */
     public Header getHeader() {
         return mPacketHeader;
@@ -199,8 +216,10 @@ public class CrtpPacket {
 
     /**
      * Get the payload of the packet.
+     * Lấy phần dữ liệu của gói tin.
      *
      * @return the payload of the packet.
+     * @return phần dữ liệu của gói tin.
      */
     public byte[] getPayload() {
         return mPacketPayload;
@@ -208,8 +227,10 @@ public class CrtpPacket {
 
     /**
      * Serialize the data of the packet. Must not include the header.
+     * Tuần tự hóa dữ liệu của gói tin. Không được kèm header.
      *
      * @param buffer the target buffer for serialization.
+     * @param buffer bộ đệm đích cho việc tuần tự hóa.
      */
     protected void serializeData(ByteBuffer buffer){
         buffer.put(mPacketPayload);
@@ -217,8 +238,10 @@ public class CrtpPacket {
 
     /**
      * Get the number of bytes used when serializing the data.
+     * Lấy số byte dùng khi tuần tự hóa dữ liệu.
      *
      * @return number of bytes required by the serialized data.
+     * @return số byte cần cho dữ liệu đã tuần tự hóa.
      */
     protected int getDataByteCount(){
         return mPacketPayload.length;
@@ -226,11 +249,14 @@ public class CrtpPacket {
 
     /**
      * Convert the packet to a byte array suitable for transmission.
+     * Chuyển gói tin thành mảng byte dùng để truyền đi.
      *
      * @return byte array containing the header and packet data.
+     * @return mảng byte chứa header và dữ liệu gói tin.
      */
     public byte[] toByteArray() {
         // if it's the first call, serialize the packet and cache it
+        // nếu là lần gọi đầu tiên thì tuần tự hóa gói tin và lưu lại
         if (mSerializedPacket == null) {
             ByteBuffer buffer = ByteBuffer.allocate(getDataByteCount() + 1).order(BYTE_ORDER);
             buffer.put(getHeaderByte());

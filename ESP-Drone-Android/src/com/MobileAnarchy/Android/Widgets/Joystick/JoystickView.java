@@ -31,6 +31,7 @@ public class JoystickView extends View {
     private JoystickMovedListener moveListener;
 
     // # of pixels movement required between reporting to the listener
+    // Số pixel cần di chuyển giữa hai lần báo cho listener
     private float moveResolution;
 
     public final static int AUTO_RETURN_NONE = 0;
@@ -40,44 +41,56 @@ public class JoystickView extends View {
     private volatile int autoReturnSequenceNum;
 
     // Max range of movement in user coordinate system
+    // Biên độ di chuyển tối đa trong hệ tọa độ người dùng
     public final static int CONSTRAIN_BOX = 0;
     public final static int CONSTRAIN_CIRCLE = 1;
     private int movementConstraint;
     private float movementRange;
 
     public final static int COORDINATE_CARTESIAN = 0; // Regular cartesian coordinates
+    // Tọa độ Descartes thông thường
     public final static int COORDINATE_DIFFERENTIAL = 1; // Uses polar rotation of 45 degrees to calc differential drive parameters
+    // Dùng phép xoay cực 45 độ để tính tham số dẫn động sai phân
     private int userCoordinateSystem;
 
     private float prefRatio = 1;
 
     // Last touch point in view coordinates
+    // Điểm chạm cuối cùng trong tọa độ của view
     private int pointerId = INVALID_POINTER_ID;
     private float touchX, touchY;
 
     // Last reported position in view coordinates (allows different reporting sensitivities)
+    // Vị trí được báo cuối cùng trong tọa độ của view (cho phép độ nhạy báo cáo khác nhau)
     private float reportX, reportY;
 
     // Handle center in view coordinates
+    // Tâm của tay cầm trong tọa độ của view
     private float handleX, handleY;
 
     // Center of the view in view coordinates
+    // Tâm của view trong tọa độ của view
     private int circleCenterX, circleCenterY;
 
     // Size of the view in view coordinates
+    // Kích thước của view trong tọa độ của view
     private int dimX, dimY;
 
     // Cartesian coordinates of last touch point - joystick center is (0,0)
+    // Tọa độ Descartes của điểm chạm cuối cùng - tâm joystick là (0,0)
     private int cartX, cartY;
 
     // Polar coordinates of the touch point from joystick center
+    // Tọa độ cực của điểm chạm tính từ tâm joystick
     private double radial;
     private double angle;
 
     // User coordinates of last touch point
+    // Tọa độ người dùng của điểm chạm cuối cùng
     private float userX, userY;
 
     // Offset co-ordinates (used when touch events are received from parent's coordinate origin)
+    // Tọa độ độ lệch (dùng khi sự kiện chạm nhận từ gốc tọa độ của view cha)
     private int offsetX;
     private int offsetY;
 
@@ -175,6 +188,7 @@ public class JoystickView extends View {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         // Here we make sure that we have a perfect circle
+        // Ở đây ta đảm bảo có một hình tròn hoàn hảo
         int measuredWidth = measure(widthMeasureSpec);
         int measuredHeight = measure(heightMeasureSpec);
         setMeasuredDimension(measuredWidth, measuredHeight);
@@ -195,6 +209,7 @@ public class JoystickView extends View {
 
         if (!isLeft && (width > size)){
             //add x offset to right joystick when size is smaller than width
+            // thêm độ lệch x cho joystick bên phải khi kích thước nhỏ hơn chiều rộng
             circleCenterX = (width-size) + (size / 2);
             setTouchOffsetX(width-size);
         } else {
@@ -203,6 +218,7 @@ public class JoystickView extends View {
         }
         if (height > size) {
             //add y offset to joystick when size is smaller than height
+            // thêm độ lệch y cho joystick khi kích thước nhỏ hơn chiều cao
             circleCenterY = (height-size) + (size / 2);
             setTouchOffsetY(height-size);
         } else {
@@ -223,13 +239,16 @@ public class JoystickView extends View {
     private int measure(int measureSpec) {
         int result = 0;
         // Decode the measurement specifications.
+        // Giải mã các thông số đo.
         int specMode = MeasureSpec.getMode(measureSpec);
         int specSize = MeasureSpec.getSize(measureSpec);
         if (specMode == MeasureSpec.UNSPECIFIED) {
             // Return a default size of 200 if no bounds are specified.
+            // Trả về kích thước mặc định 200 nếu không chỉ định giới hạn.
             result = 200;
         } else {
             // As you want to fill the available space always return the full available bounds.
+            // Vì muốn lấp đầy không gian có sẵn nên luôn trả về toàn bộ giới hạn khả dụng.
             result = specSize;
         }
         return result;
@@ -245,9 +264,11 @@ public class JoystickView extends View {
     protected void onDraw(Canvas canvas) {
 //        canvas.save();
         // Draw the background
+        // Vẽ nền
         canvas.drawCircle(circleCenterX, circleCenterY, bgRadius, bgPaint);
 
         // Draw the handle
+        // Vẽ tay cầm
         handleX = touchX + circleCenterX;
         handleY = touchY + circleCenterY;
         canvas.drawCircle(handleX, handleY, handleRadius, handlePaint);
@@ -257,12 +278,14 @@ public class JoystickView extends View {
     }
 
     // Constrain touch within a box
+    // Giới hạn điểm chạm trong một hình vuông
     private void constrainBox() {
         touchX = Math.max(Math.min(touchX, movementRadius), -movementRadius);
         touchY = Math.max(Math.min(touchY, movementRadius), -movementRadius);
     }
 
     // Constrain touch within a circle
+    // Giới hạn điểm chạm trong một hình tròn
     private void constrainCircle() {
         float diffX = touchX;
         float diffY = touchY;
@@ -341,6 +364,7 @@ public class JoystickView extends View {
             final int pointerIndex = ev.findPointerIndex(pointerId);
 
             // Translate touch position to center of view
+            // Chuyển vị trí chạm về tâm của view
             float x = ev.getX(pointerIndex);
             touchX = horizontalLocked ? 0 : x - circleCenterX;
             float y = ev.getY(pointerIndex);
@@ -376,6 +400,7 @@ public class JoystickView extends View {
 
     private void calcUserCoordinates() {
         // First convert to cartesian coordinates
+        // Đầu tiên chuyển sang tọa độ Descartes
         cartX = (int) (touchX / movementRadius * movementRange);
         cartY = (int) (touchY / movementRadius * movementRange);
 
@@ -383,6 +408,7 @@ public class JoystickView extends View {
         angle = Math.atan2(cartY, cartX);
 
         // Invert Y axis by default
+        // Đảo trục Y theo mặc định
         cartY *= -1;
 
         if (userCoordinateSystem == COORDINATE_CARTESIAN) {

@@ -34,12 +34,14 @@ import android.hardware.usb.UsbDevice;
 
 /**
  * Abstract USB interface to be independent of different implementations (eg. Java/Android)
+ * Giao diện USB trừu tượng để không phụ thuộc vào các cách triển khai khác nhau (ví dụ: Java/Android)
  *
  */
 public interface CrazyUsbInterface {
 
     /**
      * Init device
+     * Khởi tạo thiết bị
      *
      * @param usbVid
      * @param usbPid
@@ -48,19 +50,23 @@ public interface CrazyUsbInterface {
 
     /**
      * Release UsbInterface
+     * Giải phóng UsbInterface
      *
      */
     public void releaseInterface();
 
     /**
      * Returns the state of the USB connection
+     * Trả về trạng thái của kết nối USB
      *
      * @return true if USB device is connected, else false
+     * @return true nếu thiết bị USB được kết nối, ngược lại là false
      */
     public boolean isUsbConnected();
 
     /**
      * Send control data
+     * Gửi dữ liệu điều khiển
      *
      * @param requestType
      * @param request
@@ -73,6 +79,7 @@ public interface CrazyUsbInterface {
 
     /**
      * Sends bulk data
+     * Gửi dữ liệu bulk
      *
      * @param data
      * @param receiveData
@@ -82,6 +89,7 @@ public interface CrazyUsbInterface {
 
     /**
      * Returns a list of CrazyRadio devices currently connected to the computer
+     * Trả về danh sách các thiết bị CrazyRadio hiện đang kết nối với máy tính
      *
      * @param usbVid
      * @param usbPid
@@ -91,15 +99,19 @@ public interface CrazyUsbInterface {
 
     /**
      * Returns the firmware version of the USB device
+     * Trả về phiên bản firmware của thiết bị USB
      *
      * @return firmware version
+     * @return phiên bản firmware
      */
     public float getFirmwareVersion();
 
     /**
      * Returns the serial number of the USB device
+     * Trả về số sê-ri của thiết bị USB
      *
      * @return serial number
+     * @return số sê-ri
      */
     public String getSerialNumber();
 

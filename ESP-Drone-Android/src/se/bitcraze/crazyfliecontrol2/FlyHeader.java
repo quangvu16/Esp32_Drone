@@ -32,6 +32,16 @@ import se.bitcraze.crazyfliecontrol2.tune.TuneActivity;
  *
  * <p>Status is read from {@link DroneSession}, which MainPresenter's log block keeps
  * current, twice a second while the screen is visible.
+ * Gắn header màn hình dùng chung (res/layout/view_fly_header.xml) cho các màn hình
+ * Mission và Tune: các mục, link, pin, mode, ARMED và CUT MOTORS, ở đúng vị trí
+ * như trên màn hình Fly (redesign stage 3).
+ *
+ * <p>Mission và Tune được mở từ màn hình Fly (MainActivity), nơi giữ link kết nối
+ * trong khi các màn hình đó mở. Vì vậy "Fly" chỉ đơn giản finish màn hình này, còn
+ * chuyển sang mục khác sẽ mở mục đó và finish màn hình này: Back luôn quay về Fly.
+ *
+ * <p>Trạng thái được đọc từ {@link DroneSession}, nơi log block của MainPresenter
+ * cập nhật, hai lần mỗi giây khi màn hình đang hiển thị.
  */
 public final class FlyHeader {
 
@@ -44,8 +54,10 @@ public final class FlyHeader {
     private static final long POLL_MS = 500;
 
     /** Lets a screen refuse to be left, e.g. while its mission is flying. */
+    /** Cho phép một màn hình từ chối bị rời đi, ví dụ khi sứ mệnh của nó đang bay. */
     public interface LeaveGuard {
         /** A message saying why this screen must stay open, or null to allow leaving. */
+        /** Thông điệp giải thích vì sao màn hình này phải mở, hoặc null để cho phép rời đi. */
         String blockReason();
     }
 
@@ -70,6 +82,10 @@ public final class FlyHeader {
      * @param selected which section this screen is
      * @param onCut    what CUT MOTORS does on this screen (it fires on one tap here, as
      *                 these screens are used with the drone at a distance)
+     * @param header   layout view_fly_header đã inflate
+     * @param selected màn hình này thuộc mục nào
+     * @param onCut    CUT MOTORS làm gì trên màn hình này (chạy ngay khi chạm một lần,
+     *                 vì các màn hình này được dùng khi drone ở xa)
      */
     public FlyHeader(Activity activity, View header, int selected, final Runnable onCut) {
         mActivity = activity;
@@ -116,18 +132,21 @@ public final class FlyHeader {
     }
 
     /** Call from onResume. */
+    /** Gọi từ onResume. */
     public void start() {
         mHandler.removeCallbacks(mPoll);
         mHandler.post(mPoll);
     }
 
     /** Call from onPause. */
+    /** Gọi từ onPause. */
     public void stop() {
         mHandler.removeCallbacks(mPoll);
     }
 
     private void go(int section) {
         // Setup opens on top and comes back here, so it is always allowed.
+        // Setup mở đè lên trên rồi quay lại đây, nên luôn được phép.
         String reason = (section == SETUP || mLeaveGuard == null) ? null : mLeaveGuard.blockReason();
         if (reason != null) {
             android.widget.Toast.makeText(mActivity, reason, android.widget.Toast.LENGTH_LONG).show();

@@ -70,6 +70,7 @@ public class BleLink extends CrtpDriver {
     private final Logger mLogger = LoggerFactory.getLogger("BLELink");
 
     // Set to -40 to connect only to close-by Crazyflie
+    // Đặt thành -40 để chỉ kết nối với Crazyflie ở gần
     private static final int rssiThreshold = -100;
 
     private BluetoothAdapter mBluetoothAdapter;
@@ -88,6 +89,8 @@ public class BleLink extends CrtpDriver {
     private static final String CF_LOADER_DEVICE_NAME = "Crazyflie Loader";
     // The ESP32 firmware advertises under its own name (bleInit(WIFI_AP_SSID)), so a
     // scan filtered on the stock Crazyflie name would never see it.
+    // Firmware ESP32 quảng bá dưới tên riêng (bleInit(WIFI_AP_SSID)), nên một
+    // phép quét lọc theo tên Crazyflie gốc sẽ không bao giờ thấy được nó.
     private static final String ESP_DRONE_DEVICE_NAME = "ESP-Drone";
 
     private static final String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
@@ -130,11 +133,14 @@ public class BleLink extends CrtpDriver {
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 mLogger.debug("onConnectionStateChange: STATE_DISCONNECTED");
                 // This is necessary to handle a disconnect on the copter side
+                // Việc này là cần thiết để xử lý ngắt kết nối từ phía drone
                 stopScan();
                 mConnected = false;
                 state = State.IDLE;
                 // it should actually be notifyConnectionLost, but there is
                 // no difference between a deliberate disconnect and a lost connection
+                // Đáng lẽ phải gọi notifyConnectionLost, nhưng không có
+                // khác biệt nào giữa ngắt kết nối chủ động và mất kết nối
                 notifyDisconnected();
             } else {
                 mLogger.debug("onConnectionStateChange: else: " + newState);
@@ -212,6 +218,7 @@ public class BleLink extends CrtpDriver {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 //mLogger.debug(String.format("BLE ReadRSSI [%d]", rssi));
                 int percentage = 2*(rssi+90); // based on guesstimate
+                // Dựa trên ước lượng sơ bộ
                 notifyLinkQualityUpdated(limit(percentage));
             }
         }
@@ -219,15 +226,19 @@ public class BleLink extends CrtpDriver {
 
     /**
      * Limit range of int between 0 and 100
+     * Giới hạn số nguyên trong khoảng từ 0 đến 100
      *
      * @param value number
+     * @param value số
      * @return number between 0 and 100
+     * @return số trong khoảng từ 0 đến 100
      */
     private int limit(int value) {
         return Math.max(0, Math.min(value, 100));
     }
 
     /** The ESP32 firmware advertises as "ESP-Drone"; the stock Crazyflie as "Crazyflie". */
+    /** Firmware ESP32 quảng bá dưới tên "ESP-Drone"; Crazyflie gốc dưới tên "Crazyflie". */
     private static boolean isDroneDeviceName(String name) {
         return CF_DEVICE_NAME.equals(name) || ESP_DRONE_DEVICE_NAME.equals(name);
     }
@@ -270,8 +281,10 @@ public class BleLink extends CrtpDriver {
 
     private void scan () {
         // Filtered scan
+        // Quét có bộ lọc
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             // Filters are ORed: either the stock Crazyflie or the ESP32 firmware will do.
+            // Các bộ lọc được OR với nhau: Crazyflie gốc hoặc firmware ESP32 đều được.
             ScanFilter cfFilter = new ScanFilter.Builder().setDeviceName(CF_DEVICE_NAME).build();
             ScanFilter espFilter = new ScanFilter.Builder().setDeviceName(ESP_DRONE_DEVICE_NAME).build();
             mBluetoothLeScanner.startScan(Arrays.asList(cfFilter, espFilter), new ScanSettings.Builder().build(), mScanCallback21);
@@ -365,6 +378,7 @@ public class BleLink extends CrtpDriver {
                 if(mConnected) {
                     mGatt.disconnect();
                     //delay close command to fix potential NPE
+                    // Hoãn lệnh close để tránh NPE tiềm ẩn
                     new Handler().postDelayed(new Runnable() {
                         @Override
                         public void run() {
@@ -398,6 +412,10 @@ public class BleLink extends CrtpDriver {
      * The ESP32 firmware's BLE pipe is full CRTP, not just the commander subset:
      * {@code BleRawCb}/{@code BleSegCb} hand every datagram to the same
      * {@code crtpReceiveRaw} the UDP path uses, so TOC, params and logs all work.
+     * Ống BLE của firmware ESP32 mang đầy đủ CRTP, không chỉ phần commander:
+     * {@code BleRawCb}/{@code BleSegCb} chuyển mọi datagram cho cùng một
+     * {@code crtpReceiveRaw} mà đường UDP dùng, nên TOC, tham số và log đều
+     * hoạt động.
      */
     @Override
     public boolean supportsToc() {
@@ -410,19 +428,28 @@ public class BleLink extends CrtpDriver {
         // The latency workaround exists because the 50 Hz commander stream can queue
         // up on a slow link. TOC, param and log traffic must not be thinned the same
         // way — a dropped half of those stalls connection setup and the tuning screen.
+        // Cách vá độ trễ này tồn tại vì luồng commander 50 Hz có thể bị xếp
+        // hàng đợi trên liên kết chậm. Lưu lượng TOC, tham số và log không được
+        // lược bớt theo cùng cách — mất đi một nửa số đó sẽ làm nghẽn quá trình
+        // thiết lập kết nối và màn hình tinh chỉnh.
         if (!mWriteWithAnswer && packet instanceof CommanderPacket
                 && ((ctr++)%2 == 0)) {
             return;
         }
         // Raw CRTP goes on 0x202 only when the whole datagram fits in one 20-byte
         // write (PROTOCOL.md section 8); longer ones are segmented on 0x203.
+        // CRTP thô chỉ đi trên 0x202 khi toàn bộ datagram nằm gọn trong một lần
+        // ghi 20 byte (PROTOCOL.md mục 8); gói dài hơn được phân đoạn trên 0x203.
         if (packet.toByteArray().length <= 20) {
             //send normal CRTP packet
+            // gửi gói CRTP bình thường
             mContext.runOnUiThread(new SendBlePacket(packet));
         } else {
             //split and send two CRTPUP packets
+            // tách và gửi hai gói CRTPUP
             sendSplitPacket(packet);
             // TODO: test with echo packet
+            // TODO: kiểm thử với gói echo
         }
     }
 
@@ -432,6 +459,10 @@ public class BleLink extends CrtpDriver {
         // goes out as [ctrl][crtp 0..18] then [ctrl][crtp 19..]. Working in CRTP
         // byte space rather than payload space is what keeps the boundary straight:
         // CRTP byte 19 is payload[18], not payload[19].
+        // Thân đoạn (segment) chứa 19 byte CRTP (20 trừ byte điều khiển), nên
+        // một datagram được gửi thành [ctrl][crtp 0..18] rồi [ctrl][crtp 19..].
+        // Làm việc trong miền byte CRTP thay vì miền phần dữ liệu là điều giữ
+        // ranh giới đúng: byte CRTP thứ 19 là payload[18], không phải payload[19].
         byte[] crtp = packet.toByteArray();
         int total = crtp.length;
         int firstLen = Math.min(19, total);
@@ -444,6 +475,8 @@ public class BleLink extends CrtpDriver {
 
         // controlbyte + remaining CRTP bytes (the firmware ignores the length field
         // on a continuation, but PROTOCOL.md section 8 says it still carries the total)
+        // byte điều khiển + các byte CRTP còn lại (firmware bỏ qua trường length
+        // trên đoạn tiếp nối, nhưng PROTOCOL.md mục 8 nói trường này vẫn mang tổng)
         int rest = total - firstLen;
         byte[] secondPacket = new byte[rest + 1];
         secondPacket[0] = new ControlByte(false, pid, total).toByte();
@@ -478,6 +511,10 @@ public class BleLink extends CrtpDriver {
             // Testing the length field alone misclassifies a 20-byte datagram: the
             // field stores total-1 so it reads 19, and a 20-byte write cannot carry
             // 20 CRTP bytes alongside its control byte. Mirrors the firmware's BleSegCb.
+            // Chỉ một đoạn khi tổng được báo trước nằm gọn trong thân đoạn này.
+            // Chỉ kiểm tra trường length sẽ phân loại sai một datagram 20 byte:
+            // trường này lưu total-1 nên đọc ra 19, còn một lần ghi 20 byte không
+            // thể mang 20 byte CRTP kèm byte điều khiển. Giống với BleSegCb của firmware.
             if (total <= body) {
                 System.arraycopy(packet, 1, tempByteArray, 0, body);
                 return new CrtpPacket(tempByteArray);
@@ -511,6 +548,7 @@ public class BleLink extends CrtpDriver {
 
         /**
          * Sends packet with CRTP characteristic
+         * Gửi gói tin qua characteristic CRTP
          *
          * @param packet
          */
@@ -548,6 +586,7 @@ public class BleLink extends CrtpDriver {
         int length = -1;
 
         /** Parses a wire control byte. The length field is total CRTP length - 1. */
+        /** Phân tích byte điều khiển trên đường truyền. Trường length là tổng độ dài CRTP trừ 1. */
         public ControlByte(byte[] array) {
             this.start = (array[0]&0x80) != 0;
             this.pid = (array[0]>>5)&0x03;
@@ -555,6 +594,7 @@ public class BleLink extends CrtpDriver {
         }
 
         /** Builds a control byte; {@code length} is the total CRTP length. */
+        /** Dựng một byte điều khiển; {@code length} là tổng độ dài CRTP. */
         public ControlByte(boolean start, int pid, int length) {
             this.start = start;
             this.pid = pid;
@@ -575,6 +615,7 @@ public class BleLink extends CrtpDriver {
         }
 
         /** Total CRTP length of the datagram, never the raw wire field. */
+        /** Tổng độ dài CRTP của datagram, không bao giờ là trường thô trên đường truyền. */
         public int getTotalLength() {
             return length;
         }

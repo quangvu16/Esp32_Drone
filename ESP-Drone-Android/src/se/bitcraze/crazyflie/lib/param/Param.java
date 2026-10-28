@@ -53,6 +53,9 @@ import se.bitcraze.crazyflie.lib.toc.TocFetcher;
  * Enables reading/writing of parameter values to/from the Crazyflie.
  * When a Crazyflie is connected it's possible to download a TableOfContent of all
  * the parameters that can be written/read.
+ * Cho phép đọc/ghi giá trị tham số tới/từ Crazyflie.
+ * Khi đã kết nối Crazyflie, có thể tải về một TableOfContent gồm mọi
+ * tham số có thể ghi/đọc.
  *
  */
 public class Param {
@@ -69,10 +72,13 @@ public class Param {
 
     // TODO: use only one map for both
     // TODO: ParamListener already contains group/completeName
+    // TODO: chỉ dùng một bảng cho cả hai
+    // TODO: ParamListener đã chứa group/completeName
     private Map<String, ParamListener> mUpdateListeners = new HashMap<String, ParamListener>();         // completeName
     private Map<String, ParamListener> mGroupUpdateListeners = new HashMap<String, ParamListener>();    // group
 
     // Possible states
+    // Các trạng thái có thể có
     private int IDLE = 0;
     private int WAIT_TOC = 1;
     private int WAIT_READ = 2;
@@ -83,6 +89,7 @@ public class Param {
     private int WRITE_CHANNEL = 2;
 
     // TOC access command
+    // Lệnh truy cập TOC
     private int TOC_RESET = 0;
     private int TOC_GETNEXT = 1;
     private int TOC_GETCRC32 = 2;
@@ -92,6 +99,7 @@ public class Param {
         this.mCrazyflie = crazyflie;
 
         this.mToc = new Toc(); // Avoid NPE
+                               // Tránh NPE
 
         // self.param_updater = None
         // self.param_updater = _ParamUpdater(self.cf, self._param_updated)
@@ -119,6 +127,7 @@ public class Param {
 
     /**
      * Request an update of all the parameters in the TOC
+     * Yêu cầu cập nhật mọi tham số trong TOC
      */
     public void requestUpdateOfAllParams() {
         for (TocElement tocElement : mToc.getElements()) {
@@ -128,6 +137,7 @@ public class Param {
 
     /**
      * Check if all parameters from the TOC have at least been fetched once
+     * Kiểm tra xem mọi tham số trong TOC đã được lấy về ít nhất một lần chưa
      */
     public boolean checkIfAllUpdated() {
         /*
@@ -154,6 +164,7 @@ public class Param {
 
     /**
      * Callback with data for an updated parameter
+     * Callback kèm dữ liệu cho một tham số vừa được cập nhật
      */
     public void paramUpdated(CrtpPacket packet) {
         int varId = packet.getPayload()[0];
@@ -162,18 +173,21 @@ public class Param {
             //s = struct.unpack(element.pytype, pk.data[1:])[0]
             //s = s.__str__()
             // TODO: probably does not work as intended, use System.arrayCopy instead
+            // TODO: có lẽ không hoạt động như mong đợi, nên dùng System.arrayCopy
             ByteBuffer payload = ByteBuffer.wrap(packet.getPayload(), 1, packet.getPayload().length-1);
             Number number = tocElement.getCtype().parse(payload);
 
             String completeName = tocElement.getCompleteName();
 
             // Save the value for synchronous access
+            // Lưu giá trị để truy cập đồng bộ
             if (!mValues.containsKey(tocElement.getGroup())) {
                 mValues.put(tocElement.getGroup(), new HashMap<String, Number>());
             }
             mValues.get(tocElement.getGroup()).put(tocElement.getName(), number);
 
             // This will only be called once
+            // Khối này chỉ được gọi một lần
             if (checkIfAllUpdated() && !mHaveUpdated) {
                 mHaveUpdated = true;
                 // self.all_updated.call()
@@ -197,6 +211,7 @@ public class Param {
 
     /**
      * Remove the listener for a group or a complete name (group.name)
+     * Gỡ listener cho một group hoặc một tên đầy đủ (group.name)
      */
     public void removeParamListeners(String group, String name) {
         if (name == null || name.isEmpty()) {
@@ -214,6 +229,8 @@ public class Param {
     /**
      * Add a listener for a specific parameter name. This callback will be
      * executed when a new value is read from the Crazyflie.
+     * Thêm listener cho một tên tham số cụ thể. Callback này sẽ được
+     * thực thi khi một giá trị mới được đọc từ Crazyflie.
      */
     public void addParamListener(ParamListener paramListener) {
         if (paramListener.getName() == null || paramListener.getName().isEmpty()) {
@@ -229,6 +246,7 @@ public class Param {
 
     /**
      * Initiate a refresh of the parameter TOC.
+     * Khởi động một lần làm mới TOC tham số.
      */
     // def refresh_toc(self, refresh_done_callback, toc_cache):
     public void refreshToc(TocFetchFinishedListener listener, TocCache tocCache) {
@@ -240,6 +258,7 @@ public class Param {
     }
 
     //TODO: only for debugging
+    //TODO: chỉ dùng để gỡ lỗi
     public Toc getToc() {
         return this.mToc;
     }
@@ -247,6 +266,7 @@ public class Param {
     /*
     def disconnected(self, uri):
         """Disconnected callback from Crazyflie API"""
+        """Callback khi ngắt kết nối từ Crazyflie API"""
         self.param_updater.close()
         self._have_updated = False
 
@@ -254,6 +274,7 @@ public class Param {
 
     /**
      * Request an update of the value for the supplied parameter.
+     * Yêu cầu cập nhật giá trị cho tham số được cung cấp.
      *
      * @param completeName
      */
@@ -268,11 +289,13 @@ public class Param {
 
     /**
      * Set the value for the supplied parameter.
+     * Đặt giá trị cho tham số được cung cấp.
      *
      * @param completeName
      * @param value
      */
     //TODO: is Number the right data type for value?
+    //TODO: Number có phải kiểu dữ liệu đúng cho value không?
     public void setValue(String completeName, Number value) {
         TocElement tocElement = mToc.getElementByCompleteName(completeName);
         if (tocElement == null) {
@@ -281,10 +304,12 @@ public class Param {
             mLogger.debug("{} is read only, not trying to set value", completeName);
         } else {
             //TODO: extract into method
+            //TODO: tách thành một phương thức
             Header header = new Header(WRITE_CHANNEL, CrtpPort.PARAMETERS);
             //pk.data = struct.pack('<B', varid)
             //pk.data += struct.pack(element.pytype, eval(value))
             //TODO: value.byteValue() might not be the right method to use, because it can involve rounding or truncation!
+            //TODO: value.byteValue() có thể không phải phương thức đúng, vì nó có thể làm tròn hoặc cắt bớt!
             byte[] parse = tocElement.getCtype().parse(value);
             ByteBuffer bb = ByteBuffer.allocate(parse.length+1);
             bb.put((byte) tocElement.getIdent());
@@ -297,6 +322,7 @@ public class Param {
 
     /**
      * Get the value for the supplied parameter
+     * Lấy giá trị cho tham số được cung cấp
      *
      * @param completeName
      * @return
@@ -317,6 +343,7 @@ public class Param {
 
     /**
      * This thread will update params through a queue to make sure that we get back values
+     * Luồng này sẽ cập nhật tham số qua một hàng đợi để đảm bảo ta nhận lại được giá trị
      *
      */
     private class ParamUpdaterThread implements Runnable {
@@ -350,10 +377,13 @@ public class Param {
         public void close () {
             /*
             # First empty the queue from all packets
+            # Trước tiên làm trống hàng đợi khỏi tất cả gói tin
             while not self.request_queue.empty():
                 self.request_queue.get()
             # Then force an unlock of the mutex if we are waiting for a packet
             # we didn't get back due to a disconnect for example.
+            # Sau đó buộc mở khóa mutex nếu ta đang chờ một gói tin
+            # nhưng không nhận lại được, ví dụ do ngắt kết nối.
             try:
                 self.wait_lock.release()
             except:
@@ -364,12 +394,14 @@ public class Param {
 
         /**
          * Place a param request (update request or set value) on the queue.
+         * Đặt một yêu cầu tham số (yêu cầu cập nhật hoặc đặt giá trị) vào hàng đợi.
          *
          * @param packet
          */
         public void addParamRequest(CrtpPacket packet) {
             try {
                 //TODO: is put() the right method?
+                //TODO: put() có phải phương thức đúng không?
                 mRequestQueue.put(packet);
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -378,6 +410,7 @@ public class Param {
 
         /**
          * Callback for newly arrived packets
+         * Callback cho các gói tin vừa đến
          *
          * @param packet
          */
@@ -388,12 +421,15 @@ public class Param {
                 //if (pk.channel != TOC_CHANNEL and self._req_param == var_id and pk is not None):
 
                 // TODO: is this even a problem!?
+                // TODO: đây có thực sự là vấn đề không!?
 //                if (channel != TOC_CHANNEL && mReqParam != varId) {
 //                    mLogger.warn("mReqParam != varId: " + mReqParam + " : " + varId);
 //                }
 
                 /* if mReqParam == varId is actually checked, resend or late packets are dismissed,
                  * which makes the param update fragile
+                 * Nếu mReqParam == varId thực sự được kiểm tra, các gói gửi lại hoặc đến muộn
+                 * sẽ bị loại, khiến việc cập nhật tham số dễ hỏng
                  */
                 if (channel != TOC_CHANNEL /* && mReqParam == varId */) {
                     //self.updated_callback(pk)
@@ -416,6 +452,7 @@ public class Param {
                 try {
                     packet = null;
                     // pk = self.request_queue.get() # Wait for request update
+                    // Chờ yêu cầu cập nhật
                     packet = mRequestQueue.poll((long) 100, TimeUnit.MILLISECONDS);
 
                     // self.wait_lock.acquire()

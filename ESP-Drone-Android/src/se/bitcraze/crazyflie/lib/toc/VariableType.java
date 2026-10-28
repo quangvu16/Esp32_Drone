@@ -56,9 +56,12 @@ public enum VariableType {
 
     /**
      * Parse one variable of the given type.
+     * Phân tích một biến với kiểu đã cho.
      *
      * @param buffer the buffer to read raw data from
+     * @param buffer bộ đệm để đọc dữ liệu thô
      * @return the parsed variable
+     * @return biến đã được phân tích
      */
     public Number parse(ByteBuffer buffer) {
         if (buffer.capacity() < this.getSize()) {
@@ -77,6 +80,7 @@ public enum VariableType {
                 return (buffer.getInt()) & 0xffffffffL;
             case UINT64_T:
                 // TODO: throw exception
+                // TODO: ném ngoại lệ
                 mLogger.warn("UINT64_T not yet implemented");
                 return -1;
             case INT8_T:
@@ -93,6 +97,7 @@ public enum VariableType {
                 return buffer.getDouble();
             default:
                 // TODO: throw exception
+                // TODO: ném ngoại lệ
                 mLogger.warn("Parsing " + this.name() + " is not yet implemented");
                 break;
         }
@@ -101,6 +106,7 @@ public enum VariableType {
 
     /**
      * Parse one variable of the given type.
+     * Phân tích một biến với kiểu đã cho.
      *
      * @param value
      * @return
@@ -109,6 +115,7 @@ public enum VariableType {
         ByteBuffer tempBuffer4 = ByteBuffer.allocate(4).order(CrtpPacket.BYTE_ORDER);
 
         //Use ByteBuffer with 8 bytes for INT64_T and DOUBLE
+        //Dùng ByteBuffer với 8 byte cho INT64_T và DOUBLE
         ByteBuffer tempBuffer8 = ByteBuffer.allocate(8).order(CrtpPacket.BYTE_ORDER);
 
         switch (this) {
@@ -121,9 +128,11 @@ public enum VariableType {
             case UINT32_T:
                 tempBuffer4.putInt((int) ((value.intValue()) & 0xffffffffL));
                 //tempBuffer.putLong((long) (value.intValue() & 0xffffffffL)); //only works if ByteBuffer is 8 bytes long
+                // chỉ hoạt động nếu ByteBuffer dài 8 byte
                 break;
             case UINT64_T:
                 // TODO: throw exception
+                // TODO: ném ngoại lệ
                 mLogger.warn("UINT64_T not yet implemented");
                 break;
             case INT8_T:
@@ -148,6 +157,7 @@ public enum VariableType {
                 return tempBuffer8.array();
             default:
                 // TODO: throw exception
+                // TODO: ném ngoại lệ
                 mLogger.warn("Parsing " + this.name() + " is not yet implemented");
                 break;
         }

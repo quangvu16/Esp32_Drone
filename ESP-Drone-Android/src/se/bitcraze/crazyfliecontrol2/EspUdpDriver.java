@@ -24,6 +24,8 @@ public class EspUdpDriver extends CrtpDriver {
 
     // SoftAP defaults (PROTOCOL.md section 8). Overridable so Station mode can reach
     // the drone at esp-drone.local and any port remap the firmware was given.
+    // Giá trị mặc định của SoftAP (PROTOCOL.md mục 8). Có thể ghi đè để chế độ Station
+    // tới được drone tại esp-drone.local và mọi cổng đã được firmware cho phép đổi.
     private static final int APP_PORT_DEFAULT = 2399;
     private static final int DEVICE_PORT_DEFAULT = 2390;
     private static final String DEVICE_ADDRESS_DEFAULT = "192.168.43.42";
@@ -83,6 +85,9 @@ public class EspUdpDriver extends CrtpDriver {
      * @param host drone address — 192.168.43.42 on SoftAP, esp-drone.local on Station
      * @param devicePort phone → drone (2390 by default)
      * @param appPort drone → phone, which the phone binds (2399 by default)
+     * @param host địa chỉ drone — 192.168.43.42 trên SoftAP, esp-drone.local trên Station
+     * @param devicePort điện thoại → drone (mặc định 2390)
+     * @param appPort drone → điện thoại, phía điện thoại bind cổng này (mặc định 2399)
      */
     public EspUdpDriver(EspActivity activity, String host, int devicePort, int appPort) {
         mActivity = activity;

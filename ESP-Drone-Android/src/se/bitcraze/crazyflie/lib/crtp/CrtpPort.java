@@ -29,6 +29,7 @@ package se.bitcraze.crazyflie.lib.crtp;
 
 /**
  * Lists the available ports for the CRTP.
+ * Liệt kê các cổng CRTP hiện có.
  *
  */
 public enum CrtpPort {
@@ -51,8 +52,10 @@ public enum CrtpPort {
 
     /**
      * Get the number associated with this port.
+     * Lấy số gắn với cổng này.
      *
      * @return the number of the port
+     * @return số của cổng
      */
     public byte getNumber() {
         return mNumber;
@@ -60,10 +63,14 @@ public enum CrtpPort {
 
     /**
      * Get the port with a specific number.
+     * Lấy cổng theo một số cụ thể.
      *
      * @param number
      *            the number of the port.
+     * @param number
+     *            số của cổng.
      * @return the port or <code>null</code> if no port with the specified number exists.
+     * @return cổng hoặc <code>null</code> nếu không có cổng nào mang số đã chỉ định.
      */
     public static CrtpPort getByNumber(byte number) {
         for (CrtpPort p : CrtpPort.values()) {

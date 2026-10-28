@@ -38,11 +38,17 @@ import com.MobileAnarchy.Android.Widgets.Joystick.JoystickView;
  *
  * For example, mode 3 (default) maps roll to the left X-Axis, pitch to the left Y-Axis,
  * yaw to the right X-Axis and thrust to the right Y-Axis.
+ * TouchController dùng joystick trên màn hình để điều khiển các giá trị roll, pitch, yaw và lực đẩy.
+ * Cách ánh xạ các trục có thể thay đổi bằng thiết lập "mode" trong phần thiết lập.
+ *
+ * Ví dụ, mode 3 (mặc định) ánh xạ roll sang trục X bên trái, pitch sang trục Y bên trái,
+ * yaw sang trục X bên phải và lực đẩy sang trục Y bên phải.
  *
  */
 public class TouchController extends AbstractController {
 
     protected int mMovementRange = 1000;  // "resolution"
+    // "độ phân giải"
 
     protected JoystickView mJoystickViewLeft;
     protected JoystickView mJoystickViewRight;

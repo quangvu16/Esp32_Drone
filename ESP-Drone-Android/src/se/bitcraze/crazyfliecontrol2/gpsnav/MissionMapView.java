@@ -28,13 +28,23 @@ import org.osmdroid.views.overlay.TilesOverlay;
 /**
  * Mission Planner style interactive map for planning and flying GPS missions.
  *
+ * <p>Bản đồ tương tác kiểu Mission Planner để lập kế hoạch và bay các sứ mệnh GPS.
+ *
  * <p>Draws the plan (home, numbered waypoints with acceptance circles, legs), highlights the active
  * waypoint, and overlays the drone's ESTIMATED position and track. That label is not decoration:
  * the drone has no GPS and no magnetometer, so everything drawn for it is accelerometer dead
  * reckoning that drifts metres per minute (PROTOCOL.md section 6).
  *
+ * <p>Vẽ kế hoạch (home, các điểm hành trình đánh số kèm vòng tròn bán kính chấp nhận, các chặng),
+ * làm nổi bật điểm hành trình đang active, và lớp phủ vị trí cùng vết bay ƯỚC TÍNH của drone. Nhãn
+ * đó không phải trang trí: drone không có GPS cũng không có la bàn từ, nên mọi thứ vẽ cho nó đều là
+ * tự dẫn đường quán tính từ gia tốc kế, trôi vài mét mỗi phút (PROTOCOL.md mục 6).
+ *
  * <p>Based on osmdroid 6.1.20. {@code Configuration.getInstance().setUserAgentValue(...)} must run
  * before this view is inflated — the hosting activity does it in {@code onCreate}.
+ *
+ * <p>Dựa trên osmdroid 6.1.20. {@code Configuration.getInstance().setUserAgentValue(...)} phải chạy
+ * trước khi view này được nạp — activity chứa nó gọi trong {@code onCreate}.
  */
 public class MissionMapView extends MapView {
 
@@ -44,6 +54,7 @@ public class MissionMapView extends MapView {
     public static final int MAP_TYPE_TERRAIN = 3;
 
     /** Callback for taps on the map. */
+    /** Callback cho các cú chạm lên bản đồ. */
     public interface OnMapTapListener {
         void onMapTap(double latitude, double longitude);
     }
@@ -85,6 +96,7 @@ public class MissionMapView extends MapView {
         applyMapType();
 
         // Zoom 17 shows the satellite backdrop at a scale where one drone's route is legible.
+        // Zoom 17 hiện nền vệ tinh ở tỷ lệ mà lộ trình của một drone còn đọc được.
         getController().setZoom(17);
 
         mDroneDrawable = createDroneDrawable(context);
@@ -114,6 +126,7 @@ public class MissionMapView extends MapView {
     }
 
     /** Switches the map backdrop, keeping the mission overlays in place. */
+    /** Đổi nền bản đồ, giữ nguyên các lớp phủ của sứ mệnh. */
     public void setMapType(int type) {
         this.mMapType = type;
         applyMapType();
@@ -133,6 +146,8 @@ public class MissionMapView extends MapView {
             case MAP_TYPE_HYBRID:
                 // GMap.NET's GoogleHybridMapProvider composites the label tile over the satellite
                 // tile, so hybrid draws GOOGLE_LABELS on top of GOOGLE_SATELLITE.
+                // GoogleHybridMapProvider của GMap.NET ghép tile nhãn chồng lên tile vệ tinh,
+                // nên chế độ hybrid vẽ GOOGLE_LABELS lên trên GOOGLE_SATELLITE.
                 setTileSource(MapTileSources.GOOGLE_SATELLITE);
                 mLabelsOverlay = new TilesOverlay(
                         new MapTileProviderBasic(getContext(), MapTileSources.GOOGLE_LABELS),
@@ -141,6 +156,8 @@ public class MissionMapView extends MapView {
                 mLabelsOverlay.setLoadingLineColor(Color.TRANSPARENT);
                 // Index 0 draws the labels just above the base tiles, underneath every mission
                 // marker and path. MapEventsOverlay is also at 0 but paints nothing.
+                // Chỉ số 0 vẽ nhãn ngay trên tile nền, nằm dưới mọi chỉ dấu và đường của sứ mệnh.
+                // MapEventsOverlay cũng ở vị trí 0 nhưng không vẽ gì.
                 getOverlays().add(0, mLabelsOverlay);
                 break;
             case MAP_TYPE_STREET:
@@ -167,6 +184,9 @@ public class MissionMapView extends MapView {
     /**
      * Places the drone marker. The title carries the word "estimated" on purpose: this is dead
      * reckoning, not GPS.
+     *
+     * <p>Đặt chỉ dấu của drone. Tiêu đề cố tình mang chữ "estimated" (ước tính): đây là tự dẫn
+     * đường quán tính, không phải GPS.
      */
     public void setDrone(double latitude, double longitude, double headingDegrees) {
         if (Double.isNaN(latitude) || Double.isNaN(longitude)) {
@@ -220,6 +240,7 @@ public class MissionMapView extends MapView {
     }
 
     /** Shows (or with NaN clears) the one-shot GUIDED "go to here" target. */
+    /** Hiện (hoặc xoá nếu là NaN) mục tiêu GUIDED dùng một lần "go to here". */
     public void setGuidedTarget(double latitude, double longitude) {
         if (Double.isNaN(latitude) || Double.isNaN(longitude)) {
             if (mGuidedMarker != null) {
@@ -299,6 +320,7 @@ public class MissionMapView extends MapView {
     }
 
     /** Replaces the whole estimated track. Points are {@code {lat, lon}} pairs in degrees. */
+    /** Thay toàn bộ vết bay ước tính. Các điểm là cặp {@code {lat, lon}} tính bằng độ. */
     public void setTrack(List<double[]> trackPoints) {
         mTrackPoints.clear();
         if (trackPoints != null) {
@@ -310,6 +332,7 @@ public class MissionMapView extends MapView {
     }
 
     /** Appends one estimated position fix to the breadcrumb track. */
+    /** Nối thêm một vị trí ước tính vào vết bánh mì (breadcrumb track). */
     public void appendTrackPoint(double latitude, double longitude) {
         mTrackPoints.add(new GeoPoint(latitude, longitude));
         rebuildTrackPolyline();
@@ -325,6 +348,7 @@ public class MissionMapView extends MapView {
             mTrackPolyline = new Polyline();
             mTrackPolyline.setPoints(mTrackPoints);
             mTrackPolyline.setColor(Color.parseColor("#FF00E676")); // bright green breadcrumbs
+            // (vết bánh mì màu xanh lá sáng)
             mTrackPolyline.setWidth(5f);
             getOverlays().add(1, mTrackPolyline);
         }
@@ -378,6 +402,7 @@ public class MissionMapView extends MapView {
         strokePaint.setColor(Color.WHITE);
 
         // Arrow points "up" so marker rotation == compass heading.
+        // Mũi tên chỉ "lên" để góc xoay của chỉ dấu == hướng mũi la bàn.
         Path arrowPath = new Path();
         arrowPath.moveTo(size / 2f, 8f);
         arrowPath.lineTo(size - 14f, size - 14f);

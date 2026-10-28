@@ -1,10 +1,17 @@
 // Regression guard for the self-level sign in loop().
 // Run with ./run.sh, which also checks the two setpoint lines still match the sketch.
+// Chốt chặn hồi quy cho dấu của thuật ngữ tự cân bằng trong loop().
+// Chạy bằng ./run.sh, công cụ này cũng kiểm tra hai dòng setpoint còn khớp với sketch.
 //
 // The rate loop is modelled as perfect (gyro rate == rate setpoint), which is the
 // best case for it. Even then, adding the level term instead of subtracting it is
 // positive feedback: any tilt commands MORE tilt the same way and the drone flips.
 // The old formula is kept as a negative control so this cannot pass vacuously.
+// Vòng lặp tốc độ được mô hình hóa là hoàn hảo (tốc độ con quay == setpoint tốc
+// độ), tức trường hợp tốt nhất cho nó. Ngay cả khi đó, cộng thuật ngữ cân bằng
+// thay vì trừ đi là phản hồi dương: mọi độ nghiêng đều lệnh NHIỀU độ nghiêng hơn
+// theo cùng chiều và drone bị lật. Công thức cũ được giữ làm đối chứng âm để bài
+// kiểm tra này không thể pass rỗng tuếch.
 
 #include <cmath>
 #include <cstdio>
@@ -14,6 +21,8 @@ static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi 
 
 // Simulate `seconds` of flight at 250 Hz from angle0 toward target sp_deg.
 // sign = -1 is the current firmware, +1 the old one.
+// Mô phỏng `seconds` giây bay ở 250 Hz từ angle0 tới setpoint sp_deg.
+// sign = -1 là firmware hiện tại, +1 là công thức cũ.
 static float simulate(float angle0, float sp_deg, float sign, float seconds) {
   const float dt = 0.004f;
   float angle = angle0;
@@ -22,9 +31,12 @@ static float simulate(float angle0, float sp_deg, float sign, float seconds) {
     float err = angle - sp_deg;
     float level_adjust = clampf(err * LEVEL_SENSITIVITY, -200.0f, 200.0f);
     float setpoint = sp_rate + sign * level_adjust;   // firmware: sp_roll_rate - roll_level_adjust
+                                                     // trong firmware: sp_roll_rate - roll_level_adjust
     float gyro = setpoint;                              // perfect rate loop
+                                                      // vòng lặp tốc độ hoàn hảo
     angle += gyro * dt;
     if (fabsf(angle) > 180.0f) return angle;            // flipped
+                                                        // đã lật
   }
   return angle;
 }

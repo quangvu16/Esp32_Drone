@@ -6,6 +6,10 @@
 //  Byte layouts follow PROTOCOL.md: the header packs port/channel, values are
 //  little-endian, and the parameter and log TOCs use *different* type-code
 //  tables (§2) — that is why there are two enums here.
+//  Đóng khung CRTP và bộ mã hóa/giải mã giá trị có kiểu cho giao thức drone ESP32.
+//  Bố cục byte theo PROTOCOL.md: header đóng gói port/channel, giá trị theo
+//  little-endian, và TOC tham số với TOC log dùng bảng type-code *khác nhau*
+//  (§2) — đó là lý do có hai enum ở đây.
 //
 
 import Foundation
@@ -19,6 +23,7 @@ enum CrtpPort: UInt8 {
 }
 
 /// Parameter type codes — low nibble of the TOC type byte (PROTOCOL.md §2).
+/// Mã kiểu của tham số — nibble thấp của byte kiểu trong TOC (PROTOCOL.md §2).
 enum ParamType: UInt8 {
     case int8 = 0x00
     case int16 = 0x01
@@ -42,6 +47,7 @@ enum ParamType: UInt8 {
 }
 
 /// Log type codes — a different numbering from the parameter codes (§2).
+/// Mã kiểu của log — cách đánh số khác với mã kiểu của tham số (§2).
 enum LogType: UInt8 {
     case uint8 = 0x01
     case uint16 = 0x02
@@ -61,6 +67,8 @@ enum LogType: UInt8 {
 }
 
 /// A decoded little-endian scalar. Read back as `double` for maths and charts.
+/// Một giá trị vô hướng little-endian đã giải mã. Đọc lại dạng `double` để
+/// tính toán và vẽ biểu đồ.
 enum CrtpValue {
     case int8(Int8)
     case uint8(UInt8)
@@ -100,6 +108,7 @@ enum CrtpValue {
     }
 
     /// Little-endian wire bytes (PROTOCOL.md §3).
+    /// Các byte little-endian trên đường truyền (PROTOCOL.md §3).
     var encoded: Data {
         var out = Data(capacity: size)
         switch self {
@@ -120,6 +129,7 @@ enum CrtpValue {
     }
 
     /// Builds the value of the given parameter type from little-endian bytes.
+    /// Dựng giá trị theo kiểu tham số đã cho từ các byte little-endian.
     static func decode(paramType: ParamType, from data: Data) -> CrtpValue? {
         guard data.count >= paramType.size else { return nil }
         return data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> CrtpValue? in
@@ -159,6 +169,9 @@ enum CrtpValue {
 /// One complete CRTP packet: header byte plus the payload that follows it.
 /// The transport checksum (UDP/SPP) is added and stripped by the link layer,
 /// so everything above `CrtpDriver` works with raw CRTP bytes only.
+/// Một gói tin CRTP hoàn chỉnh: byte header cộng phần dữ liệu theo sau.
+/// Byte checksum của tầng truyền (UDP/SPP) được thêm và loại bỏ ở tầng
+/// liên kết, nên mọi thứ phía trên `CrtpDriver` chỉ làm việc với byte CRTP thô.
 struct CrtpPacket {
     let port: CrtpPort
     let channel: UInt8
@@ -171,6 +184,7 @@ struct CrtpPacket {
     }
 
     /// Parses raw CRTP bytes (header included, no checksum).
+    /// Phân tích byte CRTP thô (có header, không có checksum).
     init?(raw: Data) {
         guard raw.count >= 1 else { return nil }
         let header = raw[raw.startIndex]
@@ -184,6 +198,8 @@ struct CrtpPacket {
 
     /// Full CRTP bytes: header plus payload. This is what goes on the wire
     /// (plus a checksum byte on UDP/SPP).
+    /// Đầy đủ byte CRTP: header cộng phần dữ liệu. Đây là nội dung đưa lên
+    /// đường truyền (thêm một byte checksum trên UDP/SPP).
     var raw: Data {
         var out = Data(capacity: payload.count + 1)
         out.append(header)
@@ -194,11 +210,13 @@ struct CrtpPacket {
 
 enum CrtpChecksum {
     /// Low byte of the sum of all CRTP bytes including the header (§1).
+    /// Byte thấp nhất của tổng mọi byte CRTP, kể cả header (§1).
     static func of(_ crtp: Data) -> UInt8 {
         crtp.reduce(0) { UInt8(truncatingIfNeeded: Int($0) + Int($1)) }
     }
 
     /// Appends the checksum byte for UDP/SPP framing.
+    /// Nối thêm byte checksum cho khung UDP/SPP.
     static func append(to crtp: Data) -> Data {
         var out = crtp
         out.append(of(crtp))
@@ -206,6 +224,7 @@ enum CrtpChecksum {
     }
 
     /// Strips and verifies the trailing checksum. Returns the CRTP bytes.
+    /// Tách và xác minh byte checksum ở cuối. Trả về các byte CRTP.
     static func strip(from framed: Data) -> Data? {
         guard framed.count >= 2 else { return nil }
         let body = framed.dropLast()

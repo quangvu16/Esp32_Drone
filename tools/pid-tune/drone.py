@@ -25,7 +25,9 @@ import time
 
 CRTP_MAX_SIZE = 30
 UDP_DEVICE_PORT = 2390        # drone listens here
+                              # drone lắng nghe ở đây
 UDP_APP_PORT = 2399           # drone replies here
+                              # drone trả lời ở đây
 
 PORT_PARAMS, PORT_LOG, PORT_FLIGHT = 2, 5, 7
 CH_TOC, CH_READ, CH_WRITE = 0, 1, 2
@@ -36,12 +38,14 @@ CMD_TOC_ELEMENT, CMD_TOC_INFO = 0, 1
 LOG_CREATE, LOG_APPEND, LOG_DELETE, LOG_START, LOG_STOP, LOG_RESET = 0, 1, 2, 3, 4, 5
 
 # flight-control extension (port 7, ch 0), payload led by this magic
+# phần mở rộng điều khiển bay (port 7, ch 0), payload mở đầu bởi magic này
 FC_MAGIC = 0x70
 FC_SET_MODE, FC_TAKEOFF, FC_LAND, FC_SET_HOVER = 0x01, 0x02, 0x03, 0x04
 FC_EMERGENCY, FC_SET_HEADING, FC_ARM, FC_DISARM = 0x05, 0x06, 0x07, 0x08
 FC_SAVE, FC_DEFAULTS, FC_LOAD = 0x09, 0x0A, 0x0B
 
 # parameter type codes (port 2) — note these differ from the log ones
+# mã kiểu tham số (port 2) — lưu ý chúng khác với mã kiểu log
 PARAM_TYPES = {
     0x00: ("b", 1), 0x08: ("B", 1),
     0x01: ("<h", 2), 0x09: ("<H", 2),
@@ -50,6 +54,7 @@ PARAM_TYPES = {
     0x06: ("<f", 4), 0x07: ("<d", 8),
 }
 # log type codes (port 5) — deliberately not the same numbering
+# mã kiểu log (port 5) — cố ý không dùng chung một cách đánh số
 LOG_TYPES = {
     0x01: ("B", 1), 0x02: ("<H", 2), 0x03: ("<I", 4), 0x04: ("b", 1),
     0x05: ("<h", 2), 0x06: ("<i", 4), 0x07: ("<f", 4),
@@ -61,6 +66,10 @@ LOG_TYPES = {
 # (axis, k) with k in 0..2, and named pid.<axis>_<kp|ki|kd>; the name is looked
 # up in the parameter TOC at connect time, so a TOC change cannot silently
 # write the wrong parameter.
+# Một trục mỗi lần, giống trình chọn trục của các app. Một gain được chỉ định
+# theo (axis, k) với k trong 0..2, và tên pid.<axis>_<kp|ki|kd>; tên được tra
+# trong TOC tham số ngay khi kết nối, nên TOC đổi cũng không thể ghi nhầm
+# tham số một cách âm thầm.
 AXES = ("roll", "pitch", "yaw")
 GAIN_LABELS = ("kp", "ki", "kd")
 
@@ -77,12 +86,19 @@ def axis_names(axis):
 # so these are the real limits rather than a guess: kp 0..100, ki 0..20,
 # kd 0..200 on all three axes. Indexed by k. They are also the outer edge of
 # the tuner's search box; Space narrows it to current / range .. x range.
+# Firmware kẹp mọi lần ghi vào khoảng [lo, hi] của tham số (paramClampF), nên
+# đây là giới hạn thật chứ không phải phỏng đoán: kp 0..100, ki 0..20, kd 0..200
+# trên cả ba trục. Đánh chỉ mục theo k. Chúng cũng là mép ngoài của miền tìm
+# kiếm của tuner; Space thu hẹp còn current / range .. x range.
 P_MIN = (0.0, 0.0, 0.0)
 P_MAX = (100.0, 20.0, 200.0)
 
 TIP_DEG = 25.0                # firmware's MAX_TILT_DEG; past this a trial is over
+                              # MAX_TILT_DEG của firmware; vượt mức này thì lần thử kết thúc
 LEVEL_DEG = 15.0              # both axes inside this counts as upright
+                              # hai trục nằm trong khoảng này được coi là đứng thẳng
 MOTOR_SAT_HI, MOTOR_SAT_LO = 1990, 1010   # matches the apps' saturation test
+                                          # khớp với phép kiểm bão hòa của các app
 
 
 def tipped(frame):
@@ -92,6 +108,7 @@ def tipped(frame):
 
 
 fallen = tipped                     # the name ml_tune and the reference use
+                                    # tên mà ml_tune và bản tham chiếu dùng
 
 
 def cost_of(frames, trial_s):
@@ -110,6 +127,10 @@ def cost_of(frames, trial_s):
     if not frames:
         raise RuntimeError("no telemetry received")
 
+    # Score only the surviving window: cut at the first tipped frame, but keep
+    # at least 5 frames so the statistics stay defined after a very quick tip.
+    # Chỉ chấm điểm trên cửa sổ còn sống: cắt tại frame nghiêng đầu tiên, nhưng
+    # giữ ít nhất 5 frame để các thống kê vẫn có nghĩa khi nghiêng quá nhanh.
     bad_at = next((i for i, f in enumerate(frames) if tipped(f)), None)
     ok = frames[:bad_at] if bad_at is not None else frames
     if len(ok) < 5:
@@ -129,6 +150,10 @@ def cost_of(frames, trial_s):
          "control_effort": control_effort, "sat": sat}
     if m["fell"]:
         survived = bad_at / max(len(frames), 1) * trial_s
+        # Fall penalty: a crash is worse the earlier it happens, so the cost is
+        # dominated by survival time rather than by the quality of the flight.
+        # Phạt nghiêng: rơi càng sớm càng tệ, nên chi phí bị chi phối bởi thời gian
+        # sống sót hơn là chất lượng của chuyến bay.
         m["cost"] = 100 + 10 * (trial_s - survived)
     else:
         m["cost"] = (angle_std + 0.1 * rate_rms + 0.2 * motor_rms
@@ -140,6 +165,7 @@ def measure(drone, axis, trial_s):
     """One trial with the parameters already applied: settle, measure, score.
     The trial ends early the moment the drone tips."""
     time.sleep(1.5)                       # settle after the parameter change
+                                          # chờ ổn định sau khi đổi tham số
     t0 = time.monotonic()
     while time.monotonic() - t0 < trial_s:
         time.sleep(0.1)
@@ -227,6 +253,7 @@ class Drone:
             raw, csum = data[:-1], data[-1]
             if self._checksum(raw) != csum:
                 continue                        # corrupt; drop
+                                                # hỏng; bỏ qua
             header = raw[0]
             port, channel, payload = header >> 4, header & 0xF, raw[1:]
             if port == PORT_LOG and channel == LOG_CH_DATA:
@@ -321,12 +348,14 @@ class Drone:
             self._log_ctrl(LOG_DELETE, bytes([block_id]))
         except TimeoutError:
             pass                                    # already gone; re-acking is idempotent
+                                                    # đã biến mất rồi; ack lại là idempotent
 
     def _handle_log_data(self, payload):
         if len(payload) < 4:
             return
         block = payload[0]
         # timestamp is 24-bit LE, then values; we do not need it for tuning
+        # timestamp là 24-bit LE, sau đó là giá trị; ta không cần nó khi tinh chỉnh
         decode = self._decoders.get(block)
         if decode is None:
             return
@@ -379,6 +408,11 @@ class Drone:
 # samples cost_of() scores. Values are packed in request order (logSendData),
 # so the struct layouts below match TUNE_VARS / STATUS_VARS entry for entry.
 # LOG_MAX_PAYLOAD is 25 bytes of values; both blocks fit.
+# Hai khối, đúng như TuneActivity.java dựng: một khối status mang các góc nghiêng
+# mà phép kiểm nghiêng cần, và mỗi trục một khối tune mang các mẫu mà cost_of()
+# chấm điểm. Giá trị được đóng gói theo thứ tự request (logSendData), nên bố cục
+# struct bên dưới khớp từng mục với TUNE_VARS / STATUS_VARS. LOG_MAX_PAYLOAD là
+# 25 byte giá trị; cả hai khối đều vừa.
 
 STATUS_BLOCK_ID = 0
 TUNE_BLOCK_ID = 1
@@ -425,6 +459,7 @@ def open_tune_blocks(drone, axis, period_ms=TUNE_PERIOD_MS):
         _vbat, _mode, _armed, _auto, roll, pitch = STATUS_STRUCT.unpack(raw[:STATUS_STRUCT.size])
         drone.level["roll"], drone.level["pitch"] = roll, pitch
         return None                     # not a cost sample
+                                        # không phải mẫu chi phí
 
     prev_angle = [None]
 
@@ -435,6 +470,9 @@ def open_tune_blocks(drone, axis, period_ms=TUNE_PERIOD_MS):
         # The drone logs no roll/pitch gyro rates (only stabilizer.yaw is a
         # rate), so roll/pitch rates are finite-differenced from consecutive
         # angle samples. A deliberate, honest substitution — not a bug.
+        # Drone không log tốc độ con quay roll/pitch (chỉ stabilizer.yaw là
+        # tốc độ), nên tốc độ roll/pitch được sai phân hữu hạn từ các mẫu góc
+        # liên tiếp. Một sự thay thế có chủ đích, trung thực — không phải bug.
         if axis == "yaw":
             rate = angle
         else:

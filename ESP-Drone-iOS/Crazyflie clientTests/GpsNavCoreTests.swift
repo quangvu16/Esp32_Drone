@@ -7,10 +7,18 @@
 //  rotation from PROTOCOL.md §6 — the one formula the whole GPS feature rests
 //  on.
 //
+//  Bản chuyển (port) từ GpsNavCoreTests của OpenBot: toán địa lý, codec
+//  file .waypoints của Mission Planner, các thao tác chỉnh sứ mệnh và trình
+//  tự xử lý của Navigator. Cũng ghim cố định phép quay của khung cất cánh
+//  (launch frame) từ PROTOCOL.md §6 — công thức duy nhất mà toàn bộ tính
+//  năng GPS dựa vào.
+//
 
 import XCTest
 // The app target's PRODUCT_MODULE_NAME is ESP_Drone (PRODUCT_NAME = "ESP-Drone"),
 // not the target name — `@testable import Crazyflie_client` fails to resolve.
+// PRODUCT_MODULE_NAME của app target là ESP_Drone (PRODUCT_NAME = "ESP-Drone"),
+// không phải tên target — `@testable import Crazyflie_client` không resolve được.
 @testable import ESP_Drone
 
 final class GpsNavCoreTests: XCTestCase {
@@ -23,6 +31,7 @@ final class GpsNavCoreTests: XCTestCase {
 
     func testDistanceOneDegreeLatitude() {
         // 1° of latitude ≈ 111.2 km anywhere on the sphere.
+        // 1° vĩ độ ≈ 111.2 km tại bất kỳ đâu trên mặt cầu.
         let d = GeoMath.distanceMeters(0, 0, 1, 0)
         XCTAssertEqual(d, 111_194.9, accuracy: 50)
     }
@@ -63,6 +72,7 @@ final class GpsNavCoreTests: XCTestCase {
 
     func testNorthEastOffset() {
         // Due north of the start is pure +north.
+        // Hướng bắc đúng từ điểm xuất phát là độ lệch thuần +north.
         let ne = GeoMath.northEastOffset(fromLat: 0, fromLon: 0, toLat: 0.001, toLon: 0)
         XCTAssertEqual(ne.north, 111.19, accuracy: 1)
         XCTAssertEqual(ne.east, 0, accuracy: 1)
@@ -71,9 +81,13 @@ final class GpsNavCoreTests: XCTestCase {
     // MARK: - Launch frame (PROTOCOL.md §6)
 
     /// The pinned rotation. +x = nose at ALIGN (bearing alpha), +y = 90° LEFT.
+    /// Phép quay được ghim cố định. +x = hướng mũi drone tại ALIGN
+    /// (phương hướng alpha), +y = 90° TRÁI.
     func testLaunchFrameRotation() {
         // Alpha 0: nose points north. A pure-north offset is pure +x; a pure
         // east offset is pure −y (east is 90° RIGHT, so it is −y).
+        // Alpha 0: mũi hướng bắc. Độ lệch thuần bắc là thuần +x; độ lệch thuần
+        // đông là thuần −y (đông là 90° PHẢI, nên là −y).
         let northTarget = LaunchFrame.toLaunchFrame(north: 10, east: 0, alphaDegrees: 0)
         XCTAssertEqual(northTarget.x, 10, accuracy: 1e-9)
         XCTAssertEqual(northTarget.y, 0, accuracy: 1e-9)
@@ -85,11 +99,13 @@ final class GpsNavCoreTests: XCTestCase {
 
     func testLaunchFrameAlpha90() {
         // Alpha 90: nose points east. A pure-east offset is pure +x.
+        // Alpha 90: mũi hướng đông. Độ lệch thuần đông là thuần +x.
         let t = LaunchFrame.toLaunchFrame(north: 0, east: 10, alphaDegrees: 90)
         XCTAssertEqual(t.x, 10, accuracy: 1e-9)
         XCTAssertEqual(t.y, 0, accuracy: 1e-9)
 
         // A pure-north offset is now +y (north is 90° LEFT of east).
+        // Độ lệch thuần bắc giờ là +y (bắc ở bên TRÁI đông 90°).
         let t2 = LaunchFrame.toLaunchFrame(north: 10, east: 0, alphaDegrees: 90)
         XCTAssertEqual(t2.x, 0, accuracy: 1e-9)
         XCTAssertEqual(t2.y, 10, accuracy: 1e-9)
@@ -111,6 +127,7 @@ final class GpsNavCoreTests: XCTestCase {
 
     func testDefaultAcceptanceRadius() {
         // PROTOCOL.md §10 pins 2.5 m.
+        // PROTOCOL.md §10 ghim cố định 2.5 m.
         XCTAssertEqual(Waypoint.defaultAcceptanceRadiusMeters, 2.5, accuracy: 1e-9)
     }
 
@@ -134,7 +151,9 @@ final class GpsNavCoreTests: XCTestCase {
         let mission = Mission()
         mission.setHome(0, 0)
         mission.addWaypoint(Waypoint(latitude: 0.001, longitude: 0))   // ~111 m north
+                                                                     // ~111 m về phía bắc
         mission.addWaypoint(Waypoint(latitude: 0.002, longitude: 0))   // ~222 m north
+                                                                     // ~222 m về phía bắc
         XCTAssertEqual(mission.totalDistanceMeters(), 222.4, accuracy: 2)
     }
 
@@ -187,16 +206,19 @@ final class GpsNavCoreTests: XCTestCase {
         XCTAssertEqual(nav.mode, .mission)
 
         // Drone is already at waypoint A (launch frame +x ≈ 111 m north).
+        // Drone đã ở điểm hành trình A (khung cất cánh: +x ≈ 111 m về phía bắc).
         let status = nav.step(droneX: 111, droneY: 0,
                               phoneLatitude: 0, phoneLongitude: 0)
         XCTAssertTrue(status.arrived)
         XCTAssertEqual(nav.activeIndex, 1)
 
         // Now at waypoint B.
+        // Giờ ở điểm hành trình B.
         let status2 = nav.step(droneX: 222, droneY: 0,
                                phoneLatitude: 0, phoneLongitude: 0)
         XCTAssertTrue(status2.arrived)
         // Last waypoint: mission ends.
+        // Điểm hành trình cuối: sứ mệnh kết thúc.
         XCTAssertEqual(nav.mode, .idle)
     }
 
@@ -219,6 +241,7 @@ final class GpsNavCoreTests: XCTestCase {
         XCTAssertEqual(nav.mode, .rtl)
 
         // Home is the origin in the launch frame.
+        // Home là gốc tọa độ trong khung cất cánh.
         let status = nav.step(droneX: 0, droneY: 0,
                               phoneLatitude: 0, phoneLongitude: 0)
         XCTAssertTrue(status.arrived)
@@ -252,6 +275,9 @@ final class GpsNavCoreTests: XCTestCase {
     /// The target the navigator emits must be the launch-frame waypoint offset
     /// — the same frame `nav.pos_x/pos_y` is reported in. That is what lets
     /// arrival skip the lat/lon round trip.
+    /// Mục tiêu mà Navigator phát ra phải là độ lệch của điểm hành trình
+    /// trong khung cất cánh — đúng khung mà `nav.pos_x/pos_y` được báo cáo.
+    /// Nhờ vậy mà bước kiểm tra đến nơi có thể bỏ qua lượt đi-về lat/lon.
     func testTargetMatchesLaunchFrame() {
         let nav = makeNavigator()
         nav.mission.addWaypoint(Waypoint(latitude: 0.001, longitude: 0.001))
@@ -263,6 +289,7 @@ final class GpsNavCoreTests: XCTestCase {
             return XCTFail("expected a target")
         }
         // Alpha 0: target x = north, y = −east.
+        // Alpha 0: mục tiêu x = bắc, y = −đông.
         let ne = GeoMath.northEastOffset(fromLat: 0, fromLon: 0,
                                          toLat: 0.001, toLon: 0.001)
         XCTAssertEqual(target.x, ne.north, accuracy: 1e-6)

@@ -19,6 +19,10 @@ import android.widget.TextView;
  * "too low / too high" hint under it. Writing a value calls back into the activity,
  * which does the {@code Param.setValue}; {@link #onParamValue} shows values the drone
  * reports back so external changes appear.
+ * Một hàng tham số: nhãn, ô số, nút -10% / +10% và dòng gợi ý "too low / too high"
+ * bên dưới. Khi ghi một giá trị sẽ gọi ngược về activity, nơi thực hiện
+ * {@code Param.setValue}; {@link #onParamValue} hiển thị giá trị drone báo về để
+ * các thay đổi từ bên ngoài cũng xuất hiện.
  */
 public class ParamEditor extends LinearLayout {
 
@@ -29,6 +33,7 @@ public class ParamEditor extends LinearLayout {
     private final ParamSpec mSpec;
     private final EditText mValue;
     private boolean mUpdating;   // true while we push a read-back into the field
+    // đúng trong khi chúng ta đẩy giá trị đọc lại vào ô nhập
 
     public ParamEditor(Context context, ParamSpec spec, final OnCommitListener listener) {
         super(context);
@@ -70,6 +75,7 @@ public class ParamEditor extends LinearLayout {
         addView(hint, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         // Losing focus or hitting Done writes the value; the +/- buttons write directly.
+        // Mất focus hoặc bấm Done sẽ ghi giá trị; các nút +/- ghi trực tiếp.
         mValue.setOnFocusChangeListener(new OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
@@ -100,6 +106,7 @@ public class ParamEditor extends LinearLayout {
             @Override
             public void afterTextChanged(Editable s) {
                 // nothing to do; commits are explicit so half-typed values stay local
+                // không có gì để làm; commit là tường minh nên giá trị gõ dở chỉ nằm cục bộ
             }
         });
     }
@@ -117,6 +124,7 @@ public class ParamEditor extends LinearLayout {
                 double delta = Math.abs(v0) * 0.1;
                 if (delta == 0) {
                     // 10 % of zero is zero; fall back to a sensible increment
+                    // 10 % của không là không; thay bằng một bước tăng hợp lý
                     delta = mSpec.step;
                 }
                 double nv = mSpec.clamp(v0 + sign * delta);
@@ -154,6 +162,7 @@ public class ParamEditor extends LinearLayout {
     }
 
     /** Read-back from the drone; ignored while the user is editing the field. */
+    /** Giá trị đọc lại từ drone; bị bỏ qua khi người dùng đang chỉnh ô nhập. */
     public void onParamValue(Number value) {
         if (mValue.hasFocus()) {
             return;

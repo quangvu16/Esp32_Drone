@@ -16,6 +16,12 @@ import UIKit
     period (in seconds) is expired. Otherwise the onTimeout function
     will be called.
 */
+/**
+    Lớp watchdog đơn giản dựa trên NSTimer
+
+    Sau khi khởi động, cần gọi reset định kỳ trước khi chu kỳ (tính bằng
+    giây) hết hạn. Nếu không, hàm onTimeout sẽ được gọi.
+*/
 class Watchdog : NSObject
 {
     fileprivate var started = false
@@ -29,6 +35,7 @@ class Watchdog : NSObject
     }
     
     /// Start the watchdog
+    /// Bắt đầu watchdog
     func start() {
         if self.started {
             return
@@ -45,6 +52,7 @@ class Watchdog : NSObject
     }
     
     /// Stop the watchdog
+    /// Dừng watchdog
     func stop() {
         if !self.started {
             return
@@ -63,6 +71,14 @@ class Watchdog : NSObject
         - parameter period: Nil to use the default period (configured when creating the 
                 watchdog and contained in the period property). Otherwise should be
                 the period in seconds
+    */
+    /**
+        Đặt lại timer về chu kỳ đã cài. Có thể tùy chọn đặt lại với chu kỳ dài hơn
+        (ví dụ ngay trước khi chạy một thao tác được biết là mất nhiều thời gian hơn)
+
+        - parameter period: Truyền nil để dùng chu kỳ mặc định (được cấu hình khi
+                tạo watchdog và lưu trong thuộc tính period). Nếu không thì phải là
+                chu kỳ tính bằng giây
     */
     func reset(_ period: Double? = nil) {
         guard self.started == true else { return }

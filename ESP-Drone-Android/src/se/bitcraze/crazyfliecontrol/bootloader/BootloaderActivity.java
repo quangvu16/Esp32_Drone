@@ -129,7 +129,9 @@ public class BootloaderActivity extends Activity {
     @Override
     protected void onPause() {
         //TODO: improve
+        //TODO: cải thiện
         //TODO: why does resetToFirmware not work?
+        //TODO: tại sao resetToFirmware không hoạt động?
         if (mFlashFirmwareTask != null && mFlashFirmwareTask.getStatus().equals(Status.RUNNING)) {
             Log.d(LOG_TAG, "OnPause: stop bootloader.");
             mFlashFirmwareTask.cancel(true);
@@ -239,14 +241,17 @@ public class BootloaderActivity extends Activity {
 
     public void startFlashProcess(final View view) {
         // disable button and spinner
+        // tắt nút và spinner
         mFlashFirmwareButton.setEnabled(false);
         mReleaseNotesButton.setEnabled(false);
         mFirmwareSpinner.setEnabled(false);
 
         //clear console
+        // xóa console
         mConsoleTextView.setText("");
 
         // download firmware file
+        // tải tệp firmware
         appendConsole("Downloading firmware...");
 
         DownloadTask mDownloadTask = new DownloadTask();
@@ -264,6 +269,7 @@ public class BootloaderActivity extends Activity {
             HttpsURLConnection connection = null;
 
             // Retrofitting support for TLSv1.2, because GitHub only supports TLSv1.2
+            // Bổ sung hỗ trợ TLSv1.2, vì GitHub chỉ hỗ trợ TLSv1.2
             try {
                 HttpsURLConnection.setDefaultSSLSocketFactory(new TLSSocketFactory());
             } catch (KeyManagementException | NoSuchAlgorithmException e) {
@@ -276,14 +282,17 @@ public class BootloaderActivity extends Activity {
                 connection.connect();
 
                 // expect HTTP 200 OK, so we don't mistakenly save error report instead of the file
+                // kỳ vọng HTTP 200 OK, để không nhầm lẫn lưu báo cáo lỗi thay vì tệp
                 if (connection.getResponseCode() != HttpsURLConnection.HTTP_OK) {
                     return "Server returned HTTP " + connection.getResponseCode() + " " + connection.getResponseMessage();
                 }
 
                 // this will be useful to display download percentage. it might be -1: server did not report the length
+                // điều này hữu ích để hiển thị phần trăm tải. Giá trị có thể là -1: máy chủ không báo độ dài
                 int fileLength = connection.getContentLength();
 
                 // download the file
+                // tải tệp
                 File outputFile = new File(BootloaderActivity.this.getExternalFilesDir(null) + "/" + BootloaderActivity.BOOTLOADER_DIR + "/" + tagName + "/", fileName);
                 outputFile.getParentFile().mkdirs();
                 input = connection.getInputStream();
@@ -294,13 +303,16 @@ public class BootloaderActivity extends Activity {
                 int count;
                 while ((count = input.read(data)) != -1) {
                     // allow canceling
+                    // cho phép hủy
                     if (isCancelled()) {
                         input.close();
                         return null;
                     }
                     total += count;
                     // publishing the progress....
+                    // cập nhật tiến độ....
                     if (fileLength > 0) { // only if total length is known
+                    // chỉ khi biết tổng độ dài
                         publishProgress((int) (total * 100 / fileLength));
                     }
                     output.write(data, 0, count);
@@ -350,6 +362,7 @@ public class BootloaderActivity extends Activity {
         protected void onPreExecute() {
             super.onPreExecute();
             // take CPU lock to prevent CPU from going off if the user presses the power button during download
+            // giữ khóa CPU để CPU không tắt nếu người dùng nhấn nút nguồn trong khi tải
             PowerManager pm = (PowerManager) BootloaderActivity.this.getSystemService(Context.POWER_SERVICE);
             mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, getClass().getName());
             mWakeLock.acquire();
@@ -360,6 +373,7 @@ public class BootloaderActivity extends Activity {
         protected void onProgressUpdate(Integer... progress) {
             super.onProgressUpdate(progress);
             // if we get here, length is known, now set indeterminate to false
+            // nếu đến đây thì đã biết độ dài, giờ tắt chế độ không xác định
             mProgressBar.setIndeterminate(false);
             mProgressBar.setMax(100);
             mProgressBar.setProgress(progress[0]);
@@ -370,10 +384,12 @@ public class BootloaderActivity extends Activity {
             mWakeLock.release();
             if (result != null) {
                 //flash firmware once firmware is downloaded
+                // nạp firmware sau khi đã tải xong
                 appendConsole("Firmware download failed: " + result);
                 stopFlashProcess(false);
             } else {
                 //flash firmware once firmware is downloaded
+                // nạp firmware sau khi đã tải xong
                 if (mAlreadyDownloaded) {
                     appendConsole("Firmware file already downloaded.");
                 } else {
@@ -394,8 +410,11 @@ public class BootloaderActivity extends Activity {
 
         try {
             //fail quickly, when Crazyradio is not connected
+            // thất bại ngay khi Crazyradio chưa kết nối
             //TODO: fix when BLE is used as well
+            //TODO: sửa khi BLE cũng được dùng
             //TODO: extract this to RadioDriver class?
+            //TODO: tách phần này sang lớp RadioDriver?
             if (!MainActivity.isCrazyradioAvailable(this)) {
                 appendConsoleError("Please make sure that a Crazyradio (PA) is connected.");
                 stopFlashProcess(false);
@@ -440,9 +459,12 @@ public class BootloaderActivity extends Activity {
     }
 
     //TODO: simplify
+    //TODO: đơn giản hóa
     public void flashFirmware() {
         //TODO: externalize
+        //TODO: tách ra ngoài
         //Check if firmware is compatible with Crazyflie
+        // Kiểm tra firmware có tương thích với Crazyflie không
         int protocolVersion = mBootloader.getProtocolVersion();
         boolean cfType2 = !(protocolVersion == BootVersion.CF1_PROTO_VER_0 ||
                             protocolVersion == BootVersion.CF1_PROTO_VER_1);
@@ -451,6 +473,7 @@ public class BootloaderActivity extends Activity {
         appendConsole(cfversion);
 
         // check if firmware and CF are compatible
+        // kiểm tra firmware và CF có tương thích không
         if (("CF2".equalsIgnoreCase(mSelectedFirmwareRelease.getType()) && !cfType2) ||
             ("CF1".equalsIgnoreCase(mSelectedFirmwareRelease.getType()) && cfType2)) {
             appendConsoleError("Incompatible firmware version.");
@@ -459,10 +482,12 @@ public class BootloaderActivity extends Activity {
         }
 
         //keep the screen on during flashing
+        // giữ màn hình sáng trong khi nạp
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         mFlashFirmwareTask = new FlashFirmwareTask();
         mFlashFirmwareTask.execute();
         //TODO: wait for finished task
+        //TODO: chờ tác vụ hoàn tất
     }
 
     private class FlashFirmwareTask extends AsyncTask<String, String, String> {
@@ -522,6 +547,7 @@ public class BootloaderActivity extends Activity {
             } else if (progress[1] != null && progress[2] != null) {
                 mProgressBar.setProgress(Integer.parseInt(progress[1]));
                 // TODO: progress bar max is reset when activity is resumed
+                // TODO: giá trị max của thanh tiến độ bị đặt lại khi activity được tiếp tục
                 mProgressBar.setMax(Integer.parseInt(progress[2]));
             } else if (progress[3] != null) {
                 appendConsole(progress[3]);
@@ -556,6 +582,7 @@ public class BootloaderActivity extends Activity {
             mBootloader.close();
         }
         //re-enable widgets
+        // bật lại các widget
         mFlashFirmwareButton.setEnabled(true);
         mReleaseNotesButton.setEnabled(true);
         mFirmwareSpinner.setEnabled(true);

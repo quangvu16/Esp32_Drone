@@ -32,6 +32,7 @@ import java.nio.charset.Charset;
 
 /**
  * Packet containing console text from the Crazyflie.
+ * Gói tin chứa nội dung console từ Crazyflie.
  */
 public class ConsolePacket extends CrtpPacket {
 
@@ -46,8 +47,10 @@ public class ConsolePacket extends CrtpPacket {
 
     /**
      * Get the text contained in the packet.
+     * Lấy nội dung văn bản trong gói tin.
      *
      * @return the text
+     * @return nội dung văn bản
      */
     public String getText() {
         return mText;
@@ -75,9 +78,12 @@ public class ConsolePacket extends CrtpPacket {
 
     /**
      * Construct a console packet using given data.
+     * Dựng một gói tin console từ dữ liệu cho trước.
      *
      * @param payload the data (must not include the CRTP header)
+     * @param payload phần dữ liệu (không được gồm CRTP header)
      * @return parsed console packet
+     * @return gói tin console đã phân tích
      */
     public static ConsolePacket parse(byte[] payload) {
         return new ConsolePacket(new String(payload, CHARSET));

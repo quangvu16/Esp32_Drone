@@ -40,6 +40,7 @@ import se.bitcraze.crazyflie.lib.usb.CrazyUsbInterface;
 
 /**
  * Used for communication with the Crazyradio USB dongle
+ * Dùng để giao tiếp với dongle USB Crazyradio
  *
  */
 public class Crazyradio {
@@ -48,10 +49,13 @@ public class Crazyradio {
 
     // USB parameters
     public final static int CRADIO_VID = 0x1915; //Vendor ID
+    // ID nhà sản xuất
     public final static int CRADIO_PID = 0x7777; //Product ID
+    // ID sản phẩm
 
     // Dongle configuration requests
     // See http://wiki.bitcraze.se/projects:crazyradio:protocol for documentation
+    // Xem http://wiki.bitcraze.se/projects:crazyradio:protocol để biết tài liệu
     private final static int SET_RADIO_CHANNEL = 0x01;
     private final static int SET_RADIO_ADDRESS = 0x02;
     private final static int SET_DATA_RATE = 0x03;
@@ -76,12 +80,15 @@ public class Crazyradio {
     private CrazyUsbInterface mUsbInterface;
     private int mArc;
     private float mVersion; // Crazyradio firmware version
+    // phiên bản firmware của Crazyradio
     private String mSerialNumber; // Crazyradio serial number
+    // số serial của Crazyradio
 
     protected final static byte[] NULL_PACKET = new byte[] { (byte) 0xff };
 
     /**
      * Create object and scan for USB dongle if no device is supplied
+     * Tạo đối tượng và quét tìm USB dongle nếu không được truyền thiết bị
      *
      * @param usbInterface
      */
@@ -104,6 +111,8 @@ public class Crazyradio {
 
             self.dev = device
         */
+        // (Python: bản gốc của hàm khởi tạo — tự tìm dongle Crazyradio nếu
+        // không chỉ định thiết bị, báo lỗi nếu không tìm thấy)
 
         this.mVersion = mUsbInterface.getFirmwareVersion();
 
@@ -114,6 +123,7 @@ public class Crazyradio {
         this.mSerialNumber = mUsbInterface.getSerialNumber();
 
         // Reset the dongle to power up settings
+        // Đưa dongle về thiết lập mặc định lúc cấp nguồn
         this.mLogger.debug("Resetting dongle to power up settings...");
         setDatarate(DR_2MPS);
         setChannel(2);
@@ -121,6 +131,7 @@ public class Crazyradio {
         if (mVersion >= 0.4) {
             setContinuousCarrier(false);
             // self.set_address((0xE7,) * 5)
+            // (Python: gọi set_address với 5 byte 0xE7)
             setAddress(new byte[] {(byte) 0xE7, (byte) 0xE7, (byte) 0xE7, (byte) 0xE7, (byte) 0xE7});
             setPower(P_0DBM);
             setArc(3);
@@ -140,8 +151,10 @@ public class Crazyradio {
 
     /**
      * Set the radio channel to be used.
+     * Đặt kênh radio sẽ dùng.
      *
      * @param channel new channel. Must be in range 0-125.
+     * @param channel kênh mới. Phải nằm trong khoảng 0-125.
      */
     public void setChannel(int channel) {
         if (channel < 0 || channel > 125) {
@@ -152,10 +165,14 @@ public class Crazyradio {
 
     /**
      * Set the radio address to be used.
+     * Đặt địa chỉ radio sẽ dùng.
      * The same address must be configured in the receiver for the communication to work.
+     * Địa chỉ giống nhau phải được cấu hình ở phía bộ thu thì giao tiếp mới hoạt động.
      *
      * @param address new address with a length of 5 byte.
+     * @param address địa chỉ mới gồm 5 byte.
      * @throws IllegalArgumentException if the length of the address doesn't equal 5 bytes
+     * @throws IllegalArgumentException nếu độ dài địa chỉ khác 5 byte
      */
     public void setAddress(byte[] address) {
         if (address.length != 5) {
@@ -166,8 +183,10 @@ public class Crazyradio {
 
     /**
      * Set the radio data rate to be used.
+     * Đặt tốc độ dữ liệu radio sẽ dùng.
      *
      * @param datarate new data rate. Possible values are in range 0-2.
+     * @param datarate tốc độ dữ liệu mới. Giá trị có thể nằm trong khoảng 0-2.
      */
     public void setDatarate(int datarate) {
         if (datarate < 0 || datarate > 2) {
@@ -178,21 +197,28 @@ public class Crazyradio {
 
     /**
      * Set the radio power to be used
+     * Đặt công suất radio sẽ dùng
      *
      * @param power new radio power
+     * @param power công suất radio mới
      */
     public void setPower(int power) {
         //TODO: add argument check
+        //TODO: cần kiểm tra đối số
         sendVendorSetup(SET_RADIO_POWER, power, 0, null);
     }
 
     /**
      * Set the ACK retry count for radio communication
+     * Đặt số lần gửi lại cho truyền thông radio
      *
      * Set how often the radio will retry a transfer if the ACK has not been received.
+     * Đặt số lần radio sẽ gửi lại một lần truyền nếu chưa nhận được ACK.
      *
      * @param arc number of retries.
+     * @param arc số lần gửi lại.
      * @throws IllegalArgumentException if the number of retries is not in range 0-15.
+     * @throws IllegalArgumentException nếu số lần gửi lại không nằm trong khoảng 0-15.
      */
     public void setArc(int arc) {
         if (arc < 0 || arc > 15) {
@@ -204,10 +230,13 @@ public class Crazyradio {
 
     /**
      * Set the ACK retry delay for radio communication
+     * Đặt độ trễ gửi lại cho truyền thông radio
      *
      * Configure the time the radio waits for the acknowledge.
+     * Cấu hình thời gian radio chờ nhận ack.
      *
      * @param us microseconds to wait. Will be rounded to the closest possible value supported by the radio.
+     * @param us số micro giây cần chờ. Sẽ được làm tròn tới giá trị gần nhất mà radio hỗ trợ.
      */
     public void setArdTime(int us) {
         /*
@@ -217,8 +246,11 @@ public class Crazyradio {
         # 0010 - Wait 750uS
         # ........
         # 1111 - Wait 4000uS
+        # Bảng độ trễ gửi lại tự động: 0000 ứng với mức chờ 250uS, mỗi bước
+        # tăng thêm 250uS, tới 1111 ứng với mức chờ 4000uS.
         */
         // Round down, to value representing a multiple of 250uS
+        // Làm tròn xuống tới giá trị đại diện cho một bội số của 250uS
         int t = (int) Math.round(us / 250.0) - 1;
         if (t < 0) {
             t = 0;
@@ -230,9 +262,12 @@ public class Crazyradio {
 
     /**
      * Set the length of the ACK payload.
+     * Đặt độ dài của phần dữ liệu trong ACK.
      *
      * @param nbytes number of bytes in the payload.
+     * @param nbytes số byte trong phần dữ liệu.
      * @throws IllegalArgumentException if the payload length is not in range 0-32.
+     * @throws IllegalArgumentException nếu độ dài phần dữ liệu không nằm trong khoảng 0-32.
      */
     public void setArdBytes(int nbytes) {
         if (nbytes < 0 || nbytes > 32) {
@@ -245,8 +280,12 @@ public class Crazyradio {
      * Set the continuous carrier mode. When enabled the radio chip provides a
      * test mode in which a continuous non-modulated sine wave is emitted. When
      * this mode is activated the radio dongle does not transmit any packets.
+     * Đặt chế độ sóng mang liên tục. Khi bật, chip radio cung cấp chế độ thử
+     * nghiệm phát sóng sine liên tục không điều biến. Khi chế độ này được kích
+     * hoạt, dongle radio không truyền gói tin nào.
      *
      * @param active <code>true</code> to enable the continuous carrier mode
+     * @param active <code>true</code> để bật chế độ sóng mang liên tục
      */
     public void setContinuousCarrier(boolean active) {
         sendVendorSetup(SET_CONT_CARRIER, (active ? 1 : 0), 0, null);
@@ -257,14 +296,17 @@ public class Crazyradio {
           #return self.version >= 0.5
           return mUsbInterface.getFirmwareVersion() > 0.5;
           # FIXME: Mitigation for Crazyradio firmware bug #9
+          # FIXME: biện pháp khắc phục lỗi firmware của Crazyradio #9
         */
         return false;
     }
 
     /**
      * Scan all channels between 0 and 125
+     * Quét toàn bộ các kênh trong khoảng từ 0 đến 125
      *
      * @return list of channels
+     * @return danh sách các kênh
      */
     public List<Integer> scanChannels1() {
         return scanChannels(0, 125);
@@ -278,8 +320,10 @@ public class Crazyradio {
                 result.addAll(firmwareScan(start, stop));
             } else {
                 // Slow PC-driven scan
+                // Quét chậm do PC điều khiển
                 mLogger.debug("Slow scan...");
                 // for i in range(start, stop + 1):
+                // (Python: vòng lặp quét từng kênh trong khoảng)
                 for (int channel = start; channel <= stop; channel++) {
                     if(scanSelected(channel, NULL_PACKET)) {
                         mLogger.debug("Found channel: " + channel);
@@ -300,9 +344,12 @@ public class Crazyradio {
 
     /**
      * Scan for available channels.
+     * Quét các kênh khả dụng.
      *
      * @return array containing the found channels and data rates.
+     * @return mảng chứa các kênh tìm được và tốc độ dữ liệu.
      * @throws IOException if the Crazyradio is not attached (the connection is <code>null</code>).
+     * @throws IOException nếu Crazyradio chưa được gắn vào (kết nối là <code>null</code>).
      */
 
     public ConnectionData[] scanChannels() throws IOException {
@@ -311,28 +358,36 @@ public class Crazyradio {
 
     /**
      * Scan for available channels.
+     * Quét các kênh khả dụng.
      *
      * @param useSlowScan if true, then the slow scan is used
+     * @param useSlowScan nếu true thì dùng phép quét chậm
      * @return array containing the found channels and datarates.
+     * @return mảng chứa các kênh tìm được và tốc độ dữ liệu.
      * @throws IOException if the Crazyradio is not attached (the connection is <code>null</code>).
+     * @throws IOException nếu Crazyradio chưa được gắn vào (kết nối là <code>null</code>).
      */
     public ConnectionData[] scanChannels(boolean useSlowScan) throws IOException {
         List<ConnectionData> result = new ArrayList<ConnectionData>();
         if (mUsbInterface.isUsbConnected()) {
             // null packet
+            // gói tin null
             final byte[] packet = CrtpPacket.NULL_PACKET.toByteArray();
             final byte[] rdata = new byte[64];
 
             mLogger.debug("Scanning...");
             // scan for all 3 data rates
+            // quét với cả 3 tốc độ dữ liệu
             for (int datarate = 0; datarate < 3; datarate++) {
                 // set data rate
+                // đặt tốc độ dữ liệu
                 mUsbInterface.sendControlTransfer(0x40, SET_DATA_RATE, datarate, 0, null);
                 if (useSlowScan) {
                     result.addAll(scanChannelsSlow(datarate));
                 } else {
                     mLogger.debug("Fast firmware scan...");
                     //long transfer timeout (1000) is important!
+                    // thời gian chờ cho lần truyền dài (1000) là rất quan trọng!
                     mUsbInterface.sendControlTransfer(0x40, SCAN_CHANNELS, 0, 125, packet);
                     final int nfound = mUsbInterface.sendControlTransfer(0xc0, SCAN_CHANNELS, 0, 0, rdata);
                     if (nfound != 64) {
@@ -352,9 +407,12 @@ public class Crazyradio {
 
     /**
      * Slow manual scan
+     * Quét thủ công chậm
      *
      * @param datarate the data rate that should be used during the scan
+     * @param datarate tốc độ dữ liệu cần dùng trong khi quét
      * @throws IOException if the Crazyradio is not attached (the connection is <code>null</code>).
+     * @throws IOException nếu Crazyradio chưa được gắn vào (kết nối là <code>null</code>).
      */
     private List<ConnectionData> scanChannelsSlow(int datarate) throws IOException {
         mLogger.debug("Slow manual scan...");
@@ -362,6 +420,7 @@ public class Crazyradio {
 
         for (int channel = 0; channel < 126; channel++) {
             // set channel
+            // đặt kênh
             mUsbInterface.sendControlTransfer(0x40, SET_RADIO_CHANNEL, channel, 0, null);
 
             byte[] receiveData = new byte[33];
@@ -369,6 +428,7 @@ public class Crazyradio {
 
             mUsbInterface.sendBulkTransfer(sendData, receiveData);
             if ((receiveData[0] & 1) != 0) { // check if ack received
+            // kiểm tra xem đã nhận được ack chưa
                 result.add(new ConnectionData(channel, datarate));
                 mLogger.debug("Channel found: " + channel + " Data rate: " + datarate);
             }
@@ -414,8 +474,11 @@ public class Crazyradio {
      * Send a packet and receive the ack from the radio dongle.
      * The ack contains information about the packet transmission
      * and a data payload if the ack packet contained any
+     * Gửi một gói tin và nhận ack từ dongle radio. Ack chứa thông tin về
+     * quá trình truyền gói tin, kèm phần dữ liệu nếu gói tin ack có chứa.
      *
      * @param dataOut bytes to send
+     * @param dataOut các byte cần gửi
      */
     public RadioAck sendPacket(byte[] dataOut) {
         RadioAck ackIn = null;
@@ -427,6 +490,7 @@ public class Crazyradio {
         mUsbInterface.sendBulkTransfer(dataOut, data);
 
         // if data is not None:
+        // (Python: chỉ xử lý khi data khác None)
         ackIn = new RadioAck();
         if (data[0] != 0) {
             ackIn.setAck((data[0] & 0x01) != 0);
@@ -441,6 +505,7 @@ public class Crazyradio {
 
     private void sendVendorSetup(int request, int value, int index, byte[] data) {
         // usb.TYPE_VENDOR = 64 <=> 0x40
+        // usb.TYPE_VENDOR = 64 tương ứng 0x40
         int usbTypeVendor = 0x40;
         mUsbInterface.sendControlTransfer(usbTypeVendor, request, value, index, data);
     }

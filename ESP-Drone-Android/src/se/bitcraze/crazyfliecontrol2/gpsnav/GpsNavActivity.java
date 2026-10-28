@@ -58,6 +58,8 @@ import se.bitcraze.crazyfliecontrol2.FlyHeader;
 /**
  * GPS mission navigation screen (PROTOCOL.md section 10).
  *
+ * <p>Màn hình điều hướng sứ mệnh GPS (PROTOCOL.md mục 10).
+ *
  * <p>The split of labour is the whole design: the drone has no GPS and no compass, so the phone
  * plans the mission and owns the launch frame, while the drone chases one north/east offset at a
  * time. Progress (arrival checks) comes from the drone's dead-reckoned {@code nav.pos_x}/{@code
@@ -65,10 +67,23 @@ import se.bitcraze.crazyfliecontrol2.FlyHeader;
  * waypoints it never reached. The one asymmetry: in FOLLOW the target may be the phone itself, so
  * the phone is the target source and the drone's estimate remains the progress source.
  *
+ * <p>Chia việc chính là toàn bộ thiết kế: drone không có GPS cũng không có la bàn, nên điện thoại
+ * lập kế hoạch sứ mệnh và nắm giữ khung cất cánh, còn drone lần theo từng độ lệch
+ * bắc/đông một. Tiến độ (kiểm tra đến nơi) lấy từ {@code nav.pos_x}/{@code nav.pos_y} tự dẫn
+ * đường quán tính của drone — không bao giờ từ GPS của điện thoại, nếu không người điều khiển
+ * đi khỏi chỗ là drone "đến nơi" ở những điểm hành trình nó chưa hề chạm tới. Điểm bất đối xứng
+ * duy nhất: trong FOLLOW, mục tiêu có thể là chính điện thoại, nên điện thoại là nguồn mục tiêu
+ * và ước tính của drone vẫn là nguồn đo tiến độ.
+ *
  * <p>Everything drawn for the drone is labelled "estimated": it is accelerometer dead reckoning
  * and drifts metres per minute. The firmware's {@code NAV_FWD_SIGN}/{@code NAV_LEFT_SIGN} are
  * unverified on real hardware (PROTOCOL.md section 6) and one may need flipping after the first
  * flight — nothing here assumes the dead reckoning is accurate.
+ *
+ * <p>Mọi thứ vẽ cho drone đều được gắn nhãn "estimated" (ước tính): đó là tự dẫn đường quán tính
+ * từ gia tốc kế và trôi vài mét mỗi phút. {@code NAV_FWD_SIGN}/{@code NAV_LEFT_SIGN} trong firmware
+ * chưa được kiểm chứng trên phần cứng thật (PROTOCOL.md mục 6) và có thể phải đảo dấu một cái sau
+ * chuyến bay đầu tiên — không có gì ở đây giả định tự dẫn đường quán tính là chính xác.
  */
 public class GpsNavActivity extends AppCompatActivity
         implements LocationListener, SensorEventListener {
@@ -80,20 +95,25 @@ public class GpsNavActivity extends AppCompatActivity
     private static final int REQUEST_SAVE_WAYPOINTS = 45;
 
     /** A TARGET is honoured for only 3 s after the last packet (PROTOCOL.md section 6). */
+    /** Một TARGET chỉ có hiệu lực trong 3 giây sau gói tin cuối cùng (PROTOCOL.md mục 6). */
     private static final long TARGET_INTERVAL_MS = 200;
 
     /** Nav log block period: 20 Hz of pos/tgt/heading is plenty and fits the 25 byte budget. */
+    /** Chu kỳ khối log nav: 20 Hz cho pos/tgt/heading là đủ và vừa ngân sách 25 byte. */
     private static final int LOG_PERIOD_MS = 50;
 
     private static final long LOG_RETRY_MS = 500;
 
     /** Mid-range hover thrust (valid range 8000..55000) until read from `flight.hover_thrust`. */
+    /** Lực đẩy giữ độ cao mức trung (hợp lệ 8000..55000) cho tới khi đọc được `flight.hover_thrust`. */
     private static final int DEFAULT_HOVER_THRUST = 30000;
 
     /** Don't breadcrumb every 50 ms fix; one metre of movement is enough resolution. */
+    /** Không ghi dấu bánh mì cho mọi bản vị 50 ms; dịch chuyển một mét là đủ độ phân giải. */
     private static final double TRACK_MIN_STEP_M = 1.0;
 
     /** Network fixes are only trusted while no fresh GPS fix exists. */
+    /** Chỉ tin bản vị từ network khi chưa có bản vị GPS mới. */
     private static final long GPS_FIX_MAX_AGE_MS = 10000;
 
     // Drone link
@@ -102,6 +122,8 @@ public class GpsNavActivity extends AppCompatActivity
     private boolean mNavLogStarted;
 
     // Phone sensors: GPS defines the plan and launch frame, the compass gives ALIGN its alpha.
+    // Cảm biến của điện thoại: GPS định nghĩa kế hoạch và khung cất cánh, la bàn
+    // cung cấp alpha cho ALIGN.
     private LocationManager mLocationManager;
     private SensorManager mSensorManager;
     private Sensor mRotationSensor;
@@ -116,6 +138,7 @@ public class GpsNavActivity extends AppCompatActivity
     private volatile float mCompassHeadingDeg = Float.NaN;
 
     // Launch frame, fixed at ALIGN (PROTOCOL.md section 6).
+    // Khung cất cánh, cố định tại ALIGN (PROTOCOL.md mục 6).
     private volatile boolean mLaunched;
     private volatile double mLaunchLat = Double.NaN;
     private volatile double mLaunchLon = Double.NaN;
@@ -133,6 +156,7 @@ public class GpsNavActivity extends AppCompatActivity
     private int mFlightMode = -1;
 
     // Estimated-track bookkeeping for the map.
+    // Ghi sổ vết bay ước tính cho bản đồ.
     private double mLastTrackLat = Double.NaN;
     private double mLastTrackLon = Double.NaN;
     private long mLastMapUpdateElapsed;
@@ -155,6 +179,8 @@ public class GpsNavActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         // osmdroid reads its configuration before inflating a MapView, and a missing user agent
         // gets whole apps blocked by the tile servers.
+        // osmdroid đọc cấu hình trước khi nạp MapView, và thiếu user agent sẽ khiến các máy chủ
+        // tile chặn cả ứng dụng.
         Configuration.getInstance()
                 .load(this, PreferenceManager.getDefaultSharedPreferences(this));
         Configuration.getInstance().setUserAgentValue(getPackageName());
@@ -249,6 +275,7 @@ public class GpsNavActivity extends AppCompatActivity
             }
         });
         // Shared header: sections, status, CUT MOTORS (redesign stage 3).
+        // Thanh tiêu đề dùng chung: các mục, trạng thái, CUT MOTORS (giai đoạn thiết kế lại 3).
         mHeader = new FlyHeader(this, findViewById(R.id.gpsnav_header), FlyHeader.MISSION,
                 new Runnable() {
                     @Override
@@ -260,6 +287,7 @@ public class GpsNavActivity extends AppCompatActivity
             @Override
             public String blockReason() {
                 // Leaving finishes this screen and its 5 Hz send loop with it.
+                // Rời màn hình sẽ đóng màn này cùng vòng lặp gửi 5 Hz của nó.
                 return (mLaunched || mEngaged)
                         ? "Mission screen is flying the drone - land it or use CUT MOTORS before switching"
                         : null;
@@ -327,6 +355,9 @@ public class GpsNavActivity extends AppCompatActivity
         // The 5 Hz send loop deliberately keeps running across onPause: a Storage Access
         // Framework dialog pauses this activity, and any 500 ms CRTP gap trips the failsafe
         // while the drone is armed. It is stopped in onDestroy().
+        // Vòng lặp gửi 5 Hz cố ý chạy tiếp qua onPause: hộp thoại Storage Access Framework làm
+        // activity này tạm dừng, và bất kỳ khoảng trống CRTP 500 ms nào cũng kích hoạt failsafe
+        // khi drone đang armed. Vòng lặp được dừng trong onDestroy().
     }
 
     @Override
@@ -381,6 +412,7 @@ public class GpsNavActivity extends AppCompatActivity
         }
         Logg logg = mCrazyflie.getLogg();
         // addConfig dereferences the TOC without a null check, so wait until it is fetched.
+        // addConfig giải tham chiếu TOC mà không kiểm tra null, nên phải đợi TOC được lấy về.
         if (logg == null || logg.getToc() == null) {
             mHandler.removeCallbacks(mLogRetry);
             mHandler.postDelayed(mLogRetry, LOG_RETRY_MS);
@@ -389,6 +421,8 @@ public class GpsNavActivity extends AppCompatActivity
         if (mNavLog == null) {
             // nav.pos_x/pos_y/tgt_x/tgt_y + flight.heading + flight.mode = 21 B, under the
             // 25 byte data budget for one log block (PROTOCOL.md section 4).
+            // nav.pos_x/pos_y/tgt_x/tgt_y + flight.heading + flight.mode = 21 B, nằm trong
+            // ngân sách 25 byte dữ liệu cho một khối log (PROTOCOL.md mục 4).
             mNavLog = new LogConfig("nav", LOG_PERIOD_MS);
             mNavLog.addVariable("nav.pos_x");
             mNavLog.addVariable("nav.pos_y");
@@ -479,6 +513,8 @@ public class GpsNavActivity extends AppCompatActivity
         if (mLanding) {
             // LAND is idempotent and must be repeated: a 500 ms CRTP gap trips the failsafe
             // while armed, which would cut the motors mid-descent.
+            // LAND là lệnh idempotent và phải được lặp lại: khoảng trống CRTP
+            // 500 ms sẽ kích hoạt failsafe khi đang armed, làm động cơ tắt giữa lúc hạ.
             crazyflie.sendPacket(FlightControlPacket.land());
             return;
         }
@@ -501,6 +537,9 @@ public class GpsNavActivity extends AppCompatActivity
             // MISSION and GUIDED chase the target in FOLLOW; RTL hands over to RTH mode
             // (PROTOCOL.md section 10). SET_MODE is resent every tick on purpose: every
             // command is idempotent and the failsafe counts any CRTP gap.
+            // MISSION và GUIDED đuổi theo mục tiêu ở chế độ FOLLOW; RTL giao cho chế độ RTH
+            // (PROTOCOL.md mục 10). SET_MODE được gửi lại mỗi nhịp là cố ý: mọi lệnh đều
+            // idempotent và failsafe tính mọi khoảng trống CRTP.
             crazyflie.sendPacket(FlightControlPacket.setMode(mode == Navigator.NavMode.RTL
                     ? FlightControlPacket.MODE_RTH
                     : FlightControlPacket.MODE_FOLLOW));
@@ -508,6 +547,9 @@ public class GpsNavActivity extends AppCompatActivity
             // Paused or idle: stop sending TARGET so the drone stops chasing after its 3 s
             // timeout, but keep SET_MODE flowing so the drone holds instead of tripping the
             // 500 ms failsafe.
+            // Tạm dừng hoặc nhàn rỗi: ngừng gửi TARGET để drone ngừng đuổi theo sau khi hết
+            // thời gian chờ 3 giây, nhưng vẫn gửi SET_MODE để drone giữ độ cao thay vì kích
+            // hoạt failsafe 500 ms.
             crazyflie.sendPacket(FlightControlPacket.setMode(FlightControlPacket.MODE_HOLD));
         }
     }
@@ -542,6 +584,10 @@ public class GpsNavActivity extends AppCompatActivity
         // The launch frame is defined once, here: the phone's position becomes the origin every
         // TARGET offset is measured from, and its compass bearing becomes alpha (PROTOCOL.md
         // section 6). The drone cannot measure that angle itself - it has no magnetometer.
+        // Khung cất cánh được định nghĩa một lần, tại đây: vị trí của điện thoại
+        // trở thành gốc mà mọi độ lệch TARGET được đo từ đó, và phương hướng la bàn của nó trở
+        // thành alpha (PROTOCOL.md mục 6). Drone không tự đo được góc đó - nó không có cảm biến
+        // từ kế.
         mLaunchLat = mPhoneLat;
         mLaunchLon = mPhoneLon;
         mAlphaDeg = mCompassHeadingDeg;
@@ -551,6 +597,8 @@ public class GpsNavActivity extends AppCompatActivity
         }
         // ALIGN zeroes the dead reckoning and starts a fresh launch frame; RESET repeats the
         // zeroing and is harmless (both are idempotent).
+        // ALIGN đưa tự dẫn đường quán tính về không và khởi tạo khung cất cánh mới;
+        // RESET lặp lại việc đưa về không đó và vô hại (cả hai đều idempotent).
         crazyflie.sendPacket(NavPacket.align((float) mAlphaDeg));
         crazyflie.sendPacket(NavPacket.reset());
         crazyflie.sendPacket(FlightControlPacket.arm());
@@ -729,6 +777,7 @@ public class GpsNavActivity extends AppCompatActivity
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*"); // .waypoints has no registered MIME type
+        // (.waypoints không có MIME type đã đăng ký)
         startActivityForResult(intent, REQUEST_OPEN_WAYPOINTS);
     }
 
@@ -755,6 +804,8 @@ public class GpsNavActivity extends AppCompatActivity
                     if (mLaunched) {
                         // A loaded file's home row is a planning artifact; the launch point is
                         // the reference every TARGET offset is measured from.
+                        // Dòng home trong file nạp vào chỉ là sản phẩm của việc lập kế hoạch;
+                        // điểm cất cánh mới là gốc tham chiếu mà mọi độ lệch TARGET được đo từ đó.
                         mNavigator.markHome(mLaunchLat, mLaunchLon);
                     }
                 }
@@ -831,6 +882,7 @@ public class GpsNavActivity extends AppCompatActivity
 
     private void requestLocationPermission() {
         // Android 12+ requires FINE and COARSE to be requested together (and both declared).
+        // Android 12+ yêu cầu xin FINE và COARSE cùng nhau (và khai báo cả hai).
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -883,6 +935,8 @@ public class GpsNavActivity extends AppCompatActivity
         boolean fromGps = LocationManager.GPS_PROVIDER.equals(location.getProvider());
         // Network fixes are tens of metres off; only use them while no fresh GPS fix exists,
         // or the launch frame would be built on cell-tower geometry.
+        // Bản vị từ network lệch vài chục mét; chỉ dùng khi chưa có bản vị GPS mới, nếu không
+        // khung cất cánh sẽ được dựng trên hình học của các trạm phát sóng.
         if (!fromGps && mHasGpsFix
                 && (SystemClock.elapsedRealtime() - mLastGpsElapsed) < GPS_FIX_MAX_AGE_MS) {
             return;
@@ -897,6 +951,7 @@ public class GpsNavActivity extends AppCompatActivity
 
         if (!mCenteredOnPhone) {
             // Centre the map once on the first fix so the pilot is not panning from (0, 0).
+            // Căn giữa bản đồ một lần ở bản vị đầu tiên để người điều khiển không phải kéo từ (0, 0).
             mMapView.getController().setCenter(
                     new GeoPoint(mPhoneLat, mPhoneLon));
             mCenteredOnPhone = true;
@@ -927,6 +982,8 @@ public class GpsNavActivity extends AppCompatActivity
         }
         // Rotation vector is missing on some cheap devices; the deprecated orientation sensor
         // still yields an azimuth and ALIGN needs one.
+        // Rotation vector thiếu trên một số thiết bị rẻ tiền; cảm biến orientation đã deprecated
+        // vẫn cho ra phương vị và ALIGN cần một giá trị như vậy.
         mOrientationSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
         if (mOrientationSensor != null) {
             mSensorManager.registerListener(this, mOrientationSensor, SensorManager.SENSOR_DELAY_UI);
@@ -942,6 +999,8 @@ public class GpsNavActivity extends AppCompatActivity
             SensorManager.getOrientation(mRotationMatrix, mOrientation);
             // mOrientation[0] is the azimuth: rotation about the z axis from magnetic north,
             // which is the compass bearing ALIGN wants as alpha.
+            // mOrientation[0] là phương vị: góc quay quanh trục z tính từ hướng từ bắc, chính là
+            // phương hướng la bàn mà ALIGN cần làm alpha.
             mCompassHeadingDeg = (float) Math.toDegrees(mOrientation[0]);
         } else if (event.sensor.getType() == Sensor.TYPE_ORIENTATION) {
             mCompassHeadingDeg = event.values[0];
@@ -957,6 +1016,7 @@ public class GpsNavActivity extends AppCompatActivity
     // region UI updates
 
     /** Called on the UI thread for every nav log tick. */
+    /** Được gọi trên luồng UI cho mỗi nhịp log điều hướng. */
     private void onDroneTick(double posX, double posY, float headingDeg, Navigator.NavStatus status) {
         updateStatusUi(status);
 
@@ -1030,6 +1090,7 @@ public class GpsNavActivity extends AppCompatActivity
 
         mPauseButton.setText(isPaused() ? "Resume" : "Pause");
         // The icon follows the label: it shows what a tap will DO, like the text.
+        // Biểu tượng theo nhãn: nó cho biết một lần chạm sẽ LÀM gì, giống như chữ.
         if (mPauseButton instanceof MaterialButton) {
             ((MaterialButton) mPauseButton).setIconResource(
                     isPaused() ? R.drawable.ic_btn_play : R.drawable.ic_btn_pause);

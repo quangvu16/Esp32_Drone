@@ -97,8 +97,10 @@ public class FirmwareDownloader {
 
     /**
      * Check network connectivity
+     * Kiểm tra kết nối mạng
      *
      * @return true if network is available, false otherwise
+     * @return true nếu có mạng, false nếu không
      */
     public boolean isNetworkAvailable() {
         ConnectivityManager connMgr = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -149,6 +151,7 @@ public class FirmwareDownloader {
             }
 
             // Write JSON to disk
+            // Ghi JSON vào đĩa
             try {
                 writeToReleaseJsonFile(input);
                 Log.d(LOG_TAG, "Wrote JSON file.");
@@ -180,6 +183,7 @@ public class FirmwareDownloader {
 
     /**
      * Base path is CrazyflieControl directory
+     * Đường dẫn gốc là thư mục CrazyflieControl
      *
      * @param path
      * @return
@@ -195,6 +199,7 @@ public class FirmwareDownloader {
         URL url = new URL(myUrl);
 
         // Retrofitting support for TLSv1.2, because GitHub only supports TLSv1.2
+        // Bổ sung hỗ trợ TLSv1.2, vì GitHub chỉ hỗ trợ TLSv1.2
         try {
             HttpsURLConnection.setDefaultSSLSocketFactory(new TLSSocketFactory());
         } catch (KeyManagementException e) {
@@ -247,6 +252,7 @@ public class FirmwareDownloader {
                     int size = assetsObject.getInt("size");
                     String downloadURL = assetsObject.getString("browser_download_url");
                     // hardcoded filter for DFU zip file (find a better way to handle this)
+                    // bộ lọc cứng cho tệp zip DFU (tìm cách xử lý tốt hơn)
                     if (assetName.contains("_dfu")) {
                         continue;
                     }
@@ -257,6 +263,7 @@ public class FirmwareDownloader {
                 }
             } else {
                 // Filter out firmwares without assets
+                // Loại bỏ các firmware không có asset
                 Log.d(LOG_TAG, "Firmware " + tagName + " was filtered out, because it has no assets.");
             }
         }

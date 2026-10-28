@@ -109,6 +109,7 @@ class FakeFirmware:
         self.values = {}
         for i, (g, n, t, size, ro, lo, hi) in enumerate(PARAM_TOC):
             self.values[i] = 1 + i          # an int packs into every param fmt
+                                            # một số int đóng gói được vào mọi định dạng tham số
         self.blocks = {}                  # id -> {"vars": [...], "started": bool}
         self.running = True
         self.thread = threading.Thread(target=self.serve, daemon=True)
@@ -131,6 +132,7 @@ class FakeFirmware:
             self.sock.sendto(raw + bytes([self._csum(raw)]), self.app)
         except OSError:
             pass                            # closed under us at teardown
+                                            # socket bị đóng ngay khi teardown
 
     def serve(self):
         while self.running:
@@ -146,6 +148,7 @@ class FakeFirmware:
             raw = data[:-1]
             port, ch = raw[0] >> 4, raw[0] & 0xF
             p = raw                      # the firmware indexes from the header
+                                         # firmware đánh chỉ mục từ header
             if ch == 0 and (port == D.PORT_PARAMS or port == D.PORT_LOG):
                 self.toc(port, p)
             elif port == D.PORT_PARAMS:
@@ -186,6 +189,7 @@ class FakeFirmware:
             v = min(max(v, lo), hi)            # paramClampF
             if fmt[-1] not in "fd":
                 v = int(v)                     # then (uint16_t) for integer params
+                                               # rồi (uint16_t) cho các tham số số nguyên
             self.values[i] = v
             self._send(D.PORT_PARAMS, D.CH_WRITE, bytes([i]) + struct.pack(fmt, v))
 
@@ -201,6 +205,7 @@ class FakeFirmware:
         if cmd in (D.LOG_CREATE, D.LOG_APPEND):
             ids = []
             # i = 3 matches the firmware: p[0] header, p[1] cmd, p[2] id
+            # i = 3 khớp với firmware: p[0] header, p[1] cmd, p[2] id
             for i in range(3, len(p) - 1, 2):
                 if p[i] == 0:
                     break
@@ -234,6 +239,8 @@ class FakeFirmware:
 
     # Deterministic, distinguishable values per log variable, so a decode test
     # that sees the wrong number knows which field landed where.
+    # Giá trị tất định, phân biệt được cho từng biến log, để bài kiểm tra giải mã
+    # mà thấy số sai sẽ biết trường nào đã rơi nhầm chỗ.
     LOG_VALUES = {
         "pm.vbat": 3.9, "stabilizer.roll": 1.5, "stabilizer.pitch": -2.5,
         "stabilizer.yaw": 12.0, "controller.roll": 7.0, "controller.pitch": -7.0,
@@ -328,10 +335,13 @@ def test_link():
         expect("the status block is 15 B", 15, sum(LOG_TOC[i][3] for i in fw.blocks[0]["vars"]))
         expect("the roll tune block is 22 B", 22, sum(LOG_TOC[i][3] for i in fw.blocks[1]["vars"]))
         # re-creating an identical block must re-ack OK, not raise
+        # tạo lại một khối giống hệt phải được ack lại OK, không ném lỗi
         d.log_create(D.TUNE_BLOCK_ID, D.TUNE_VARS["roll"], 50)
         print("ok   identical CREATE re-acks OK")
         # a CREATE with *different* variables over a live block is refused (17),
         # which is why open_tune_blocks() STOP+DELETEs before switching axis
+        # một CREATE với biến *khác* trên block đang sống bị từ chối (17), đó là
+        # lý do open_tune_blocks() STOP+DELETE trước khi đổi trục
         try:
             d.log_create(D.TUNE_BLOCK_ID, D.TUNE_VARS["pitch"], 50)
             check("different CREATE is refused (err 17)", False)
@@ -383,6 +393,7 @@ def test_link():
         cost, m = D.cost_of(tipped, 10.0)
         check("a tip is flagged", m["fell"])
         # survived = 5/20 * 10 s = 2.5 s -> 100 + 10 * 7.5 = 175
+        # sống sót = 5/20 * 10 s = 2.5 s -> 100 + 10 * 7.5 = 175
         close("tip cost is 100 + 10 x seconds lost", 175.0, cost, 1e-6)
         cost, m = D.cost_of(flat, 10.0)
         check("a clean window costs under 1", not m["fell"] and cost < 1.0)
@@ -421,6 +432,7 @@ def test_maths():
     check("a gain of 0 is rejected", sp.to_unit([0.0, 0.2, 15.0]) is None)
     check("outside the box is rejected", sp.to_unit([2.0, 0.2, 999.0]) is None)
     # the box must never leave the firmware's own clamp
+    # hộp không bao giờ được vượt ra ngoài clamp của chính firmware
     for k in range(3):
         lo, hi = sp.lo[k], sp.hi[k]
         check(f"dim {k} box sits inside [P_MIN, P_MAX]",
@@ -504,6 +516,7 @@ def synthetic(cls):
     class Synthetic(cls):
         def wait_level(self, prompt=False):
             self.check_stop()          # the stop test still has to see the flag
+                                       # bài kiểm tra dừng vẫn phải thấy cờ này
 
         def evaluate(self, stage, params):
             self.check_stop()
@@ -553,6 +566,7 @@ def test_optimisers():
         check(f"{name}: reported a predicted best",
               trials and trials[-1]["best_pred"] is not None)
         # every trial must record the model window the ModelWindow draws
+        # mỗi lần thử phải ghi lại cửa sổ mô hình mà ModelWindow vẽ
         t = trials[-1]
         check(f"{name}: trial report carries the model",
               all(key in t for key in ("gp", "space", "X", "Y", "own", "fell_mask", "best_x")))
@@ -568,6 +582,7 @@ def test_history_seeding():
         [2, "ml", "2.1", "0.2", "15.0", "0.55", "False"],
         [3, "ml", "2.0", "0.2", "15.0", "120.0", "True"],
         [4, "ml", "9.9", "0.2", "15.0", "0.30", "False"],   # other gains differ
+                                                            # các gain khác lệch đi
     ]
     with open(path, "w") as f:
         for r in rows:
@@ -585,6 +600,8 @@ def test_history_seeding():
     X, Y = tuner.seed(sp)
     # rows 1 and 3 match the other gains; row 4 has kp 9.9 which is the tuned
     # gain so it is *not* filtered by the "other gains" test; all three land.
+    # dòng 1 và 3 khớp các gain khác; dòng 4 có kp 9.9 vốn là gain được tinh
+    # chỉnh nên *không* bị lọc bởi phép kiểm "gain khác"; cả ba đều được nhận.
     expect("matching past trials seed the model", 3, len(X))
     check("a tip seeds a high cost", max(Y) > M.to_y(50))
 

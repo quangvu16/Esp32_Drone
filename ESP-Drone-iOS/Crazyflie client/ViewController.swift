@@ -59,6 +59,8 @@ final class ViewController: UIViewController {
     private var flightClock: Timer?
     // Joystick moves refresh this screen many times a second; only rebuild a
     // button's label when what it says actually changes.
+    // Di chuyển joystick làm màn hình này refresh nhiều lần mỗi giây; chỉ dựng
+    // lại nhãn nút khi nội dung nó hiển thị thực sự thay đổi.
     private var shownPrimaryArmed: Bool?
     private var shownConnectTitle: String?
     private var shownCutConnected: Bool?
@@ -198,6 +200,12 @@ final class ViewController: UIViewController {
     //   sides   = the two floating joysticks, unchanged
     // The storyboard's own centre strip (Connect, Settings, progress, Yaw switch) is
     // hidden rather than deleted, so the storyboard itself does not have to change.
+    // Một màn hình duy nhất để cầm khi bay (thiết kế lại giai đoạn 1):
+    //   header  = các khu · liên kết · pin · chế độ · ARMED · CUT MOTORS, luôn hiện
+    //   centre  = chế độ, một hành động chính (Takeoff / Land), bốn số trực tiếp, More
+    //   sides   = hai joystick nổi, không đổi
+    // Dải giữa của storyboard (Connect, Settings, thanh tiến độ, công tắc Yaw) bị
+    // ẩn chứ không xóa, nên bản thân storyboard không phải thay đổi.
 
     private enum Fly {
         static func rgb(_ hex: UInt32) -> UIColor {
@@ -230,11 +238,14 @@ final class ViewController: UIViewController {
 
     private func setupFlyScreen() {
         // The design is a high-contrast light theme for use outdoors in daylight.
+        // Thiết kế là theme sáng độ tương phản cao để dùng ngoài trời ban ngày.
         overrideUserInterfaceStyle = .light
         view.backgroundColor = Fly.ground
 
         // Retire the storyboard's centre strip; its jobs move into the header,
         // the "not connected" card and the More panel.
+        // Khai tử dải giữa của storyboard; việc của nó chuyển vào header,
+        // thẻ "not connected" và bảng More.
         connectButton.isHidden = true
         settingsButton.isHidden = true
         connectProgress.isHidden = true
@@ -268,6 +279,7 @@ final class ViewController: UIViewController {
         header.addSubview(hairline)
 
         // Sections. Fly is this screen; the others open their screens as before.
+        // Các khu. Fly là màn hình này; các khu khác mở màn hình của chúng như trước.
         let tabs = UIStackView()
         tabs.axis = .horizontal
         tabs.spacing = 2
@@ -397,6 +409,7 @@ final class ViewController: UIViewController {
     }
 
     /// Opens a section from the Fly header, or after another screen's header closed it.
+    /// Mở một khu từ header của Fly, hoặc sau khi header màn hình khác đóng nó.
     private func openSection(_ section: AppSection) {
         switch section {
         case .fly: break
@@ -409,6 +422,7 @@ final class ViewController: UIViewController {
     }
 
     /// Setup is still two existing screens (link, sticks), picked from this short menu.
+    /// Setup vẫn là hai màn hình sẵn có (liên kết, cần điều khiển), chọn từ menu ngắn này.
     private func openSetup(from source: UIView) {
         let sheet = UIAlertController(title: "Setup", message: nil, preferredStyle: .actionSheet)
         sheet.addAction(UIAlertAction(title: "Link — Wi-Fi or Bluetooth", style: .default) { [weak self] _ in
@@ -721,12 +735,16 @@ final class ViewController: UIViewController {
 
     /// Pulls every Fly-screen value from the connection state and the status
     /// log block. Called on view-model updates and on every telemetry sample.
+    /// Lấy mọi giá trị của màn hình Fly từ trạng thái kết nối và khối log trạng
+    /// thái. Được gọi khi view-model cập nhật và trên mỗi mẫu dữ liệu từ xa.
     private func refreshFly() {
         guard viewModel != nil, !sectionButtons.isEmpty else { return }
         let connected = isConnected
 
         // The status block (battery, mode, armed, sequence, roll, pitch) is what
         // the header and the numbers read. Request it each time a link comes up.
+        // Khối trạng thái (pin, chế độ, armed, chuỗi, roll, pitch) là thứ header
+        // và các con số đọc. Yêu cầu nó mỗi lần liên kết được thiết lập.
         if connected && !wasConnected {
             client?.createBlock(id: TelemetryStore.BlockId.status.rawValue,
                                 variables: TelemetryStore.statusVariables, periodMs: 200)
@@ -790,9 +808,11 @@ final class ViewController: UIViewController {
         }
 
         // Mode control: Follow and RTH live on the Mission screen, so none is selected.
+        // Điều khiển chế độ: Follow và RTH nằm trên màn hình Mission, nên không chọn gì.
         modeControl.selectedSegmentIndex = mode <= 2 ? mode : UISegmentedControl.noSegment
 
         // One main action that follows the situation.
+        // Một hành động chính luôn theo hoàn cảnh hiện tại.
         if armed != shownPrimaryArmed {
             shownPrimaryArmed = armed
             updatePrimary(armed: armed)
@@ -803,6 +823,7 @@ final class ViewController: UIViewController {
 
 
         // Sticks only steer in Manual; dim them otherwise so that is visible.
+        // Cần chỉ lái ở Manual; các chế độ khác làm chúng mờ đi để thấy rõ điều đó.
         let sticksLive = mode == 0
         leftView.alpha = sticksLive ? 1 : 0.45
         rightView.alpha = sticksLive ? 1 : 0.45
@@ -851,6 +872,7 @@ final class ViewController: UIViewController {
 }
 
 /// A label with padding, for the status chips in the Fly header.
+/// Một nhãn có padding, dùng cho các chip trạng thái trong header của Fly.
 final class ChipLabel: UILabel {
     var insets = UIEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
 

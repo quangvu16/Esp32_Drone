@@ -43,6 +43,8 @@ open class CrazyFlie: NSObject {
     private(set) var crtpDriver:CrtpDriver!
     /// The receive path + client state machine (TOC/params/logs/flight/nav).
     /// Created alongside the driver so both share the same transport.
+    /// Đường nhận + máy trạng thái của client (TOC/tham số/log/điều khiển bay/điều hướng).
+    /// Được tạo cùng trình điều khiển để cả hai dùng chung một tầng truyền.
     private(set) var crtp: CrtpClient!
 
     var commander: CrazyFlieCommander?
@@ -80,6 +82,7 @@ open class CrazyFlie: NSObject {
                 var body:String?
                 
                 // Find the reason and prepare a message
+                // Tìm nguyên nhân và chuẩn bị một thông điệp
                 title = "Network Error"
                 body = "The network is not connected"
                 

@@ -1,21 +1,29 @@
 // Regression guard for SBUS frame acceptance (sbusFrameUsable in the sketch).
 // Run with ./run.sh, which checks the copied lines still match the sketch.
+// Chốt chặn hồi quy cho việc chấp nhận frame SBUS (sbusFrameUsable trong sketch).
+// Chạy bằng ./run.sh, công cụ này kiểm tra các dòng được copy còn khớp với sketch.
 //
 // SBUS flags live in byte 23 (bit2 frame lost, bit3 failsafe); byte 24 is the
 // footer. The old check read byte 24, so a receiver in failsafe -- which keeps
 // sending frames with the last stick positions -- was never noticed.
+// Cờ SBUS nằm ở byte 23 (bit2 frame bị mất, bit3 failsafe); byte 24 là footer.
+// Phép kiểm cũ lại đọc byte 24, nên một bộ thu đang ở failsafe -- vốn vẫn gửi
+// các frame với vị trí stick cuối cùng -- không bao giờ bị phát hiện.
 
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 
 // ---- copied verbatim from Esp32_drone.ino ----
+// ---- được copy nguyên văn từ Esp32_drone.ino ----
 bool sbusFrameUsable(const uint8_t *f) {
   if (f[0] != 0x0F) return false;
   const uint8_t footer = f[24];
   if (footer != 0x00 && (footer & 0x0F) != 0x04) return false;
   if (f[23] & 0x08) return false;      // receiver failsafe
+                                       // bộ thu ở trạng thái failsafe
   if (f[23] & 0x04) return false;      // this frame was lost
+                                       // frame này bị mất
   return true;
 }
 // ----------------------------------------------

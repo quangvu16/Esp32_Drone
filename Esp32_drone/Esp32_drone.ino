@@ -2,7 +2,9 @@
  *  XW_Z1_V2.0  欣薇_无人机 — ESP32 Flight Controller Firmware
  * =============================================================================
  *  Board : ESP32 DevKit + MPU6500 (SPI) + SBUS RX + 4x AO3416 brushed drivers
+ *  Bo mạch : ESP32 DevKit + MPU6500 (SPI) + SBUS RX + 4x driver chổi than AO3416
  *  Motors: 8520 coreless, direct MOSFET PWM (NOT ESC / servo pulse)
+ *  Động cơ: 8520 coreless, PWM MOSFET trực tiếp (KHÔNG phải ESC / xung servo)
  *
  *  VERIFIED PIN MAP (from schematic Screenshot 2026-10-26):
  *  ┌──────────────┬────────────┬────────────────────────────────────────┐
@@ -21,6 +23,7 @@
  *  └──────────────┴────────────┴────────────────────────────────────────┘
  *
  *  Quad layout & motor numbering (top view, matches schematic labels):
+ *  Bố trí quad và đánh số động cơ (nhìn từ trên xuống, khớp nhãn trên sơ đồ):
  *
  *         FRONT
  *     LF(4)   RF(1)
@@ -32,23 +35,31 @@
  *         REAR
  *
  *  Prop direction (viewed from above) — MATCH YOUR PROPS TO THIS:
+ *  Hướng quay cánh quạt (nhìn từ trên xuống) — LẮP CÁNH THEO ĐÚNG NHƯ SAU:
  *     RF & LR = CW      RR & LF = CCW
  *  (If yaw is inverted in flight, flip YAW_DIRECTION below.)
+ *  (Nếu yaw bị ngược khi bay, đổi dấu YAW_DIRECTION bên dưới.)
  *
  *  SBUS channel map (default, adjust to your radio):
+ *  Ánh xạ kênh SBUS (mặc định, chỉnh theo tay điều khiển của bạn):
  *     CH1 = roll, CH2 = pitch, CH3 = throttle, CH4 = yaw, CH5 = arm switch
  *
  *  ┌──────────────────────────────────────────────────────────────────────┐
  *  │ BUILD: select the "Huge APP" partition scheme.                       │
+ *  │ BUILD: chọn scheme phân vùng "Huge APP".                            │
  *  │   Arduino IDE  -> Tools -> Partition Scheme -> Huge APP              │
  *  │   arduino-cli  -> --fqbn esp32:esp32:esp32:PartitionScheme=huge_app  │
  *  │                                                                      │
  *  │ WiFi + Bluetooth Classic + BLE all compile in, which is ~1.7 MB and  │
  *  │ does not fit the default 1.25 MB app partition. Huge APP gives 3 MB  │
  *  │ and drops OTA, which a drone does not need.                          │
+ *  │ WiFi + Bluetooth Classic + BLE đều được biên dịch vào, khoảng 1.7 MB │
+ *  │ và không vừa phân vùng app mặc định 1.25 MB. Huge APP cho 3 MB và   │
+ *  │ bỏ OTA — thứ mà drone không cần.                                    │
  *  └──────────────────────────────────────────────────────────────────────┘
  *
  *  Protocol reference for the phone apps: ../PROTOCOL.md
+ *  Tài liệu giao thức cho các app điện thoại: ../PROTOCOL.md
  * ==========================================================================*/
 
 #include <SPI.h>
@@ -60,6 +71,8 @@
 
 // Optional transports. Turning one off saves flash; the link profile that needs
 // it is then reported as unavailable at boot instead of being offered.
+// Các tầng truyền tùy chọn. Tắt một cái sẽ tiết kiệm flash; hồ sơ liên kết cần
+// nó sẽ được báo là không khả dụng khi khởi động thay vì được đưa ra lựa chọn.
 #define LINK_USE_BT_SPP  1
 #define LINK_USE_BLE     1
 
@@ -109,6 +122,7 @@
 #define FAILSAFE_MS        500
 
 // channel index (0-based) — change to match your radio trainer map
+// chỉ mục kênh (bắt đầu từ 0) — đổi theo bản đồ trainer của tay điều khiển
 #define CH_ROLL           0
 #define CH_PITCH          1
 #define CH_THROTTLE       2
@@ -123,6 +137,9 @@
 // Low-battery protection. The ADC reading is smoothed and only a SUSTAINED drop
 // counts, so a throttle punch that sags the cell for a moment does not trigger
 // it. Set VBAT_ARM_CHECK to 0 to allow arming on USB power with no battery.
+// Bảo vệ pin yếu. Giá trị đọc ADC được làm mượt và chỉ mức giảm DUY TRÌ mới
+// được tính, nên một cú đẩy throttle làm sụt pin trong chốc lát sẽ không kích hoạt.
+// Đặt VBAT_ARM_CHECK = 0 để cho phép kích hoạt khi cấp nguồn USB, không cần pin.
 #define VBAT_ARM_CHECK    1
 #define VBAT_FILTER_ALPHA 0.02f    // per 4 ms loop, ~0.2 s time constant
 #define VBAT_CRIT_HOLD_MS 3000
@@ -131,6 +148,10 @@
 //  Untested placeholders — tune these with the phone's tuning screen or the
 //  tuning screen's auto-tune before trusting a hover. Defaults live in macros
 //  so cfgLoad()'s "restore defaults" and these declarations cannot drift apart.
+//  Giá trị placeholder chưa được thử — hãy tinh chỉnh bằng màn hình tinh chỉnh
+//  của điện thoại hoặc auto-tune của màn hình đó trước khi tin vào hover.
+//  Giá trị mặc định nằm trong macro để "restore defaults" của cfgLoad() và các
+//  khai báo này không thể lệch nhau.
 #define PID_ROLL_KP   1.3f
 #define PID_ROLL_KI   0.04f
 #define PID_ROLL_KD   18.0f
@@ -152,10 +173,12 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define THROTTLE_MAX      1800    // leave headroom for PID at full stick
 
 // CRTP commander safety clamps
+// Các mức kẹp an toàn cho CRTP commander
 #define MAX_TILT_DEG       25.0f  // max commanded roll/pitch angle (deg)
 #define MAX_YAW_RATE      200.0f  // max commanded yaw rate (deg/s)
 
 // Axis / sign config — flip these if a rotation is inverted after first hover
+// Cấu hình trục / dấu — đảo các giá trị này nếu một phép quay bị ngược sau lần giữ độ cao đầu tiên
 #define GYRO_X_SIGN       1       // pitch rate
 #define GYRO_Y_SIGN       1       // roll  rate
 #define GYRO_Z_SIGN       1       // yaw   rate
@@ -168,6 +191,10 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 //  Every UDP datagram is:  [CRTP bytes ...][uint8 checksum = 8-bit sum of CRTP bytes]
 //  Phone -> drone : udp://192.168.43.42:2390
 //  Drone  -> phone: udp://<phone ip>:2399
+//  Khớp với các app ESP-Drone của Espressif (Android EspUdpDriver / iOS ESPUDPLink).
+//  Mỗi gói UDP là:  [CRTP bytes ...][uint8 checksum = tổng 8-bit của các byte CRTP]
+//  Điện thoại -> drone : udp://192.168.43.42:2390
+//  Drone -> điện thoại: udp://<ip điện thoại>:2399
 #define WIFI_AP_SSID      "ESP-Drone"
 #define WIFI_AP_PASS      "12345678"      // WPA2, >=8 chars
 #define WIFI_AP_CHANNEL   6
@@ -179,6 +206,7 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define CRTP_MAX_SIZE     30              // largest CRTP packet we handle
 
 // CRTP header:  bits 7..4 = port, bits 3..2 reserved, bits 1..0 = channel
+// CRTP header:  bit 7..4 = port, bit 3..2 dành riêng, bit 1..0 = channel
 #define CRTP_PORT_CONSOLE     0
 #define CRTP_PORT_PARAMS      2
 #define CRTP_PORT_COMMANDER   3
@@ -188,9 +216,11 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define CRTP_PORT_LINK        15
 
 // CommanderPacket (CRTP port 3, channel 0), little-endian:
+// CommanderPacket (CRTP port 3, channel 0), định dạng little-endian:
 //   [0] header 0x30
 //   [1..4]  float roll  (deg)
 //   [5..8]  float pitch (deg, NOTE: app sends -pitch)
+//   [5..8]  float pitch (độ, LƯU Ý: app gửi -pitch)
 //   [9..12] float yaw   (deg/s)
 //   [13..14] uint16 thrust (0..65535)
 #define CMD_PACKET_SIZE   16              // 1 header + 14 payload + 1 checksum
@@ -202,9 +232,15 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 // function definition — so any type named in a function signature must already
 // be complete by that point. The protocol itself is documented in the
 // "CRTP TOC / PARAMETERS / LOGGING" section further down.
+// Mã lệnh và mã kiểu cùng các struct TocEntry/LogBlock. Chúng nằm ở đây cùng
+// các #define khác vì bộ tiền xử lý Arduino tự tạo prototype cho mọi hàm trong
+// sketch và chèn chúng trước định nghĩa hàm đầu tiên — nên mọi kiểu được đặt tên
+// trong chữ ký hàm phải đã hoàn chỉnh ở thời điểm đó. Bản thân giao thức được
+// mô tả trong phần "CRTP TOC / PARAMETERS / LOGGING" ở phía dưới.
 // ===========================================================================
 
 // --- TOC request commands (identical on the params and logging ports) ---
+// --- lệnh yêu cầu TOC (giống nhau trên cả port tham số và port log) ---
 #define TOC_CMD_GET_ELEMENT  0
 #define TOC_CMD_GET_INFO     1
 
@@ -219,6 +255,7 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define LOG_CHAN_LOGDATA     2
 
 // --- logging control commands (log/Logg.java) ---
+// --- lệnh điều khiển log (log/Logg.java) ---
 #define LOG_CMD_CREATE       0
 #define LOG_CMD_APPEND       1
 #define LOG_CMD_DELETE       2
@@ -227,6 +264,7 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define LOG_CMD_RESET        5
 
 // --- error codes Logg.java turns into user-visible strings ---
+// --- mã lỗi mà Logg.java chuyển thành chuỗi hiển thị cho người dùng ---
 #define LOG_ERR_OK           0
 #define LOG_ERR_NO_ID        2
 #define LOG_ERR_TOO_LARGE    7
@@ -235,6 +273,7 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define LOG_ERR_EXISTS      17
 
 // Parameter type codes — low nibble of the TOC type byte (toc/Toc.java).
+// Mã kiểu tham số — nibble thấp của byte kiểu TOC (toc/Toc.java).
 #define PT_INT8    0x00
 #define PT_INT16   0x01
 #define PT_FLOAT   0x06
@@ -243,15 +282,18 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define PT_UINT32  0x0A
 
 // Log type codes — a DIFFERENT numbering from the parameter codes above.
+// Mã kiểu log — cách đánh số KHÁC với mã tham số ở trên.
 #define LT_UINT8   0x01
 #define LT_UINT16  0x02
 #define LT_FLOAT   0x07
 
 // TocElement.java reads read-only from bit 6 of the type byte.
+// TocElement.java đọc cờ chỉ đọc từ bit 6 của byte kiểu.
 #define TOC_ACCESS_RO  0x40
 #define TOC_ACCESS_RW  0x00
 
 // Log data budget: <header><id><ts24><values...> must fit in CRTP_MAX_SIZE.
+// Ngân sách dữ liệu log: <header><id><ts24><values...> phải vừa trong CRTP_MAX_SIZE.
 #define LOG_DATA_OVERHEAD  5                 // header + id + 24-bit timestamp
 #define LOG_MAX_PAYLOAD    (CRTP_MAX_SIZE - LOG_DATA_OVERHEAD)
 #define LOG_MAX_BLOCKS     3
@@ -261,19 +303,32 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 //  The same CRTP framing ([CRTP ...][uint8 checksum]) runs over four
 //  transports. Which one is live is chosen at boot from NVS (key "link"), so a
 //  radio change always starts from a known state.
+//  Cùng một khung CRTP ([CRTP ...][uint8 checksum]) chạy trên bốn tầng truyền.
+//  Tầng nào đang hoạt động được chọn khi khởi động từ NVS (key "link"), nên đổi
+//  radio luôn bắt đầu từ một trạng thái đã biết.
 //
 //    0  WIFI_AP     drone hosts "ESP-Drone", phone joins it (default)
+//    0  WIFI_AP     drone phát "ESP-Drone", điện thoại kết nối vào (mặc định)
 //    1  WIFI_STA    drone joins an existing network, mDNS esp-drone.local
+//    1  WIFI_STA    drone tham gia mạng có sẵn, mDNS esp-drone.local
 //    2  BT_SPP      Bluetooth Classic serial — no WiFi involved
+//    2  BT_SPP      Bluetooth Classic serial — không dùng WiFi
 //    3  BLE         BLE GATT, the Bitcraze Crazyflie service (works on iOS)
+//    3  BLE         BLE GATT, service Bitcraze Crazyflie (chạy trên iOS)
 //    4  WIFI_AP_BLE WiFi softAP plus BLE, sharing the radio
+//    4  WIFI_AP_BLE WiFi softAP kèm BLE, dùng chung radio
 //    5  WIFI_STA_BLE WiFi station plus BLE
+//    5  WIFI_STA_BLE WiFi station kèm BLE
 //
 //  ESP32 WiFi and Bluetooth Classic share one 2.4 GHz radio, so BT_SPP is an
 //  alternative to WiFi rather than something that runs alongside it. BLE has a
 //  coexistence mode and can share with WiFi, which is what the *_BLE profiles
 //  use. Pick one with "link <n>" on the serial console or FC_CMD_LINK over
 //  CRTP; the board reboots to apply it.
+//  WiFi và Bluetooth Classic trên ESP32 dùng chung một radio 2.4 GHz, nên BT_SPP
+//  là phương án thay thế WiFi chứ không phải chạy song song. BLE có chế độ chung
+//  sống và có thể dùng chung với WiFi — đó là các hồ sơ *_BLE. Chọn bằng "link <n>"
+//  trên console serial hoặc FC_CMD_LINK qua CRTP; board sẽ khởi động lại để áp dụng.
 #define LINK_MODE_WIFI_AP      0
 #define LINK_MODE_WIFI_STA     1
 #define LINK_MODE_BT_SPP       2
@@ -284,6 +339,8 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 
 // Station-mode credentials, used by LINK_MODE_WIFI_STA*. Empty SSID falls back
 // to the softAP profile so a board with no config still comes up reachable.
+// Thông tin đăng nhập chế độ station, dùng bởi LINK_MODE_WIFI_STA*. SSID rỗng sẽ
+// chuyển về hồ sơ softAP để board chưa cấu hình vẫn lên sóng và kết nối được.
 #define WIFI_STA_SSID          ""            // <-- set yours, or via serial "sta <ssid> <pass>"
 #define WIFI_STA_PASS          ""
 #define WIFI_STA_TIMEOUT_MS    15000
@@ -292,10 +349,15 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 // ---- BLE GATT framing ------------------------------------------------
 //  Matches the Bitcraze service the Android BleLink talks to, so that client
 //  works unmodified:
+//  Khớp với service Bitcraze mà BleLink trên Android kết nối tới, nên client đó
+//  chạy được nguyên bản, không cần sửa:
 //    00000201-1C7F-4F9E-947B-43B7C00A9A08  service
 //      00000202  CRTP      write   phone -> drone, raw CRTP when <= 20 bytes
+//      00000202  CRTP      write   điện thoại -> drone, CRTP thô khi <= 20 byte
 //      00000203  CRTPUP    write   phone -> drone, segmented with control byte
+//      00000203  CRTPUP    write   điện thoại -> drone, phân đoạn theo control byte
 //      00000204  CRTPDOWN  notify  drone -> phone, always control-byte framed
+//      00000204  CRTPDOWN  notify  drone -> điện thoại, luôn đóng khung bằng control byte
 //
 //  Control byte:  bit7 start | bits6..5 pid (0..3) | bits4..0 (totalLen-1)
 //  A datagram of N CRTP bytes goes out in ceil(N/19) segments of 20 bytes:
@@ -303,10 +365,16 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 //     [ctrl cont , pid    ]  crtp[19 .. 37]   ... and so on
 //  The receiver keys single- vs multi-segment on whether the announced length
 //  fits in the segment, not on the length field alone — see BLE_SEG_BYTES.
+//  Một gói N byte CRTP được gửi ra thành ceil(N/19) đoạn 20 byte:
+//     [ctrl start, len=N-1]  crtp[0 .. 18]
+//     [ctrl cont , pid    ]  crtp[19 .. 37]   ... và tiếp tục như vậy
+//  Bên nhận phân biệt một đoạn hay nhiều đoạn bằng việc độ dài được báo có vừa
+//  trong đoạn hay không, chứ không chỉ dựa vào trường độ dài — xem BLE_SEG_BYTES.
 #define BLE_SEG_BYTES        19             // CRTP bytes per 20-byte BLE segment
 #define BLE_MAX_SEGMENTS     2              // CRTP_MAX_SIZE 30 -> 2 segments
 
 // ---- CRTP port 7, channel 0: flight control (this firmware's own extension)
+// ---- CRTP port 7, channel 0: điều khiển bay (phần mở rộng riêng của firmware này)
 //  [0] 0x70 | [1] cmd | [2..] args        reply: [0x70][cmd][status u8]
 //
 //  0x01 SET_MODE      u8 mode     0 manual | 1 hold | 2 auto
@@ -324,13 +392,20 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 //
 //  Modes:
 //    MANUAL  pilot commands attitude / rate / thrust directly (CommanderPacket)
+//    MANUAL  người lái ra lệnh thẳng tư thế / tốc độ góc / lực đẩy (CommanderPacket)
 //    HOLD    attitude level, heading locked, thrust = hover_thrust
+//    HOLD    tư thế cân bằng, khóa hướng mũi, lực đẩy = hover_thrust
 //    AUTO    TAKEOFF ramp -> HOLD -> LAND ramp -> disarm
+//    AUTO    bám TAKEOFF -> HOLD -> bám LAND -> ngắt kích hoạt
 //
 //  There is no barometer, ToF or GPS on this board, so HOLD holds a thrust
 //  level rather than an altitude, and AUTO is a takeoff/hover/land sequence
 //  rather than waypoint flight. Hover altitude is approximate and drifts —
 //  the app says so rather than pretending otherwise.
+//  Bo mạch này không có áp kế, ToF hay GPS, nên HOLD giữ mức lực đẩy chứ không
+//  giữ độ cao, và AUTO là chuỗi cất cánh/giữ độ cao/hạ cánh chứ không bay theo
+//  điểm hành trình. Độ cao khi hover chỉ là xấp xỉ và bị trôi — app nói rõ điều
+//  đó thay vì giả vờ ngược lại.
 #define FC_HDR               (CRTP_PORT_GENERIC << 4)   // 0x70
 #define FC_CMD_SET_MODE      0x01
 #define FC_CMD_TAKEOFF       0x02
@@ -346,6 +421,7 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define FC_CMD_LINK          0x10
 
 // Flight modes and auto sequence states, as reported in the log TOC.
+// Các chế độ bay và trạng thái chuỗi tự động, được báo trong log TOC.
 #define MODE_MANUAL          0
 #define MODE_HOLD            1
 #define MODE_AUTO            2
@@ -359,6 +435,8 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 
 // Flight-control tuning. Hover thrust lives in the CommanderPacket domain
 // (0..65535) so the app can reuse its existing thrust mapping.
+// Tinh chỉnh điều khiển bay. Lực đẩy hover nằm trong miền CommanderPacket
+// (0..65535) để app dùng lại phép ánh xạ lực đẩy sẵn có của mình.
 #define HOVER_THRUST_DEFAULT 30000         // ~46% — a starting guess, trim it
 #define HOVER_THRUST_MIN     8000
 #define HOVER_THRUST_MAX     55000
@@ -367,70 +445,109 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define HEADING_KP           2.0f           // deg/s of yaw rate per deg of error
 
 // ---- CRTP port 7, channel 1: navigation / phone reference ----------------
+// ---- CRTP port 7, channel 1: dẫn đường / tham chiếu từ điện thoại --------
 //  The phone reads its OWN GPS and compass (no SensorServer needed) and sends
 //  the target as an offset from the launch point, already rotated into the
 //  drone's launch heading frame. The drone then estimates where it is by
 //  integrating its own accelerometer, and flies toward that offset.
+//  Điện thoại đọc GPS và la bàn của CHÍNH nó (không cần SensorServer) và gửi
+//  mục tiêu dạng độ lệch so với điểm cất cánh, đã quay sẵn vào khung hướng cất
+//  cánh của drone. Drone sau đó ước lượng vị trí của mình bằng cách tích phân
+//  gia tốc kế, rồi bay về phía độ lệch đó.
 //
 //  [0] 0x71 | [1] cmd | [2..] args        reply: [0x71][cmd][status u8]
 //
 //  0x20 TARGET   f32 x_m  f32 y_m   target offset from launch, launch frame
 //                                    (+x = where the nose pointed at launch,
 //                                     +y = 90 deg left of that)
+//  0x20 TARGET   f32 x_m  f32 y_m   độ lệch mục tiêu so với điểm cất cánh, theo khung cất cánh
+//                                    (+x = hướng mũi tại lúc cất cánh,
+//                                     +y = lệch 90 độ sang trái hướng đó)
 //  0x21 RESET    —                   zero the dead-reckoned position
+//  0x21 RESET    —                   đặt lại vị trí tự dẫn đường quán tính về 0
 //  0x22 ALIGN    f32 alpha_deg       compass bearing of the nose at launch;
 //                                    the phone sends this so its GPS offsets
 //                                    can be rotated into the drone's frame
+//  0x22 ALIGN    f32 alpha_deg       phương hướng la bàn của mũi tại lúc cất cánh;
+//                                    điện thoại gửi giá trị này để các độ lệch GPS
+//                                    của nó được quay vào khung của drone
 //
 //  HONEST LIMIT: the position below is accelerometer double integration on
 //  MEMS hardware. Bias makes it drift — metres within a minute. It is good
 //  enough to fly a rough "toward the pilot" and nothing more. Both apps label
 //  it approximate rather than implying GPS-grade tracking.
+//  GIỚI HẠN THẬT: vị trí bên dưới là tích phân đôi gia tốc kế trên phần cứng MEMS.
+//  Sai lệch làm nó trôi — vài mét trong một phút. Nó đủ để bay đại khái "về phía
+//  người lái" và không hơn. Cả hai app đều ghi rõ đây là xấp xỉ chứ không ngụ ý
+//  độ chính xác cấp GPS.
 #define NAV_HDR              0x71
 #define NAV_CMD_TARGET       0x20
 #define NAV_CMD_RESET        0x21
 #define NAV_CMD_ALIGN        0x22
 
 // Dead-reckoning tuning.
+// Tinh chỉnh tự dẫn đường quán tính.
 #define NAV_ACC_LSB_PER_G    4096.0f       // MPU6500 at +-8 g -- must match MPU_REG_ACCEL_CFG in mpuInit()
 #define NAV_GRAVITY          9.80665f
 // Velocity leak per second. Bounds the velocity error that accelerometer bias
 // would otherwise grow without limit; costs a little of any sustained move.
+// Rò rỉ vận tốc mỗi giây. Giới hạn sai số vận tốc mà sai lệch gia tốc kế vốn sẽ
+// làm tăng vô hạn; đổi lại mất một chút khi di chuyển liên tục.
 #define NAV_VEL_LEAK_PER_S   0.60f
 #define NAV_TARGET_TIMEOUT_MS 3000         // stale phone reference -> hold
 #define NAV_STOP_BAND_M      0.6f          // within this of the target, stop
 #define NAV_MAX_TILT_DEG     12.0f
 // Sensor axis signs for the horizontal plane. Flip here if "follow" flies
 // away from you instead of toward you — the same trick as GYRO_*_SIGN.
+// Dấu các trục cảm biến trên mặt phẳng ngang. Đảo tại đây nếu chế độ "follow" bay
+// ra xa bạn thay vì bay về phía bạn — cùng cách làm như với GYRO_*_SIGN.
 #define NAV_FWD_SIGN         1             // +1 if sensor +Y is nose-forward
 #define NAV_LEFT_SIGN        1             // +1 if sensor +X is to the left
 // Sign of the yaw that rotates body axes into the launch frame. This is a
 // separate question from the two above: not the accelerometer, but which way
 // heading_deg turns.
+// Dấu của yaw dùng để quay các trục thân vào khung cất cánh. Đây là câu hỏi riêng
+// so với hai mục trên: không phải gia tốc kế, mà là heading_deg quay theo chiều nào.
 //
 // heading_deg is a compass bearing: it wraps to 0..360 and hold_heading_deg is
 // assigned straight from the phone's FC_CMD_SET_HEADING, which is a compass
 // bearing. A compass bearing rises as the nose turns RIGHT.
+// heading_deg là phương hướng la bàn: nó gói về 0..360 và hold_heading_deg được
+// gán thẳng từ FC_CMD_SET_HEADING của điện thoại, vốn là phương hướng la bàn.
+// Phương hướng la bàn tăng khi mũi máy bay quay sang PHẢI.
 //
 // The body->launch rotation needs the opposite sign: +y is the drone's LEFT, so
 // turning right must rotate the nose toward -y. With +1 the two disagree and
 // navSetpoints() rolls toward the target's cross-axis instead of pitching at
 // it -- up to 8.66 deg of spurious roll at 30 deg of yaw, and a spiral away
 // from anything not dead ahead. test/yawrot_test.cpp pins both directions.
+// Phép quay thân -> cất cánh cần dấu ngược lại: +y là bên TRÁI của drone, nên
+// quay phải phải làm mũi hướng về -y. Với +1 thì hai thứ mâu thuẫn và
+// navSetpoints() sẽ roll về trục phụ của mục tiêu thay vì pitch về phía nó --
+// tới 8.66 độ roll giả khi yaw 30 độ, và xoắn ốc ra xa bất kỳ mục tiêu nào
+// không thẳng phía trước. test/yawrot_test.cpp cố định cả hai chiều.
 //
 // This feeds BOTH navUpdate() and navSetpoints(), so they stay an exact
 // inverse pair whichever way it is set.
+// Giá trị này cấp cho CẢ navUpdate() và navSetpoints(), nên hai hàm luôn là một
+// cặp nghịch đảo chính xác bất kể được đặt theo chiều nào.
 #define NAV_HEADING_SIGN     -1
 
 typedef struct {
   const char *group;
   const char *name;
   uint8_t     ctype;    // PT_* for params, LT_* for logs
+                        // PT_* cho tham số, LT_* cho log
   uint8_t     size;     // value width in bytes
+                        // độ rộng giá trị tính bằng byte
   uint8_t     access;   // params only: TOC_ACCESS_*
+                        // chỉ dành cho tham số: TOC_ACCESS_*
   void       *value;    // live variable the entry exposes
+                        // biến trực tiếp mà mục này phơi ra
   float       lo, hi;   // RW params only: phone writes are clamped into [lo, hi]
                         // and NaN/inf is refused (see paramStore)
+                        // chỉ tham số RW: giá trị ghi từ điện thoại bị kẹp trong [lo, hi]
+                        // và NaN/inf bị từ chối (xem paramStore)
 } TocEntry;
 
 typedef struct {
@@ -438,10 +555,14 @@ typedef struct {
   bool     started;
   uint8_t  id;
   uint8_t  period;      // 10 ms units, exactly as the client sends it
+                        // đơn vị 10 ms, đúng như client gửi
   uint8_t  nvars;
   uint8_t  var_id[LOG_MAX_VARS];   // indices into LOG_TOC
+                                   // các chỉ mục vào LOG_TOC
   uint32_t start_ms;    // timestamp origin
+                        // mốc thời gian gốc
   uint32_t last_ms;     // next-send pacing
+                        // nhịp cho lần gửi kế tiếp
 } LogBlock;
 
 // ============================ MPU6500 REGISTERS ============================
@@ -484,6 +605,9 @@ float    roll_level_adjust, pitch_level_adjust;
 // Per-term breakdown of the last pidCompute(), kept only so the phone's tuning
 // screen can chart which term is doing the work (P fighting D, I windup, ...).
 // Same sign convention as the corresponding pid_output_*.
+// Phân rã từng thành phần của pidCompute() gần nhất, chỉ giữ lại để màn hình tinh
+// chỉnh của điện thoại vẽ được thành phần nào đang làm việc (P đối kháng D, I windup,...).
+// Cùng quy ước dấu với pid_output_* tương ứng.
 float    pid_p_roll,  pid_i_roll,  pid_d_roll;
 float    pid_p_pitch, pid_i_pitch, pid_d_pitch;
 float    pid_p_yaw,   pid_i_yaw,   pid_d_yaw;
@@ -504,6 +628,7 @@ uint32_t  crtp_last_rx_ms = 0;
 uint8_t   crtp_rx_buf[64];
 
 // commander setpoints (from CRTP CommanderPacket)
+// các setpoint từ commander (từ CRTP CommanderPacket)
 float    cmd_roll_deg = 0.0f;
 float    cmd_pitch_deg = 0.0f;
 float    cmd_yaw_dps = 0.0f;
@@ -537,6 +662,7 @@ float    heading_deg  = 0.0f;               // integrated from gyro-z, 0..360
 float    hold_heading_deg = 0.0f;           // heading locked when hold/auto engaged
 
 // --- navigation (launch frame: +x = nose at launch, +y = 90 deg left) ---
+// --- dẫn đường (khung cất cánh: +x = hướng mũi lúc cất cánh, +y = lệch 90 độ sang trái) ---
 float    pos_x = 0.0f, pos_y = 0.0f;        // dead-reckoned offset from launch, m
 float    vel_x = 0.0f, vel_y = 0.0f;        // m/s
 float    heading_ref_deg = 0.0f;            // heading_deg at launch
@@ -548,11 +674,17 @@ float    nav_kp = 1.2f;                     // deg of tilt per m of position err
 
 // Setpoints the flight-mode stage hands to the PID. loop() writes these and
 // never touches the PID inputs directly.
+// Các setpoint mà tầng chế độ bay giao cho PID. loop() ghi các giá trị này và
+// không bao giờ chạm thẳng vào các đầu vào của PID.
 //
 // Roll/pitch carry BOTH an attitude target and a rate feed-forward, because
 // the two control sources speak different languages: CRTP CommanderPackets
 // command a tilt ANGLE, while SBUS sticks command a body RATE. Holding mode
 // wants angle 0 with no rate; manual wants whatever the pilot asked for.
+// Roll/pitch mang CẢ mục tiêu tư thế lẫn feed-forward tốc độ góc, vì hai nguồn
+// điều khiển nói hai thứ tiếng khác nhau: CRTP CommanderPacket ra lệnh một GÓC
+// nghiêng, còn cần SBUS ra lệnh TỐC ĐỘ GÓC thân. Chế độ giữ muốn góc 0 và không
+// có tốc độ góc; chế độ manual lấy đúng giá trị người lái yêu cầu.
 float    sp_roll_deg    = 0.0f;             // attitude target, deg
 float    sp_pitch_deg   = 0.0f;
 float    sp_roll_rate   = 0.0f;             // rate feed-forward, deg/s
@@ -569,6 +701,7 @@ inline void mpuDeselect() { digitalWrite(PIN_MPU_CS, HIGH); }
 void mpuWrite(uint8_t reg, uint8_t val) {
   mpuSelect();
   SPI.transfer(reg & 0x7F);       // bit7 = 0 -> write
+                                  // bit7 = 0 -> ghi
   SPI.transfer(val);
   mpuDeselect();
   delayMicroseconds(10);
@@ -577,6 +710,7 @@ void mpuWrite(uint8_t reg, uint8_t val) {
 uint8_t mpuRead(uint8_t reg) {
   mpuSelect();
   SPI.transfer(reg | 0x80);       // bit7 = 1 -> read
+                                  // bit7 = 1 -> đọc
   uint8_t v = SPI.transfer(0x00);
   mpuDeselect();
   return v;
@@ -600,12 +734,17 @@ bool mpuInit() {
 
   delay(50);
   mpuWrite(MPU_REG_PWR_MGMT_1, 0x80);   // device reset
+                                        // reset thiết bị
   delay(100);
   mpuWrite(MPU_REG_PWR_MGMT_1, 0x01);   // clock = PLL with X-axis gyro
+                                        // clock = PLL với gyro trục X
   delay(10);
   mpuWrite(MPU_REG_PWR_MGMT_2, 0x00);   // all axes on
+                                        // bật tất cả các trục
   mpuWrite(MPU_REG_SMPLRT_DIV, 0x03);   // 1kHz/(1+3) = 250 Hz sample rate
+                                        // tần số lấy mẫu 1kHz/(1+3) = 250 Hz
   mpuWrite(MPU_REG_CONFIG,     0x02);   // DLPF 92 Hz gyro BW — good for 250 Hz loop
+                                        // DLPF 92 Hz băng thông gyro — phù hợp vòng lặp 250 Hz
   mpuWrite(MPU_REG_GYRO_CFG,   0x08);   // ±500 dps  (65.5 LSB/(deg/s))
   mpuWrite(MPU_REG_ACCEL_CFG,  0x10);   // ±8 g      (4096 LSB/g)
   delay(10);
@@ -621,6 +760,7 @@ void mpuReadRaw() {
   raw_ay = (int16_t)(buf[2]  << 8 | buf[3]);
   raw_az = (int16_t)(buf[4]  << 8 | buf[5]);
   /* buf[6..7] = temperature (skip) */
+  /* buf[6..7] = nhiệt độ (bỏ qua) */
   raw_gx = (int16_t)(buf[8]  << 8 | buf[9]);
   raw_gy = (int16_t)(buf[10] << 8 | buf[11]);
   raw_gz = (int16_t)(buf[12] << 8 | buf[13]);
@@ -646,10 +786,12 @@ void mpuCalibrateGyro() {
 // =============================================================================
 void sbusInit() {
   // 5th arg `true` = invert RX — required for standard SBUS levels
+  // Đối số thứ 5 `true` = đảo RX — bắt buộc với mức điện SBUS tiêu chuẩn
   Serial2.begin(100000, SERIAL_8E2, PIN_SBUS_RX, -1, true);
 }
 
 // Decode 16 x 11-bit channels out of a 25-byte SBUS frame
+// Giải mã 16 kênh 11-bit từ một khung SBUS 25 byte
 void sbusDecode(const uint8_t *b) {
   sbus_raw[0]  = (b[1]        | b[2]  << 8)                 & 0x7FF;
   sbus_raw[1]  = (b[2]  >> 3  | b[3]  << 5)                 & 0x7FF;
@@ -673,6 +815,7 @@ void sbusDecode(const uint8_t *b) {
     rc[i] = constrain(v, RC_MIN, RC_MAX);
   }
   // CH5 as a simple high/low arm channel -> map to 1000/2000
+  // CH5 như một kênh kích hoạt cao/thấp đơn giản -> ánh xạ về 1000/2000
   rc[CH_ARM] = (sbus_raw[CH_ARM] > 1024) ? 2000 : 1000;
 
   sbus_frame_ok = true;
@@ -687,6 +830,14 @@ void sbusDecode(const uint8_t *b) {
 // positions, so a failsafe frame must NOT refresh sbus_last_frame_ms: letting
 // the FAILSAFE_MS timeout run out is what stops the motors.
 // (The old check read the flags from byte 24, the footer, so it never saw them.)
+// Một khung chỉ được dùng khi nó đúng cấu trúc VÀ bộ thu vẫn còn nghe thấy máy
+// phát. Bố cục: [0] 0x0F header | [1..22] kênh |
+// [23] cờ (bit2 = mất khung, bit3 = failsafe) | [24] footer.
+// Footer là 0x00 trên SBUS thường; bộ thu SBUS2 luân phiên 0x04/0x14/0x24/0x34.
+// Bộ thu đang ở failsafe thường vẫn gửi các khung mang vị trí cần gạt LẦN CUỐI,
+// nên khung failsafe KHÔNG được làm mới sbus_last_frame_ms: để hết thời gian
+// chờ FAILSAFE_MS mới là thứ dừng động cơ.
+// (Bản kiểm tra cũ đọc cờ từ byte 24, tức footer, nên không bao giờ thấy chúng.)
 bool sbusFrameUsable(const uint8_t *f) {
   if (f[0] != 0x0F) return false;
   const uint8_t footer = f[24];
@@ -697,6 +848,7 @@ bool sbusFrameUsable(const uint8_t *f) {
 }
 
 // Pull any pending bytes; parse frames as they complete
+// Kéo các byte còn chờ; giải mã khung khi chúng hoàn tất
 void sbusPoll() {
   while (Serial2.available()) {
     uint8_t c = (uint8_t)Serial2.read();
@@ -713,6 +865,8 @@ void sbusPoll() {
 //  CRTP / UDP link  (Espressif ESP-Drone app protocol)
 //  Framing on the wire:  [CRTP ...][uint8 checksum]  where checksum is the
 //  8-bit sum of the CRTP bytes INCLUDING the header byte.
+//  Đóng khung trên đường truyền:  [CRTP ...][uint8 checksum]  trong đó checksum
+//  là tổng 8-bit của các byte CRTP BAO GỒM cả byte header.
 // =============================================================================
 uint8_t crtpChecksum(const uint8_t *data, size_t len) {
   uint32_t sum = 0;
@@ -726,16 +880,25 @@ uint8_t crtpChecksum(const uint8_t *data, size_t len) {
 //  The CRTP layer only ever calls linkSend() and hands inbound bytes to
 //  crtpReceiveFramed()/crtpReceiveRaw(). Everything below picks the active
 //  transport from link_mode, which is read back from NVS at boot.
+//  Tầng CRTP chỉ gọi linkSend() và chuyển byte vào cho
+//  crtpReceiveFramed()/crtpReceiveRaw(). Mọi thứ bên dưới chọn tầng truyền đang
+//  hoạt động từ link_mode, giá trị đọc lại từ NVS khi khởi động.
 //
 //  Framing differs by transport because the clients differ:
 //    UDP / SPP : [CRTP ...][uint8 checksum]   checksum over the CRTP bytes
 //    BLE       : raw CRTP wrapped in control-byte segments (see bleSend)
+//  Cách đóng khung khác nhau theo tầng truyền vì client khác nhau:
+//    UDP / SPP : [CRTP ...][uint8 checksum]   checksum trên các byte CRTP
+//    BLE       : CRTP thô bọc trong các đoạn có control byte (xem bleSend)
 // =============================================================================
 void crtpDispatch(const uint8_t *p, size_t len);
 
 // The flight-mode stage is defined further down but called from the CRTP
 // handlers above it. Declaring them here keeps the sketch order-independent
 // for a real C++ pass as well as the Arduino preprocessor.
+// Tầng chế độ bay được định nghĩa phía dưới nhưng được gọi từ các handler CRTP
+// ở trên. Khai báo các hàm ở đây giúp sketch không phụ thuộc thứ tự, cả với một
+// lượt biên dịch C++ thật lẫn với bộ tiền xử lý Arduino.
 void flightSetMode(uint8_t mode);
 bool flightTakeoff(uint16_t thrust);
 bool armChecksOk(const char *who);
@@ -765,6 +928,7 @@ bool linkUsesBle(uint8_t mode) {
 }
 
 // Inbound UDP/SPP: `data` is [CRTP ...][checksum].
+// Vào từ UDP/SPP: `data` là [CRTP ...][checksum].
 void crtpReceiveFramed(const uint8_t *data, size_t len) {
   if (len < 2 || len > CRTP_MAX_SIZE + 1) return;
   if (crtpChecksum(data, len - 1) != data[len - 1]) return;
@@ -773,6 +937,7 @@ void crtpReceiveFramed(const uint8_t *data, size_t len) {
 }
 
 // Inbound BLE: the transport already framed it, so no checksum is present.
+// Vào từ BLE: tầng truyền đã đóng khung sẵn, nên không có checksum.
 void crtpReceiveRaw(const uint8_t *data, size_t len) {
   if (len < 1 || len > CRTP_MAX_SIZE) return;
   crtpDispatch(data, len);
@@ -791,6 +956,13 @@ BluetoothSerial *btSpp = nullptr;
 // part of one into a different command.
 // Everything here is non-blocking. The old Stream::readBytes() waited up to its
 // 1 s default timeout for a full buffer, freezing the flight loop.
+// SPP là một luồng byte: các lần ghi từ điện thoại có thể bị tách hoặc ghép, nên
+// ranh giới gói tin được khôi phục theo cách trình đọc của BtSppLink.java -- độ
+// dài ngắn nhất có checksum cuối gói hợp lệ. CommanderPacket chỉ được chấp nhận
+// ở đúng độ dài thật (16), nên một checksum trùng ngẫu nhiên không bao giờ biến
+// một phần gói thành lệnh khác.
+// Mọi thứ ở đây đều không chặn. Stream::readBytes() cũ đợi tới hết thời gian chờ
+// mặc định 1 s cho đủ bộ đệm, làm đông cứng vòng lặp bay.
 #define BT_FRAME_MAX  (CRTP_MAX_SIZE + 1)
 uint8_t bt_acc[2 * BT_FRAME_MAX];
 size_t  bt_acc_len = 0;
@@ -798,6 +970,9 @@ size_t  bt_acc_len = 0;
 // >0: a whole frame of that length is at the head of bt_acc
 //  0: need more bytes
 // -1: the head byte cannot start a frame -- drop it and resync
+// >0: một khung trọn vẹn độ dài đó đang ở đầu bt_acc
+//  0: cần thêm byte
+// -1: byte đầu không thể mở một khung -- bỏ nó và đồng bộ lại
 int btFrameLen() {
   if (bt_acc_len < 2) return 0;
   if (((bt_acc[0] >> 4) & 0x0F) == CRTP_PORT_COMMANDER) {
@@ -841,6 +1016,7 @@ bool btInit(const char *name) {
 
 // ---------------------------------------------------------------------------
 //  BLE GATT — Bitcraze Crazyflie service, so the Android BleLink works as-is.
+//  BLE GATT — service Bitcraze Crazyflie, để BleLink trên Android chạy nguyên bản.
 // ---------------------------------------------------------------------------
 #if LINK_USE_BLE
 static const char *BLE_UUID_SERVICE  = "00000201-1C7F-4F9E-947B-43B7C00A9A08";
@@ -858,6 +1034,7 @@ uint8_t  ble_rx_pid    = 0xFF;
 // Split a CRTP datagram into 20-byte control-byte-framed notifications.
 //   seg[0] = bit7 start | bits6..5 pid | bits4..0 (totalLen-1)
 //   seg[1..] = CRTP bytes
+// Tách một gói CRTP thành các notification 20 byte có control byte.
 bool bleSend(const uint8_t *data, size_t len) {
   if (!bleCrtpDown || !ble_connected || len == 0 || len > CRTP_MAX_SIZE) return false;
   uint8_t seg[BLE_SEG_BYTES + 1];
@@ -878,6 +1055,7 @@ bool bleSend(const uint8_t *data, size_t len) {
 }
 
 // Copy the characteristic value out, whichever core version we are on.
+// Chép giá trị characteristic ra ngoài, bất kể đang ở bản core nào.
 static size_t bleReadValue(BLECharacteristic *ch, uint8_t *out, size_t cap) {
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
   String v = ch->getValue();
@@ -894,6 +1072,7 @@ static size_t bleReadValue(BLECharacteristic *ch, uint8_t *out, size_t cap) {
 }
 
 // 0x202: the client sends short packets raw, with no control byte.
+// 0x202: client gửi các gói ngắn dạng thô, không có control byte.
 class BleRawCb : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *ch) {
     uint8_t buf[CRTP_MAX_SIZE];
@@ -903,6 +1082,7 @@ class BleRawCb : public BLECharacteristicCallbacks {
 };
 
 // 0x203: long packets arrive here segmented with a control byte.
+// 0x203: các gói dài đến đây theo từng đoạn có control byte.
 class BleSegCb : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *ch) {
     uint8_t buf[BLE_SEG_BYTES + 1];
@@ -916,6 +1096,10 @@ class BleSegCb : public BLECharacteristicCallbacks {
     // when the whole thing fits here, NOT merely when that field reads < 20:
     // the field saturates at 32 and a 20-byte datagram would otherwise be
     // mistaken for a single segment it cannot fit into.
+    // Trường độ dài là (tổng độ dài CRTP - 1). Một gói là một đoạn duy nhất khi
+    // toàn bộ gói nằm gọn trong đây, CHỨ không chỉ khi trường đó < 20:
+    // trường này bão hòa ở 32 và một gói 20 byte sẽ bị hiểu nhầm thành một đoạn
+    // duy nhất mà nó không thể chứa được.
     size_t total = (size_t)((ctrl & 0x1F) + 1);
     size_t body  = n - 1;
 
@@ -929,6 +1113,9 @@ class BleSegCb : public BLECharacteristicCallbacks {
         // The length field is authoritative. A well-behaved client sends
         // exactly `total` bytes here, but dispatch what was announced rather
         // than what happened to arrive, so padding cannot reach the parser.
+        // Trường độ dài là nguồn quyết định. Client đúng chuẩn gửi đúng `total`
+        // byte vào đây, nhưng hãy xử lý đúng số đã báo chứ không phải số byte thực
+        // tế đến, để phần đệm không lọt vào bộ phân tích.
         crtpReceiveRaw(ble_rx_buf, total);
         ble_rx_len = 0;
       }
@@ -955,6 +1142,7 @@ class BleServerCb : public BLEServerCallbacks {
     ble_rx_len = 0;
     Serial.println(F("[BLE] phone disconnected"));
     s->startAdvertising();              // ready for the next phone
+                                        // sẵn sàng cho điện thoại tiếp theo
   }
 };
 
@@ -1033,6 +1221,7 @@ void udpPoll() {
   if (n < 2) return;
 
   // Learn the phone address — this is also where replies go (apps bind 2399).
+  // Học địa chỉ điện thoại — đây cũng là nơi gửi phản hồi (app bind cổng 2399).
   IPAddress src = Udp.remoteIP();
   if (!app_ip_known || src != app_ip) {
     app_ip = src;
@@ -1046,6 +1235,7 @@ void udpPoll() {
 //  Send / poll / init
 // ---------------------------------------------------------------------------
 // `payload` is a complete CRTP packet, header included, no checksum.
+// `payload` là một gói CRTP hoàn chỉnh, có header, không có checksum.
 bool linkSend(const uint8_t *payload, size_t len) {
   if (len == 0 || len > CRTP_MAX_SIZE) return false;
 
@@ -1064,6 +1254,7 @@ bool linkSend(const uint8_t *payload, size_t len) {
 #endif
 
   // UDP (including the WiFi+BLE profiles, which carry CRTP over UDP)
+  // UDP (gồm cả các hồ sơ WiFi+BLE, vốn chở CRTP qua UDP)
   if (!app_ip_known) return false;
   uint8_t out[CRTP_MAX_SIZE + 1];
   memcpy(out, payload, len);
@@ -1079,6 +1270,7 @@ void linkPoll() {
   if (link_mode == LINK_MODE_BT_SPP) btPoll();
 #endif
   // BLE RX arrives in callbacks; nothing to poll.
+  // BLE RX đến trong các callback; không có gì để poll.
 }
 
 void linkInit() {
@@ -1089,6 +1281,7 @@ void linkInit() {
   bool ble  = linkUsesBle(link_mode);
 
   // BLE coexists with WiFi, so the *_BLE profiles just enable both stacks.
+  // BLE chung sống được với WiFi, nên các hồ sơ *_BLE chỉ bật cả hai giao thức.
   if (wifi)      WiFi.mode(link_mode == LINK_MODE_WIFI_STA || link_mode == LINK_MODE_WIFI_STA_BLE
                             ? WIFI_STA : WIFI_AP);
   else if (ble)  WiFi.mode(WIFI_OFF);
@@ -1122,6 +1315,8 @@ void linkInit() {
 
 // Send a CRTP packet (no checksum) to the phone. linkSend adds whatever
 // framing the active transport needs.
+// Gửi một gói CRTP (không checksum) tới điện thoại. linkSend thêm phần đóng khung
+// mà tầng truyền đang hoạt động cần.
 bool crtpSend(const uint8_t *payload, size_t len) {
   return linkSend(payload, len);
 }
@@ -1129,9 +1324,14 @@ bool crtpSend(const uint8_t *payload, size_t len) {
 // Convenience: send human-readable console text (CRTP port 0, channel 0).
 // NOTE: the iOS app decodes inbound datagrams as UTF-8 text and would crash on
 // raw binary, so console text is the only payload both apps tolerate.
+// Tiện ích: gửi văn bản console dạng người đọc được (CRTP port 0, channel 0).
+// LƯU Ý: app iOS giải mã gói vào dạng văn bản UTF-8 và sẽ crash với dữ liệu nhị
+// phân thô, nên văn bản console là phần dữ liệu duy nhất cả hai app chấp nhận.
 void crtpConsole(const char *text) {
   // Never emit an empty datagram: the client's resend-queue matcher indexes
   // into the payload without a bounds check, so a 1-byte packet could throw.
+  // Không bao giờ phát một gói rỗng: bộ so khớp hàng đợi gửi lại của client truy
+  // cập phần dữ liệu không kiểm tra biên, nên gói 1 byte có thể gây lỗi.
   if (!text || !*text) return;
   uint8_t buf[CRTP_MAX_SIZE];
   size_t n = strlen(text);
@@ -1144,8 +1344,11 @@ void crtpConsole(const char *text) {
 // ---- CommanderPacket (CRTP port 3, channel 0) ------------------------------
 // [0] 0x30 header | [1..4] float roll | [5..8] float pitch (already negated
 // by the client) | [9..12] float yaw | [13..14] uint16 thrust | [15] checksum
+// [0] 0x30 header | [1..4] float roll | [5..8] float pitch (client đã đảo dấu)
+// | [9..12] float yaw | [13..14] uint16 thrust | [15] checksum
 void crtpHandleCommander(const uint8_t *p, size_t len) {
   // 1 header + 14 payload = 15 CRTP bytes (checksum handled by caller)
+  // 1 header + 14 phần dữ liệu = 15 byte CRTP (checksum do hàm gọi xử lý)
   if (len < 15) return;
   float roll, pitch, yaw;
   uint16_t thrust;
@@ -1155,6 +1358,7 @@ void crtpHandleCommander(const uint8_t *p, size_t len) {
   memcpy(&thrust, p + 13, 2);
 
   // sanity: reject NaN/inf and absurd angles
+  // kiểm tra hợp lệ: loại NaN/inf và các góc vô lý
   if (!isfinite(roll) || !isfinite(pitch) || !isfinite(yaw)) return;
   if (fabsf(roll) > 180.0f || fabsf(pitch) > 180.0f || fabsf(yaw) > 2000.0f) return;
 
@@ -1171,6 +1375,9 @@ void crtpHandleCommander(const uint8_t *p, size_t len) {
 // Every command re-acks on retransmission: the client retries unacknowledged
 // packets every 500 ms, and these must be safe to apply twice. The only
 // non-idempotent one is TAKEOFF, which simply restarts the ramp.
+// Mỗi lệnh đều ack lại khi được gửi lại: client thử lại các gói chưa có ack mỗi
+// 500 ms, nên các lệnh này phải an toàn khi áp dụng hai lần. Lệnh duy nhất không
+// idempotent là TAKEOFF, vốn chỉ khởi động lại đoạn bám lực đẩy.
 void crtpHandleFlightControl(const uint8_t *p, size_t len) {
   if (len < 2) return;
   uint8_t cmd = p[1];
@@ -1180,9 +1387,13 @@ void crtpHandleFlightControl(const uint8_t *p, size_t len) {
     case FC_CMD_SET_MODE:
       // Modes run 0..4 (MANUAL..RTH), not 0..2 — the old bound silently
       // rejected FOLLOW and RTH, which are the whole point of the nav stack.
+      // Các chế độ chạy 0..4 (MANUAL..RTH), không phải 0..2 — biên cũ từng lặng
+      // lẽ từ chối FOLLOW và RTH, vốn là mục đích chính của hệ dẫn đường.
       if (len < 3 || p[2] > MODE_RTH) { status = 1; break; }
       // Once the battery is critical the drone is landing. A mode command (the
       // GPS screen resends SET_MODE every tick) must not cancel that.
+      // Khi pin đã ở mức nguy kịch, drone sẽ hạ cánh. Một lệnh chế độ (màn hình
+      // GPS gửi lại SET_MODE mỗi nhịp) không được hủy việc đó.
       if (armed && vbat_crit) { status = 1; break; }
       flightSetMode(p[2]);
       break;
@@ -1222,6 +1433,9 @@ void crtpHandleFlightControl(const uint8_t *p, size_t len) {
       // Refused unless the motors would start from idle: MANUAL with the
       // phone's thrust at zero, or AUTO before a takeoff. In HOLD/FOLLOW/RTH the
       // motors would jump straight to hover thrust -- use TAKEOFF for that.
+      // Từ chối trừ khi động cơ sẽ khởi động từ trạng thái nghỉ: MANUAL với lực
+      // đẩy từ điện thoại bằng không, hoặc AUTO trước khi cất cánh. Ở HOLD/FOLLOW/RTH
+      // động cơ sẽ nhảy thẳng tới lực đẩy hover -- hãy dùng TAKEOFF cho việc đó.
       if (!armed) {
         bool from_idle = (flight_mode == MODE_MANUAL && cmd_thrust <= 500) ||
                          (flight_mode == MODE_AUTO && auto_state == AUTO_IDLE);
@@ -1239,6 +1453,7 @@ void crtpHandleFlightControl(const uint8_t *p, size_t len) {
 
     case FC_CMD_SAVE:
       // NVS writes erase flash, which stalls both cores for milliseconds.
+      // Ghi NVS sẽ xóa flash, làm cả hai nhân đứng yên hàng milli giây.
       if (armed) { status = 1; break; }
       cfgSave();
       break;
@@ -1253,6 +1468,7 @@ void crtpHandleFlightControl(const uint8_t *p, size_t len) {
 
     case FC_CMD_LINK:
       // Never write flash and reboot in the air.
+      // Không bao giờ ghi flash và khởi động lại khi đang bay.
       if (armed || len < 3 || p[2] >= LINK_MODE_COUNT) { status = 1; break; }
       nvs.putUChar("link", p[2]);
       pending_link_mode = p[2];
@@ -1266,6 +1482,8 @@ void crtpHandleFlightControl(const uint8_t *p, size_t len) {
 
   // Two payload bytes after the header, so the client's resend-queue matcher
   // can index it without a bounds check.
+  // Hai byte phần dữ liệu sau header, để bộ so khớp hàng đợi gửi lại của client
+  // có thể truy cập mà không cần kiểm tra biên.
   uint8_t out[3] = { FC_HDR, cmd, status };
   crtpSend(out, sizeof(out));
 }
@@ -1274,6 +1492,9 @@ void crtpHandleFlightControl(const uint8_t *p, size_t len) {
 // The phone computes the target from its own GPS and compass and sends it as
 // an offset from the launch point. Everything the drone does with it is an
 // estimate — see the NAVIGATION section above.
+// Điện thoại tính mục tiêu từ GPS và la bàn của chính nó rồi gửi dạng độ lệch so
+// với điểm cất cánh. Mọi thứ drone làm với nó đều là ước lượng — xem phần
+// NAVIGATION ở trên.
 void crtpHandleNav(const uint8_t *p, size_t len) {
   if (len < 2) return;
   uint8_t cmd = p[1];
@@ -1284,6 +1505,9 @@ void crtpHandleNav(const uint8_t *p, size_t len) {
       // north/east offset of the target from the launch point, in metres.
       // The drone has no compass, so it cannot rotate these into its own
       // frame by itself — NAV_CMD_ALIGN supplied that angle at launch.
+      // độ lệch bắc/đông của mục tiêu so với điểm cất cánh, tính bằng mét.
+      // Drone không có la bàn nên không thể tự quay các giá trị này vào khung của
+      // mình — NAV_CMD_ALIGN cung cấp góc đó tại lúc cất cánh.
       if (len < 10) { status = 1; break; }
       { float n = 0.0f, e = 0.0f;
         memcpy(&n, p + 2, 4);
@@ -1298,6 +1522,15 @@ void crtpHandleNav(const uint8_t *p, size_t len) {
         // The second line used to carry the opposite sign, which put the target
         // on the STARBOARD side and made the drone fly away from any target
         // that was not straight ahead. frame_test.cpp pins this.
+        // Khung cất cánh: +x là hướng mũi tại ALIGN, +y lệch 90 độ sang TRÁI --
+        // đúng khung mà navUpdate() tích phân vào, nên navSetpoints() có thể trừ
+        // hai giá trị trực tiếp. Chiếu (n, e) lên các vectơ đơn vị tại phương
+        // hướng alpha và alpha-90:
+        //   +x = n*cos(a) + e*sin(a)
+        //   +y = n*sin(a) - e*cos(a)
+        // Dòng thứ hai trước đây mang dấu ngược, làm mục tiêu nằm về phía MẠN
+        // PHẢI và khiến drone bay ra xa mọi mục tiêu không thẳng phía trước.
+        // frame_test.cpp cố định điều này.
         const float a = align_alpha_deg * DEG_TO_RAD;
         const float ca = cosf(a), sa = sinf(a);
         tgt_x = n * ca + e * sa;
@@ -1315,6 +1548,10 @@ void crtpHandleNav(const uint8_t *p, size_t len) {
       // relationship the drone cannot measure — it has no magnetometer — so
       // the phone supplies it and the drone treats this moment as launch:
       // heading_ref_deg is zeroed here and the dead reckoning restarts.
+      // Phương hướng la bàn của mũi tại lúc cất cánh. Đây là mối quan hệ khung
+      // duy nhất drone không đo được — nó không có từ kế — nên điện thoại cung
+      // cấp giá trị và drone xem khoảnh khắc này là lúc cất cánh:
+      // heading_ref_deg được đặt về 0 tại đây và tự dẫn đường quán tính khởi động lại.
       if (len < 6) { status = 1; break; }
       { float a = 0.0f;
         memcpy(&a, p + 2, 4);
@@ -1352,15 +1589,26 @@ void crtpHandleNav(const uint8_t *p, size_t len) {
 //  The client keeps a 500 ms resend queue, so every handler here must be
 //  idempotent: a retransmitted CREATE/START/DELETE has to re-ack success
 //  rather than report "already exists" / "no such id".
+//  Bố cục byte bị chi phối bởi thư viện Java "crazyflie" của Bitcraze mà client
+//  Android được xây dựng từ đó, và được neo theo các tệp được liệt kê ở trên.
+//
+//  Client giữ một hàng đợi gửi lại 500 ms, nên mọi handler ở đây phải idempotent:
+//  một CREATE/START/DELETE được gửi lại phải ack lại thành công thay vì báo
+//  "already exists" / "no such id".
 // =============================================================================
 
 // The command codes and the TocEntry/LogBlock types are defined up with the
 // other #defines at the top of the file; see the note there about the Arduino
 // preprocessor's generated prototypes.
+// Các mã lệnh và các kiểu TocEntry/LogBlock được định nghĩa cùng các #define ở
+// đầu tệp; xem ghi chú ở đó về các prototype do bộ tiền xử lý Arduino sinh ra.
 
 // The three parameters MainPresenter.java probes at connect time. This board
 // has no buzzer deck, zRanger or LED ring, so all three report 0 — which is
 // what keeps the matching buttons disabled instead of silently dead.
+// Ba tham số mà MainPresenter.java dò khi kết nối. Bo này không có buzzer deck,
+// zRanger hay LED ring, nên cả ba đều báo 0 — nhờ vậy các nút tương ứng bị mờ đi
+// thay vì chết lặng lẽ.
 static uint32_t p_cpu_flash      = 0;
 static uint8_t  p_deck_bczranger = 0;
 static uint8_t  p_ring_neffect   = 0;
@@ -1370,6 +1618,7 @@ static const TocEntry PARAM_TOC[] = {
   { "deck", "bcZRanger", PT_UINT8,  1, TOC_ACCESS_RO, &p_deck_bczranger },
   { "ring", "neffect",   PT_UINT8,  1, TOC_ACCESS_RO, &p_ring_neffect   },
   // PID gains are exposed read/write so they can be tuned from the phone.
+  // Các gain PID được phơi dạng đọc/ghi để có thể tinh chỉnh từ điện thoại.
   { "pid",  "roll_kp",   PT_FLOAT,  4, TOC_ACCESS_RW, &pid_p_gain_roll, 0.0f, 100.0f },
   { "pid",  "roll_ki",   PT_FLOAT,  4, TOC_ACCESS_RW, &pid_i_gain_roll, 0.0f, 20.0f },
   { "pid",  "roll_kd",   PT_FLOAT,  4, TOC_ACCESS_RW, &pid_d_gain_roll, 0.0f, 200.0f },
@@ -1389,6 +1638,9 @@ static const TocEntry PARAM_TOC[] = {
 // Telemetry the app can subscribe to. pm.vbat is the one MainPresenter's
 // "Standard" config actually requests; the rest are here for flight-data views.
 // There is no magnetometer, so stabilizer.yaw is the yaw RATE in deg/s.
+// Dữ liệu từ xa mà app có thể đăng ký. pm.vbat là thứ cấu hình "Standard" của
+// MainPresenter thực sự yêu cầu; phần còn lại phục vụ các màn hình dữ liệu bay.
+// Không có từ kế, nên stabilizer.yaw là TỐC ĐỘ GÓC yaw theo deg/s.
 static const TocEntry LOG_TOC[] = {
   { "pm",         "vbat",  LT_FLOAT,  4, TOC_ACCESS_RO, &vbat            },
   { "stabilizer", "roll",  LT_FLOAT,  4, TOC_ACCESS_RO, &angle_roll_deg  },
@@ -1404,6 +1656,8 @@ static const TocEntry LOG_TOC[] = {
 
   // Flight state, so the phone can show mode / sequence / armed without a
   // second protocol. `armed` is a bool, read back as one little-endian byte.
+  // Trạng thái bay, để điện thoại hiển thị chế độ / chuỗi / armed mà không cần
+  // giao thức thứ hai. `armed` là giá trị bool, đọc lại thành một byte little-endian.
   { "flight", "mode",       LT_UINT8,  1, TOC_ACCESS_RO, &flight_mode  },
   { "flight", "auto_state", LT_UINT8,  1, TOC_ACCESS_RO, &auto_state   },
   { "flight", "armed",      LT_UINT8,  1, TOC_ACCESS_RO, &armed        },
@@ -1411,6 +1665,8 @@ static const TocEntry LOG_TOC[] = {
 
   // Dead-reckoned position. Rough — see the NAVIGATION section. Surfaced so
   // the app can draw it and say plainly that it drifts.
+  // Vị trí tự dẫn đường quán tính. Xấp xỉ — xem phần NAVIGATION. Được phơi ra
+  // để app vẽ được và nói rõ rằng nó bị trôi.
   { "nav", "pos_x", LT_FLOAT, 4, TOC_ACCESS_RO, &pos_x },
   { "nav", "pos_y", LT_FLOAT, 4, TOC_ACCESS_RO, &pos_y },
   { "nav", "vel_x", LT_FLOAT, 4, TOC_ACCESS_RO, &vel_x },
@@ -1421,6 +1677,9 @@ static const TocEntry LOG_TOC[] = {
   // Per-term breakdown of the PID output. Charting these is how you see which
   // loop is doing the work — a D term spiking against P is a different fix
   // from I windup, and the summed output hides the difference.
+  // Phân rã từng thành phần của output PID. Vẽ các giá trị này là cách thấy vòng
+  // nào đang làm việc — D gai lên chống lại P cần cách xử lý khác với I windup,
+  // còn output tổng thì che mất sự khác biệt đó.
   { "pid", "roll_p",  LT_FLOAT, 4, TOC_ACCESS_RO, &pid_p_roll  },
   { "pid", "roll_i",  LT_FLOAT, 4, TOC_ACCESS_RO, &pid_i_roll  },
   { "pid", "roll_d",  LT_FLOAT, 4, TOC_ACCESS_RO, &pid_d_roll  },
@@ -1438,6 +1697,9 @@ static LogBlock log_blocks[LOG_MAX_BLOCKS];
 // CRC-32 (IEEE) over the TOC contents. The client only compares this against
 // its own cache key, so it has to be stable and content-derived; it does not
 // need to match any external implementation.
+// CRC-32 (IEEE) trên nội dung TOC. Client chỉ so giá trị này với khóa cache của
+// chính nó, nên nó phải ổn định và suy từ nội dung; không cần khớp với triển
+// khai bên ngoài nào.
 uint32_t crc32Byte(uint32_t crc, uint8_t b) {
   crc ^= b;
   for (uint8_t i = 0; i < 8; i++)
@@ -1458,6 +1720,7 @@ uint32_t tocCrc(const TocEntry *toc, uint8_t n) {
 }
 
 // <cmd><nItems><crc32 LE> on the TOC channel of the given port.
+// <cmd><nItems><crc32 LE> trên kênh TOC của port được chỉ định.
 void tocSendInfo(uint8_t port, const TocEntry *toc, uint8_t n) {
   uint8_t buf[CRTP_MAX_SIZE];
   buf[0] = (uint8_t)((port << 4) | LOG_CHAN_TOC);
@@ -1471,6 +1734,9 @@ void tocSendInfo(uint8_t port, const TocEntry *toc, uint8_t n) {
 // <cmd><id><type|access><group\0><name\0>. Refusing to send rather than
 // truncating matters: TocElement.java needs exactly two NUL-separated fields,
 // so a clipped name would silently drop the element and desync the TOC.
+// <cmd><id><type|access><group\0><name\0>. Từ chối gửi thay vì cắt bớt là điều
+// quan trọng: TocElement.java cần đúng hai trường ngăn bởi NUL, nên một tên bị
+// cắt sẽ lặng lẽ loại bỏ phần tử và làm lệch đồng bộ TOC.
 void tocSendElement(uint8_t port, const TocEntry *toc, uint8_t n, uint8_t id) {
   if (id >= n) return;
   const TocEntry &e = toc[id];
@@ -1493,6 +1759,9 @@ void tocSendElement(uint8_t port, const TocEntry *toc, uint8_t n, uint8_t id) {
 // Store a value written from the phone. Floats must be finite, and every
 // numeric value is clamped into the entry's [lo, hi]. Without this a NaN gain,
 // or a takeoff_ms of 0 (a divide-by-zero in the ramp), reached the motors.
+// Lưu giá trị được ghi từ điện thoại. Float phải hữu hạn, và mọi giá trị số bị
+// kẹp trong khoảng [lo, hi] của mục đó. Không có bước này thì một gain NaN, hoặc
+// takeoff_ms bằng 0 (chia cho 0 trong đoạn bám), sẽ tới được động cơ.
 static float paramClampF(const TocEntry &e, float v) {
   if (v < e.lo) return e.lo;
   if (v > e.hi) return e.hi;
@@ -1504,6 +1773,7 @@ void paramStore(const TocEntry &e, const uint8_t *src) {
     float v;
     memcpy(&v, src, 4);
     if (!isfinite(v)) return;          // refused -- the echo shows the old value
+                                       // từ chối -- giá trị echo sẽ là giá trị cũ
     v = paramClampF(e, v);
     memcpy(e.value, &v, 4);
   } else if (e.ctype == PT_UINT16) {
@@ -1513,11 +1783,14 @@ void paramStore(const TocEntry &e, const uint8_t *src) {
     memcpy(e.value, &v, 2);
   } else if (src != e.value) {
     memcpy(e.value, src, e.size);      // no RW entries of other types today
+                                       // hiện chưa có mục RW loại nào khác
   }
 }
 
 // After loading from NVS: a non-finite stored gain restores all defaults, then
 // every RW entry is clamped into its range.
+// Sau khi tải từ NVS: một gain đã lưu không hữu hạn sẽ khôi phục toàn bộ mặc định,
+// rồi mọi mục RW được kẹp vào khoảng cho phép của nó.
 void paramSanitizeAll() {
   bool bad = false;
   for (uint8_t i = 0; i < PARAM_TOC_COUNT; i++) {
@@ -1552,6 +1825,7 @@ void crtpHandleParams(const uint8_t *p, size_t len) {
   }
 
   // Value access — <id><value LE> in both directions.
+  // Truy cập giá trị — <id><value LE> ở cả hai chiều.
   uint8_t id = p[1];
   if (id >= PARAM_TOC_COUNT) return;
   const TocEntry &e = PARAM_TOC[id];
@@ -1568,11 +1842,16 @@ void crtpHandleParams(const uint8_t *p, size_t len) {
     // client's resend queue retries an unmatched write every 500 ms and never
     // gives up. Ack with whatever is actually in the variable so the matcher
     // clears; the app's read-back then shows the true value.
+    // Mục chỉ đọc không được lưu, nhưng im lặng không phải câu trả lời đúng: hàng
+    // đợi gửi lại của client thử lại một lần ghi chưa khớp mỗi 500 ms và không bao
+    // giờ bỏ cuộc. Hãy ack với đúng giá trị đang có trong biến để bộ so khớp được
+    // xóa; sau đó phần đọc lại của app sẽ hiện giá trị thật.
     if (e.access == TOC_ACCESS_RW) paramStore(e, p + 2);
     uint8_t buf[CRTP_MAX_SIZE];
     buf[0] = (uint8_t)((CRTP_PORT_PARAMS << 4) | PARAM_CHAN_WRITE);
     buf[1] = id;
     memcpy(buf + 2, e.value, e.size);           // echo what is actually stored
+                                                // echo đúng giá trị đang được lưu
     crtpSend(buf, 2 + e.size);
   }
 }
@@ -1592,6 +1871,8 @@ LogBlock *logAlloc() {
 
 // Every control reply is <cmd><id><err>. Logg.java reads all three bytes
 // unconditionally, so a shorter reply would throw there.
+// Mọi phản hồi điều khiển là <cmd><id><err>. Logg.java đọc cả ba byte không có
+// điều kiện, nên một phản hồi ngắn hơn sẽ gây lỗi ở đó.
 void logReply(uint8_t cmd, uint8_t id, uint8_t err) {
   uint8_t buf[CRTP_MAX_SIZE];
   buf[0] = (uint8_t)((CRTP_PORT_LOGGING << 4) | LOG_CHAN_SETTINGS);
@@ -1603,6 +1884,8 @@ void logReply(uint8_t cmd, uint8_t id, uint8_t err) {
 
 // <id><ts24 LE><value...> on the log-data channel. Values are read straight out
 // of the live variables so one packet is internally consistent.
+// <id><ts24 LE><value...> trên kênh dữ liệu log. Giá trị được đọc thẳng từ các
+// biến trực tiếp để một gói luôn nhất quán nội bộ.
 void logSendData(const LogBlock &b) {
   uint8_t buf[CRTP_MAX_SIZE];
   buf[0] = (uint8_t)((CRTP_PORT_LOGGING << 4) | LOG_CHAN_LOGDATA);
@@ -1623,8 +1906,10 @@ void logSendData(const LogBlock &b) {
 }
 
 // Push each log block whose period has elapsed. period is in 10 ms units.
+// Đẩy mỗi khối log có chu kỳ đã hết. period tính bằng đơn vị 10 ms.
 void logUpdate() {
   if (!link_ready) return;      // linkSend() handles "no phone yet" for each transport
+                                // linkSend() tự xử lý "chưa có điện thoại" cho từng tầng truyền
   uint32_t now = millis();
   for (uint8_t i = 0; i < LOG_MAX_BLOCKS; i++) {
     LogBlock &b = log_blocks[i];
@@ -1648,6 +1933,7 @@ void crtpHandleLogging(const uint8_t *p, size_t len) {
     return;
   }
   if (ch != LOG_CHAN_SETTINGS) return;   // channel 2 is our own output
+                                         // channel 2 là kênh phát ra của chính ta
 
   const uint8_t cmd = p[1];
   const uint8_t id  = (len >= 3) ? p[2] : 0;
@@ -1672,6 +1958,13 @@ void crtpHandleLogging(const uint8_t *p, size_t len) {
       // The whole block is validated before anything is committed: Logg.java
       // unpacks a log packet against its own variable list, so accepting a
       // subset would desynchronise the payload and read garbage.
+      // Phần dữ liệu sau <cmd><id> là một danh sách phẳng các cặp <type><tocId>.
+      // Byte type chỉ mang tính thông tin — tocId đã quyết định kiểu và độ rộng —
+      // nên chỉ các id được giữ lại.
+      //
+      // Toàn bộ khối được kiểm tra trước khi ghi nhận gì: Logg.java giải nén một
+      // gói log theo danh sách biến của chính nó, nên chấp nhận một tập con sẽ làm
+      // lệch phần dữ liệu và đọc phải rác.
       uint8_t  ids[LOG_MAX_VARS];
       uint8_t  n     = 0;
       uint16_t total = 0;
@@ -1694,6 +1987,12 @@ void crtpHandleLogging(const uint8_t *p, size_t len) {
         // start at 1 (see Toc.java), so a zero type byte cannot be a real
         // element and ends the list. Without this the padding would parse as
         // repeated element 0 and overflow the block.
+        // Logg.create() dựng yêu cầu này trong một ByteBuffer cố định 31 byte và
+        // gửi toàn bộ mảng nền (CrtpPacket không cắt bớt), nên các cặp
+        // <type><tocId> thật theo sau là phần đệm bằng 0. Mã kiểu log bắt đầu từ
+        // 1 (xem Toc.java), nên byte type bằng 0 không thể là phần tử thật và sẽ
+        // kết thúc danh sách. Không có bước này thì phần đệm sẽ bị phân tích thành
+        // phần tử 0 lặp lại và tràn khối.
         if (p[i] == 0) break;
         uint8_t tid = p[i + 1];
         if (tid >= LOG_TOC_COUNT || n >= LOG_MAX_VARS ||
@@ -1713,6 +2012,10 @@ void crtpHandleLogging(const uint8_t *p, size_t len) {
         // 500 ms until something matches its expectation, and LOG_ERR_EXISTS
         // would surface to the user as a failure for what is really just a
         // lost ack. Only a genuinely different variable list is a conflict.
+        // Một CREATE được gửi lại phải được ack OK lần nữa. Client gửi lại mỗi
+        // 500 ms cho tới khi có gì khớp kỳ vọng, và LOG_ERR_EXISTS sẽ hiện với
+        // người dùng như một thất bại cho việc vốn chỉ là một ack bị mất. Chỉ một
+        // danh sách biến thật sự khác mới là xung đột.
         if (b->nvars == n && memcmp(b->var_id, ids, n) == 0) {
           logReply(cmd, id, LOG_ERR_OK);
         } else {
@@ -1737,6 +2040,8 @@ void crtpHandleLogging(const uint8_t *p, size_t len) {
     case LOG_CMD_DELETE:
       // Deleting an absent block still acks: a lost ack would otherwise make
       // the client's retransmission look like a failed delete.
+      // Xóa một khối không tồn tại vẫn phải ack: nếu không, một ack bị mất sẽ làm
+      // lần gửi lại của client trông như một lần xóa thất bại.
       if (LogBlock *b = logFind(id)) {
         b->used = false;
         b->started = false;
@@ -1770,6 +2075,7 @@ void crtpHandleLogging(const uint8_t *p, size_t len) {
 }
 
 // Dispatch one full CRTP packet (checksum already verified).
+// Phân phối một gói CRTP hoàn chỉnh (checksum đã được kiểm tra).
 void crtpDispatch(const uint8_t *p, size_t len) {
   uint8_t port = (p[0] >> 4) & 0x0F;
   switch (port) {
@@ -1795,10 +2101,13 @@ void crtpDispatch(const uint8_t *p, size_t len) {
 }
 
 // (wifiUdpInit() / crtpPoll() moved into the TRANSPORT section above.)
+// (wifiUdpInit() / crtpPoll() đã được chuyển vào phần TRANSPORT ở trên.)
 
 // =============================================================================
 //  Motor PWM  (LEDC, brushed MOSFET drive — duty cycle, not servo pulse)
 //  20 kHz keeps switching above audible range for 8520 coreless motors.
+//  Motor PWM  (LEDC, điều khiển MOSFET chổi than — duty cycle, không phải xung servo)
+//  20 kHz giữ tần số chuyển mạch trên ngưỡng nghe được của động cơ coreless 8520.
 // =============================================================================
 #define MOTOR_PWM_FREQ_HZ  20000
 #define MOTOR_PWM_BITS     10          // 0..1023 duty
@@ -1822,6 +2131,7 @@ void motorInit() {
 }
 
 // Convert the internal 1000..2000 µs convention to a 0..1023 duty
+// Chuyển quy ước nội bộ 1000..2000 µs thành duty 0..1023
 inline uint16_t usToDuty(int16_t us) {
   if (us <= 1000) return 0;
   if (us >= 2000) return MOTOR_PWM_MAX;
@@ -1851,9 +2161,11 @@ void motorStop() {
 // =============================================================================
 void batteryUpdate() {
   // analogReadMilliVolts() uses the factory Vref calibration
+  // analogReadMilliVolts() dùng hiệu chỉnh Vref của nhà máy
   uint32_t mv = analogReadMilliVolts(PIN_VBAT);
   float sample = (mv / 1000.0f) * VBAT_DIVIDER;
   // Smooth it: one ADC read is noisy and sags with every throttle punch.
+  // Làm mượt: một lần đọc ADC rất nhiễu và sụt theo mỗi cú đẩy throttle.
   if (vbat <= 0.0f) vbat = sample;
   else              vbat += VBAT_FILTER_ALPHA * (sample - vbat);
   vbat_warn = (vbat < VBAT_CELLS * VBAT_CELL_WARN);
@@ -1871,6 +2183,9 @@ void batteryUpdate() {
 // Pre-arm checks shared by every arming path (SBUS, CRTP thrust-up, ARM,
 // TAKEOFF). The message is rate-limited so a held stick or a streaming thrust
 // value cannot flood the console.
+// Các bước kiểm tra trước khi kích hoạt, dùng chung cho mọi đường kích hoạt
+// (SBUS, CRTP lực đẩy-up, ARM, TAKEOFF). Thông báo bị giới hạn tần suất để một
+// cần gạt giữ nguyên hoặc một luồng giá trị lực đẩy không thể làm ngập console.
 bool armChecksOk(const char *who) {
 #if VBAT_ARM_CHECK
   if (vbat < VBAT_CELLS * VBAT_CELL_CRIT) {
@@ -1891,6 +2206,7 @@ bool armChecksOk(const char *who) {
 
 // =============================================================================
 //  PID  (rate loop; stick gives rate setpoint, accelerometer levels the frame)
+//  PID  (vòng lặp tốc độ góc; cần gạt cho setpoint tốc độ góc, gia tốc kế làm cân bằng khung)
 // =============================================================================
 void pidCompute() {
   float err;
@@ -1939,10 +2255,14 @@ void pidReset() {
 //  Attitude  (complementary filter, 250 Hz)
 //  gyro_pitch/gyro_roll/gyro_yaw are RATES in deg/s (fed to the PID).
 //  angle_pitch_deg/angle_roll_deg are filtered ANGLES in deg (used to self-level).
+//  Tư thế  (bộ lọc bổ sung, 250 Hz)
+//  gyro_pitch/gyro_roll/gyro_yaw là TỐC ĐỘ GÓC theo deg/s (đưa vào PID).
+//  angle_pitch_deg/angle_roll_deg là GÓC đã lọc theo độ (dùng để tự cân bằng).
 // =============================================================================
 
 void attitudeUpdate() {
   // raw minus bias, with configurable axis signs
+  // giá trị thô trừ sai lệch bias, với dấu trục có thể cấu hình
   const float gx = (raw_gx - gyro_x_cal) * GYRO_X_SIGN / 65.5f;   // deg/s
   const float gy = (raw_gy - gyro_y_cal) * GYRO_Y_SIGN / 65.5f;
   const float gz = (raw_gz - gyro_z_cal) * GYRO_Z_SIGN / 65.5f;
@@ -1959,6 +2279,7 @@ void attitudeUpdate() {
   if (acc_total < 1.0f) acc_total = 1.0f;
 
   // only trust asin argument while |axis| < |vector|
+  // chỉ tin đối số asin khi |trục| < |vectơ|
   if (fabsf(ay) < acc_total) angle_pitch_acc = asinf(ay / acc_total) * RAD_TO_DEG;
   if (fabsf(ax) < acc_total) angle_roll_acc  = asinf(-ax / acc_total) * RAD_TO_DEG;
 
@@ -1977,6 +2298,9 @@ void attitudeUpdate() {
   // Heading is integrated from the yaw rate. There is no magnetometer on this
   // board, so heading hold is only as good as the gyro bias over a flight —
   // it drifts slowly. That is a real limit, not something to paper over.
+  // Hướng mũi được tích phân từ tốc độ góc yaw. Bo này không có từ kế, nên việc
+  // giữ hướng chỉ tốt bằng sai lệch bias của gyro qua một chuyến bay — nó trôi
+  // chậm. Đó là giới hạn thật, không phải thứ để che đậy.
   heading_deg += gz * dt;
   if      (heading_deg >= 360.0f) heading_deg -= 360.0f;
   else if (heading_deg < 0.0f)    heading_deg += 360.0f;
@@ -1993,6 +2317,16 @@ void attitudeUpdate() {
 //  velocity integrator, a velocity zero whenever the drone is holding still,
 //  and a position reset at launch and landing. Treat the result as "roughly
 //  toward the pilot", never as a tracked position.
+//  DẪN ĐƯỜNG — tự dẫn đường quán tính bằng gia tốc kế về mục tiêu do điện thoại cung cấp
+//
+//  Bo này không có GPS, không có từ kế và không có cảm biến khoảng cách, nên
+//  drone không thể đo nó đang ở đâu. Việc nó có thể làm là tích phân gia tốc kế
+//  của chính nó và bay về phía một độ lệch do điện thoại tính từ GPS của điện
+//  thoại. Ước lượng đó bị trôi — vài mét trong một phút — vì sai lệch gia tốc kế
+//  MEMS bị tích phân hai lần. Các biện pháp khắc phục ở đây là bộ tích phân vận tốc
+//  có rò rỉ, đặt vận tốc về 0 mỗi khi drone đứng yên, và đặt lại vị trí khi cất
+//  cánh và hạ cánh. Hãy coi kết quả là "đại khái về phía người lái", đừng bao giờ
+//  coi đó là vị trí được theo dõi.
 // =============================================================================
 void navReset() {
   pos_x = pos_y = 0.0f;
@@ -2006,6 +2340,8 @@ void navUpdate(float dt, bool holding) {
 
   // MPU6500 specific force -> m/s^2. It reads +1 g on the vertical axis at
   // rest, so subtracting the attitude-derived gravity leaves linear accel.
+  // Lực riêng của MPU6500 -> m/s^2. Khi nghỉ nó đọc +1 g trên trục thẳng đứng,
+  // nên trừ trọng lực suy từ tư thế đi sẽ còn gia tốc tuyến tính.
   const float ax_b = raw_ax / NAV_ACC_LSB_PER_G * G;
   const float ay_b = raw_ay / NAV_ACC_LSB_PER_G * G;
 
@@ -2016,14 +2352,18 @@ void navUpdate(float dt, bool holding) {
 
   // Gravity in the sensor frame. Matches the firmware's own tilt convention
   // (pitch from +ay, roll from -ax), so the unit vector is consistent.
+  // Trọng lực trong khung cảm biến. Khớp quy ước nghiêng của chính firmware
+  // (pitch từ +ay, roll từ -ax), nên vectơ đơn vị luôn nhất quán.
   const float gx_g = -G * sg * ct;
   const float gy_g = +G * st;
 
   // Linear acceleration along the two horizontal sensor axes.
+  // Gia tốc tuyến tính dọc hai trục cảm biến nằm ngang.
   float fwd  = (ay_b - gy_g) * (float)NAV_FWD_SIGN;
   float left = (ax_b - gx_g) * (float)NAV_LEFT_SIGN;
 
   // Rotate into the launch frame using the yaw since launch.
+  // Quay vào khung cất cánh bằng yaw kể từ lúc cất cánh.
   const float yaw_rel = (heading_deg - heading_ref_deg) * (float)NAV_HEADING_SIGN * DEG_TO_RAD;
   const float cy = cosf(yaw_rel), sy = sinf(yaw_rel);
   const float ax_w = fwd * cy - left * sy;
@@ -2035,11 +2375,15 @@ void navUpdate(float dt, bool holding) {
   // Leaky integrator: without this, bias integrates into a velocity error that
   // grows without bound. The leak costs a little of any sustained move, which
   // is the right trade for a craft that mostly hovers.
+  // Bộ tích phân có rò rỉ: không có nó, bias tích thành sai số vận tốc tăng vô hạn.
+  // Khoản rò làm mất một chút khi di chuyển liên tục, nhưng đó là đánh đổi đúng cho
+  // một vật thể phần lớn thời gian ở trạng thái hover.
   const float leak = powf(NAV_VEL_LEAK_PER_S, dt);
   vel_x *= leak;
   vel_y *= leak;
 
   // Holding still is the one thing we know for certain, so use it.
+  // Đứng yên là điều duy nhất ta biết chắc, nên hãy tận dụng nó.
   if (holding) {
     vel_x = 0.0f;
     vel_y = 0.0f;
@@ -2051,6 +2395,8 @@ void navUpdate(float dt, bool holding) {
 
 // Position controller: turn an offset error into a tilt angle toward it.
 // Fills sp_roll_deg / sp_pitch_deg; yaw is left to the heading hold.
+// Bộ điều khiển vị trí: biến sai số độ lệch thành góc nghiêng về phía mục tiêu.
+// Điền sp_roll_deg / sp_pitch_deg; yaw để cho phần giữ hướng đảm nhiệm.
 void navSetpoints() {
   float ex = tgt_x - pos_x;
   float ey = tgt_y - pos_y;
@@ -2058,11 +2404,14 @@ void navSetpoints() {
 
   if (dist < NAV_STOP_BAND_M || !tgt_valid) {
     // close enough (or no target): hold where we are
+    // đã đủ gần (hoặc không có mục tiêu): giữ nguyên vị trí
     return;
   }
 
   // Command a tilt toward the target, magnitude proportional to distance and
   // capped. nav_kp is already deg-of-tilt per metre, so mag is in degrees.
+  // Ra lệnh nghiêng về phía mục tiêu, độ lớn tỷ lệ với khoảng cách và bị chặn.
+  // nav_kp đã tính bằng độ nghiêng trên mỗi mét, nên mag tính bằng độ.
   float mag = constrain(dist * nav_kp, 0.0f, (float)NAV_MAX_TILT_DEG);
   float ux = ex / dist * mag;             // toward the target, launch frame
   float uy = ey / dist * mag;
@@ -2074,6 +2423,8 @@ void navSetpoints() {
 
   // +x body = nose, and a nose-up pitch is +pitch; +y body = left, and a
   // left-wing-down roll is +roll in this firmware's convention.
+  // +x thân = mũi, và pitch mũi hướng lên là +pitch; +y thân = trái, và roll
+  // cánh trái hướng xuống là +roll theo quy ước của firmware này.
   sp_pitch_deg = constrain(body_fwd,  -MAX_TILT_DEG, MAX_TILT_DEG);
   sp_roll_deg  = constrain(body_left, -MAX_TILT_DEG, MAX_TILT_DEG);
 }
@@ -2089,6 +2440,16 @@ void navSetpoints() {
 //
 //  Modes apply to the CRTP (phone) path only. SBUS stays rate-mode manual
 //  always: the physical RC is the safety net and must never be overridden.
+//  CÁC CHẾ ĐỘ BAY — manual / hold / auto(cất cánh -> giữ -> hạ cánh)
+//
+//  Bo này CHỈ có MPU6500: không áp kế, không ToF/không cảm biến khoảng cách,
+//  không GPS. Nên "hold" giữ tư thế cân bằng + khóa hướng mũi + giữ mức LỰC ĐẨU,
+//  còn "auto" là chuỗi cất cánh / hover / hạ cánh. Không chế độ nào cam kết giữ
+//  độ cao — độ cao khi hover là thứ hover_thrust tạo ra và bị trôi khi pin yếu đi.
+//  Giao diện điện thoại nói rõ điều đó thay vì vẽ một mức giữ độ cao giả.
+//
+//  Các chế độ chỉ áp dụng cho đường CRTP (điện thoại). SBUS luôn ở chế độ rate
+//  manual: RC vật lý là lưới an toàn và không bao giờ được ghi đè.
 // =============================================================================
 void flightConfigDefaults() {
   pid_p_gain_roll  = PID_ROLL_KP;   pid_i_gain_roll  = PID_ROLL_KI;   pid_d_gain_roll  = PID_ROLL_KD;
@@ -2102,6 +2463,9 @@ void flightConfigDefaults() {
 // The nine gains plus the flight config are what the phone's tuning screen
 // persists. Stored as raw floats so a read-back is byte-identical to what was
 // written — no rounding between the editor and the loop.
+// Chín gain cùng cấu hình bay là những gì màn hình tinh chỉnh của điện thoại lưu
+// lại. Được lưu dạng float thô để khi đọc lại giống hệt từng byte với giá trị đã
+// ghi — không có làm tròn giữa trình biên tập và vòng lặp.
 void cfgSave() {
   float g[9] = {
     pid_p_gain_roll,  pid_i_gain_roll,  pid_d_gain_roll,
@@ -2135,7 +2499,9 @@ void cfgLoad() {
 void flightSetMode(uint8_t mode) {
   if (mode > MODE_RTH) return;
   if (mode != MODE_AUTO) auto_state = AUTO_IDLE;   // FOLLOW/RTH are not a sequence
+                                                   // FOLLOW/RTH không phải một chuỗi
   if (mode == MODE_HOLD) hold_heading_deg = heading_deg;   // lock where we are
+                                                           // khóa hướng theo vị trí hiện tại
   flight_mode = mode;
 }
 
@@ -2144,14 +2510,19 @@ bool flightTakeoff(uint16_t thrust) {
   // A retransmitted TAKEOFF (the client resends every 500 ms until it sees the
   // ack) must not restart the ramp from zero while climbing or hovering --
   // that would drop the drone. Treat it as already done.
+  // Một TAKEOFF được gửi lại (client gửi lại mỗi 500 ms cho tới khi thấy ack) không
+  // được khởi động lại đoạn bám từ 0 khi đang lên hoặc đang hover --
+  // làm vậy sẽ làm rơi drone. Hãy coi như đã hoàn tất.
   if (armed && flight_mode == MODE_AUTO &&
       (auto_state == AUTO_TAKEOFF || auto_state == AUTO_HOLD)) return true;
   // Flying in another mode: a ramp from zero thrust is never what is wanted.
+  // Đang bay ở chế độ khác: một đoạn bám từ lực đẩy 0 không bao giờ là điều muốn.
   bool spinning = motor_rf > 1000 || motor_rr > 1000 || motor_lr > 1000 || motor_lf > 1000;
   if (armed && spinning) return false;
   if (!armed && !armChecksOk("TAKEOFF")) return false;
   hold_heading_deg = heading_deg;
   navReset();                        // this is the launch point
+                                     // đây là điểm cất cánh
   flight_mode = MODE_AUTO;
   auto_state  = AUTO_TAKEOFF;
   auto_phase_start_ms = millis();
@@ -2172,6 +2543,7 @@ void flightLand() {
 }
 
 // Always honoured, whatever the mode: props off, now.
+// Luôn được thực hiện, bất kể chế độ nào: tắt cánh quạt ngay lập tức.
 void flightEmergency() {
   armed = false;
   motorStop();
@@ -2182,6 +2554,7 @@ void flightEmergency() {
 }
 
 // Fill sp_* from the active mode. Called once per loop, before pidCompute().
+// Điền sp_* theo chế độ đang hoạt động. Gọi một lần mỗi vòng lặp, trước pidCompute().
 void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
   sp_roll_deg = sp_pitch_deg = 0.0f;
   sp_roll_rate = sp_pitch_rate = sp_yaw_rate = 0.0f;
@@ -2189,6 +2562,7 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
 
   if (use_crtp && flight_mode != MODE_MANUAL) {
     // ---- HOLD / AUTO: the state machine owns every setpoint ----
+    // ---- HOLD / AUTO: máy trạng thái làm chủ mọi setpoint ----
     float thrust = (float)hover_thrust;
 
     if (flight_mode == MODE_AUTO) {
@@ -2228,6 +2602,7 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
     }
 
     // Heading hold: turn a heading error into a yaw rate setpoint.
+    // Giữ hướng mũi: biến sai số hướng thành setpoint tốc độ góc yaw.
     float herr = hold_heading_deg - heading_deg;
     if      (herr >  180.0f) herr -= 360.0f;
     else if (herr < -180.0f) herr += 360.0f;
@@ -2235,6 +2610,8 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
 
     // Attitude target is level, with no rate feed-forward — that is the
     // whole point of hold: the pilot is not flying the axes.
+    // Mục tiêu tư thế là cân bằng, không có feed-forward tốc độ góc — đó là
+    // toàn bộ ý nghĩa của hold: người lái không điều khiển các trục.
     sp_roll_deg = sp_pitch_deg = 0.0f;
     sp_roll_rate = sp_pitch_rate = 0.0f;
 
@@ -2242,6 +2619,10 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
     // controller works in the body frame, so the drone slides toward the
     // target whichever way it happens to face; the phone can still command
     // heading separately if it wants the nose pointed at the pilot.
+    // FOLLOW/RTH nghiêng về phía mục tiêu thay vì giữ cân bằng. Bộ điều khiển
+    // làm việc trong khung thân, nên drone trượt về phía mục tiêu bất kể nó đang
+    // quay mặt hướng nào; điện thoại vẫn có thể ra lệnh hướng riêng nếu muốn mũi
+    // chỉ về phía người lái.
     if (flight_mode == MODE_FOLLOW || flight_mode == MODE_RTH) {
       if (flight_mode == MODE_RTH) { tgt_x = 0.0f; tgt_y = 0.0f; tgt_valid = true; }
       navSetpoints();
@@ -2253,6 +2634,7 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
 
   if (use_crtp) {
     // ---- MANUAL over CRTP: a CommanderPacket commands tilt ANGLES ----
+    // ---- MANUAL qua CRTP: CommanderPacket ra lệnh GÓC nghiêng ----
     sp_roll_deg    = constrain(cmd_roll_deg,  -MAX_TILT_DEG, MAX_TILT_DEG);
     sp_pitch_deg   = constrain(cmd_pitch_deg, -MAX_TILT_DEG, MAX_TILT_DEG);
     sp_roll_rate   = 0.0f;
@@ -2266,6 +2648,8 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
 
   // ---- SBUS: rate mode. Sticks command body RATES and the frame self-levels,
   //      so the attitude target stays 0 and the stick feeds the rate term. ----
+  // ---- SBUS: chế độ rate. Cần gạt ra lệnh TỐC ĐỘ GÓC thân và khung tự cân bằng,
+  //      nên mục tiêu tư thế giữ ở 0 và cần gạt cấp vào thành phần tốc độ góc. ----
   if (rc[CH_ROLL] > 1508)       sp_roll_rate  = (rc[CH_ROLL]  - 1508) / SETPOINT_DIVISOR;
   else if (rc[CH_ROLL] < 1492)  sp_roll_rate  = (rc[CH_ROLL]  - 1492) / SETPOINT_DIVISOR;
 
@@ -2285,6 +2669,11 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
 //  when thrust falls back to zero. HOLD/AUTO arm and disarm explicitly, driven
 //  by the flight-control commands (takeoff arms; landing end / emergency cuts).
 //  SBUS path (RC transmitter): throttle low + yaw gesture / CH5 switch.
+//  Kích hoạt / ngắt kích hoạt
+//  Đường CRTP (app điện thoại): chế độ manual tự kích hoạt khi tăng throttle và tự
+//  ngắt khi lực đẩy về không. HOLD/AUTO kích hoạt và ngắt rõ ràng, theo các lệnh
+//  điều khiển bay (cất cánh thì kích hoạt; hết hạ cánh / emergency thì cắt).
+//  Đường SBUS (tay phát RC): throttle thấp + thao tác yaw / công tắc CH5.
 // =============================================================================
 void armUpdate(uint32_t now, bool use_crtp) {
   if (use_crtp) {
@@ -2294,12 +2683,18 @@ void armUpdate(uint32_t now, bool use_crtp) {
     // HOLD/AUTO arm and disarm from the flight-control commands, not from the
     // thrust stick — the stick is not the throttle in those modes. Letting the
     // implicit thrust-up arming run here would fight the auto sequence.
+    // HOLD/AUTO kích hoạt và ngắt bằng các lệnh điều khiển bay, không cần gạt lực
+    // đẩy — cần gạt không phải throttle trong các chế độ đó. Để việc kích hoạt ngầm
+    // khi tăng lực đẩy chạy ở đây sẽ xung đột với chuỗi tự động.
     if (flight_mode != MODE_MANUAL) return;
 
     if (!armed) {
       // Arm on thrust-up, but only after the app has shown thrust at zero: a
       // phone whose throttle is already up when it connects must not spin the
       // props straight to that level.
+      // Kích hoạt khi tăng lực đẩy, nhưng chỉ sau khi app đã báo lực đẩy về 0: một
+      // điện thoại có throttle đang tăng khi kết nối không được làm quay cánh quạt
+      // thẳng tới mức đó.
       if (cmd_thrust <= 500) crtp_thrust_was_low = true;
       if (cmd_thrust > 1000 && crtp_thrust_was_low && armChecksOk("CRTP thrust-up")) {
         armed = true;
@@ -2309,6 +2704,7 @@ void armUpdate(uint32_t now, bool use_crtp) {
       }
     } else {
       // disarm the moment the app drops thrust to (near) zero
+      // ngắt kích hoạt ngay khi app hạ lực đẩy về (gần) 0
       if (cmd_thrust <= 500) {
         armed = false;
         motorStop();
@@ -2340,6 +2736,7 @@ void armUpdate(uint32_t now, bool use_crtp) {
   } else {
     arm_stick_ms = 0;
     // Disarm: throttle low + yaw-left held, OR arm switch dropped (if one is used)
+    // Ngắt kích hoạt: throttle thấp + giữ yaw trái, HOẶC công tắc kích hoạt hạ xuống (nếu có dùng)
     bool switch_disarm = arm_switch_seen && !switch_arm;
     if ((throttle_low && stick_disarm) || switch_disarm) {
       if (disarm_stick_ms == 0) disarm_stick_ms = now;
@@ -2355,10 +2752,12 @@ void armUpdate(uint32_t now, bool use_crtp) {
   }
 
   if (switch_arm) arm_switch_seen = true;   // remember a switch is in use
+                                            // ghi nhớ rằng có dùng công tắc
 }
 
 // =============================================================================
 //  Motor mixing  (X-quad, matches schematic labels)
+//  Trộn tín hiệu động cơ  (X-quad, khớp các nhãn trên sơ đồ)
 //    RF = throttle - pitch + roll - yaw
 //    RR = throttle + pitch + roll + yaw
 //    LR = throttle + pitch - roll - yaw
@@ -2380,6 +2779,7 @@ void motorMix(int16_t throttle) {
   } else {
     motor_rf = motor_rr = motor_lr = motor_lf = 1000;
     pidReset();   // avoid I-term windup while disarmed / at idle
+                  // tránh I-term windup khi đã ngắt kích hoạt / đang nghỉ
   }
 }
 
@@ -2402,6 +2802,11 @@ void telemetry(uint32_t now) {
 //  Serial console commands — bench use; the phone uses CRTP instead.
 //    link <n>           switch transport profile (applied after a reboot)
 //    sta <ssid> <pass>  set station-mode credentials (saved to NVS)
+//    save | load | defaults
+//    status
+//  Lệnh console serial — dùng khi thử trên bàn; điện thoại dùng CRTP thay thế.
+//    link <n>           đổi hồ sơ tầng truyền (áp dụng sau khi khởi động lại)
+//    sta <ssid> <pass>  đặt thông tin đăng nhập chế độ station (lưu vào NVS)
 //    save | load | defaults
 //    status
 // =============================================================================
@@ -2485,6 +2890,7 @@ void setup() {
   Serial.println(F("[MPU] MPU6500 detected, SPI OK."));
 
   analogSetAttenuation(ADC_11db);          // full 0-3.3 V range on GPIO36
+                                           // dải đầy đủ 0-3.3 V trên GPIO36
   pinMode(PIN_VBAT, INPUT);
 
   sbusInit();
@@ -2524,6 +2930,10 @@ void loop() {
   // a packet handled this very loop can carry a timestamp 1 ms newer than `now`.
   // Unsigned, that wrapped to ~49 days old and tripped the failsafe for one
   // loop -- enough to cut the motors mid-flight.
+  // Tuổi gói tin được so theo dấu SIGNED. `now` được đọc trước khi các bộ thu
+  // được poll, nên một gói xử lý ngay trong vòng lặp này có thể mang mốc thời gian
+  // mới hơn `now` 1 ms. Nếu so unsigned, giá trị đó quấn thành ~49 ngày tuổi và
+  // kích hoạt failsafe trong một vòng lặp -- đủ để cắt động cơ giữa chuyến bay.
   bool sbus_ok = sbus_frame_ok && (int32_t)(now - sbus_last_frame_ms) < FAILSAFE_MS;
   bool cmd_ok  = cmd_valid     && (int32_t)(now - cmd_last_ms)        < FAILSAFE_MS;
   // Any CRTP packet proves the phone link is alive (PROTOCOL.md "Failsafe").
@@ -2531,12 +2941,19 @@ void loop() {
   // so any traffic keeps them alive. MANUAL still needs a live CommanderPacket
   // stream, because that stream IS the setpoint -- other traffic alone would
   // leave the last thrust latched.
+  // Bất kỳ gói CRTP nào cũng chứng minh liên kết điện thoại còn sống (PROTOCOL.md
+  // "Failsafe"). HOLD/AUTO/FOLLOW/RTH được điều khiển bằng lệnh port-7, không phải
+  // CommanderPacket, nên bất kỳ lưu lượng nào cũng giữ cho chúng sống. MANUAL vẫn
+  // cần một luồng CommanderPacket trực tiếp, vì luồng đó CHÍNH LÀ setpoint -- chỉ
+  // lưu lượng khác thôi sẽ để lực đẩy cuối cùng bị khóa giữ.
   bool crtp_ok  = (crtp_last_rx_ms != 0) &&
                   (int32_t)(now - crtp_last_rx_ms) < FAILSAFE_MS;
   bool phone_ok = (flight_mode == MODE_MANUAL) ? cmd_ok : crtp_ok;
   if (!cmd_ok) crtp_thrust_was_low = false;   // a reconnect must show zero thrust again
+                                              // khi kết nối lại phải thấy lực đẩy bằng 0 lần nữa
 
   // The phone wins whenever it is live; otherwise fall back to the SBUS receiver
+  // Điện thoại được ưu tiên khi còn kết nối; nếu không thì dùng lại bộ thu SBUS
   bool rx_ok     = phone_ok || sbus_ok;
   bool use_crtp  = phone_ok;
 
@@ -2554,6 +2971,7 @@ void loop() {
   if (rx_ok) armUpdate(now, use_crtp);
 
   // ---- critical battery: land the phone-flown modes, warn an RC/manual pilot ----
+  // ---- pin nguy kịch: hạ cánh các chế độ bay bằng điện thoại, cảnh báo người lái RC/manual ----
   if (armed && vbat_crit) {
     if (use_crtp && flight_mode != MODE_MANUAL) {
       if (!(flight_mode == MODE_AUTO && auto_state == AUTO_LAND)) {
@@ -2581,18 +2999,25 @@ void loop() {
   // is just as stationary as HOLD -- navSetpoints() leaves the tilt level -- so
   // it belongs in the same bucket, otherwise the estimate keeps drifting for no
   // reason while the drone sits there.
+  // ---- tự dẫn đường quán tính (cấp liệu cho follow / return-to-launch) ----
+  // "Holding" là trạng thái duy nhất ta biết drone không dịch chuyển, nên nó là
+  // mỏ neo duy nhất cho khoản rò vận tốc. FOLLOW/RTH không có mục tiêu trực tiếp
+  // cũng đứng yên như HOLD -- navSetpoints() để tư thế cân bằng -- nên thuộc cùng
+  // nhóm, nếu không ước lượng sẽ cứ trôi vô cớ trong khi drone nằm yên ở đó.
   bool holding = (flight_mode == MODE_HOLD) ||
                  (flight_mode == MODE_AUTO && auto_state == AUTO_HOLD) ||
                  ((flight_mode == MODE_FOLLOW || flight_mode == MODE_RTH) && !tgt_valid);
   navUpdate(LOOP_TIME_US / 1000000.0f, holding && armed);
   if (tgt_valid && (int32_t)(now - tgt_last_ms) > NAV_TARGET_TIMEOUT_MS) {
     tgt_valid = false;          // phone reference went stale — stop chasing
+                                // tham chiếu từ điện thoại đã cũ — ngừng đuổi theo
   }
 
   // ---- setpoints (manual / hold / auto / follow / return) ----
   flightSetpoints(now, use_crtp, sbus_ok);
 
   // ---- self-level: drive angle error to zero, then add the rate term ----
+  // ---- tự cân bằng: đẩy sai số góc về 0, rồi cộng thành phần tốc độ góc ----
   float roll_err_deg  = angle_roll_deg  - sp_roll_deg;
   float pitch_err_deg = angle_pitch_deg - sp_pitch_deg;
 
@@ -2603,6 +3028,9 @@ void loop() {
   // must be asked for a NEGATIVE rate to come back. Adding it (the old code)
   // asked for more tilt in the same direction, and the drone flipped.
   // test/level_test.cpp pins this.
+  // Thành phần cân bằng bị TRỪ đi. Khi nghiêng quá mục tiêu +5 độ, vòng tốc độ góc
+  // phải được yêu cầu một tốc độ góc ÂM để quay về. Cộng nó vào (code cũ) lại đòi
+  // nghiêng thêm cùng chiều, làm drone lật. test/level_test.cpp cố định điều này.
   roll_setpoint  = sp_roll_rate  - roll_level_adjust;
   pitch_setpoint = sp_pitch_rate - pitch_level_adjust;
   yaw_setpoint   = sp_yaw_rate;
@@ -2621,11 +3049,14 @@ void loop() {
   // ---- housekeeping ----
   batteryUpdate();
   logUpdate();          // stream any CRTP log block the app has started
+                        // phát các khối log CRTP mà app đã khởi động
   telemetry(now);
   serialCommandPoll();
 
   // A link-profile change was requested over CRTP: give the reply time to
   // leave, then reboot so the radios come up in the new configuration.
+  // Một thay đổi hồ sơ liên kết được yêu cầu qua CRTP: cho phản hồi kịp rời đi,
+  // rồi khởi động lại để các radio lên với cấu hình mới.
   if (reboot_at_ms != 0 && (int32_t)(now - reboot_at_ms) >= 0) {
     Serial.printf("[LINK] switching to profile %u, rebooting\n", pending_link_mode);
     Serial.flush();

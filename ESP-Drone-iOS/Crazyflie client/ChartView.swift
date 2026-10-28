@@ -8,8 +8,14 @@
 //  series' range. With `sharedScale` all series use one range instead, so they
 //  compare directly (the per-term panels). The zero line is the middle of the
 //  plot.
+//  Biểu đồ dải cuộn, port từ ChartView.kt của PID-Calibration.
+//  Mỗi chuỗi được tự chia tỷ lệ riêng, đối xứng quanh 0, nên một góc nhỏ lẫn
+//  một đầu ra điều khiển ±255 đều đọc được; chú giải cho biết biên của từng
+//  chuỗi. Với `sharedScale`, mọi chuỗi dùng chung một biên để so sánh trực tiếp
+//  (các panel theo từng thành phần PID). Đường 0 nằm giữa vùng vẽ.
 //
 //  Capacity is 300 samples at 20 Hz = 15 s, matching the Android client.
+//  Dung lượng 300 mẫu ở 20 Hz = 15 s, khớp với client Android.
 //
 
 import UIKit
@@ -21,6 +27,7 @@ final class ChartView: UIView {
         let unit: String
         let color: UIColor
         /// Floor on the plotted range so a flat line is still readable.
+        /// Giá trị sàn của khoảng vẽ để một đường phẳng vẫn đọc được.
         let minRange: Float
         var enabled: Bool
     }
@@ -43,12 +50,15 @@ final class ChartView: UIView {
     var title: String?
     var sharedScale = false
     /// Shown once in the legend when `sharedScale`.
+    /// Chỉ hiển thị một lần trong chú giải khi dùng `sharedScale`.
     var unit = ""
     /// Dashed horizontal lines, e.g. PWM saturation limits.
+    /// Các đường ngang nét đứt, ví dụ giới hạn bão hòa PWM.
     var markers: [Float] = []
 
     private var data: [[Float]] = []
     /// Index the next sample goes to.
+    /// Chỉ số nơi mẫu tiếp theo sẽ được ghi vào.
     private var head = 0
     private var count = 0
 
@@ -87,6 +97,7 @@ final class ChartView: UIView {
     }
 
     /// k-th oldest stored sample of series i.
+    /// Mẫu đã lưu cũ thứ k của chuỗi i.
     private func at(_ i: Int, _ k: Int) -> Float {
         data[i][(head - count + k + ChartView.capacity) % ChartView.capacity]
     }
@@ -122,6 +133,7 @@ final class ChartView: UIView {
             ctx.setAlpha(1)
         }
         // 1 s ticks at 20 Hz
+        // vạch chia mỗi 1 s ở 20 Hz
         ctx.setStrokeColor(gridColor)
         ctx.setAlpha(0.25)
         var s = 0
@@ -180,6 +192,7 @@ final class ChartView: UIView {
                 let path = CGMutablePath()
                 for k in 0..<count {
                     // newest sample at the right edge
+                    // mẫu mới nhất ở mép phải
                     let x = w - CGFloat(count - 1 - k) * w / CGFloat(ChartView.capacity - 1)
                     let y = mid - CGFloat(at(i, k) / range) * half
                     if k == 0 {
@@ -228,6 +241,11 @@ final class ChartView: UIView {
 // are the documented dark-surface set (the validator could not run here — no
 // node — but the reference files these as passing for these exact slots).
 // Color follows the entity (series identity), never its rank in the list.
+// Thứ tự phân loại cố định từ bảng màu tham chiếu của dataviz. Bốn bậc này là
+// bộ dành cho nền tối đã được tài liệu hóa (validator không chạy được ở đây —
+// không có node — nhưng bản tham chiếu vẫn ghi nhận là đạt cho đúng các ô
+// này). Màu đi theo thực thể (định danh chuỗi), không theo vị trí trong danh
+// sách.
 
 extension ChartView {
     static let seriesColors: [UIColor] = [

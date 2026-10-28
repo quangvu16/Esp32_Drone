@@ -49,8 +49,10 @@ import se.bitcraze.crazyflie.lib.crtp.CrtpPort;
 
 /**
  *  Access to TOC cache. To turn off the cache functionality don't supply any directories.
+ *  Truy cập vào TOC cache. Để tắt chức năng cache thì không cung cấp thư mục nào.
  *
  *  Heavily based on toccache.py
+ *  Phần lớn dựa trên toccache.py
  *
  *
  */
@@ -62,10 +64,12 @@ public class TocCache {
     private static final String PARAM_CACHE_DIR = "paramCache";
     private static final String LOG_CACHE_DIR = "logCache";
     private ObjectMapper mMapper = new ObjectMapper(); // can reuse, share globally
+                                                       // có thể tái sử dụng, chia sẻ toàn cục
 
     public TocCache(File cacheDir) {
         this.mCacheDir = cacheDir;
         //TODO: should it be possible to change the name of the dirs?
+        //TODO: có nên cho phép đổi tên các thư mục không?
         addExistingCacheFiles(LOG_CACHE_DIR);
         addExistingCacheFiles(PARAM_CACHE_DIR);
     }
@@ -73,6 +77,7 @@ public class TocCache {
     private void addExistingCacheFiles(String cachePath) {
         if (cachePath != null) {
             //use cache dir if it's not null
+            //dùng thư mục cache nếu nó không phải null
             File cachePathFile = (mCacheDir != null) ? new File(mCacheDir, cachePath) : new File(cachePath);
             if(cachePathFile.exists()) {
                 this.mCacheFiles.addAll(Arrays.asList(cachePathFile.listFiles(jsonFilter)));
@@ -88,9 +93,12 @@ public class TocCache {
 
     /**
      * Try to get a hit in the cache, return None otherwise
+     * Thử tìm trong cache, nếu không thấy thì trả về None
      *
      * @param crc CRC code of the TOC
+     * @param crc mã CRC của TOC
      * @param port CrtpPort of the TOC
+     * @param port CrtpPort của TOC
      */
     public Toc fetch(int crc, CrtpPort port) {
         Toc fetchedToc = null;
@@ -112,6 +120,7 @@ public class TocCache {
                 fetchedToc.setTocElementMap(readValue);
                 mLogger.debug("Number of cached elements: " + fetchedToc.getElements().size());
                 //TODO: file leak?
+                //TODO: rò rỉ file?
             } catch (JsonParseException jpe) {
                 mLogger.error("Error while parsing cache file " + hit.getName() + ": " + jpe.getMessage());
                 return null;
@@ -128,6 +137,7 @@ public class TocCache {
 
     /**
      * Save a new cache to file
+     * Lưu một cache mới ra file
      */
     public void insert (int crc, CrtpPort port,  Toc toc) {
         String fileName = String.format("%08X.json", crc);
@@ -142,9 +152,11 @@ public class TocCache {
             this.mMapper.enable(SerializationFeature.INDENT_OUTPUT);
             this.mMapper.writeValue(cacheFile, toc.getTocElementMap());
             //TODO: add "__class__" : "LogTocElement",
+            //TODO: thêm "__class__" : "LogTocElement",
             this.mLogger.info("Saved cache to " + fileName);
             this.mCacheFiles.add(cacheFile);
             //TODO: file leak?
+            //TODO: rò rỉ file?
         } catch (JsonGenerationException jge) {
             mLogger.error("Could not save cache to file " + fileName + ".\n" + jge.getMessage());
         } catch (JsonMappingException jme) {

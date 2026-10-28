@@ -42,6 +42,10 @@ import com.MobileAnarchy.Android.Widgets.Joystick.JoystickView;
  * of the device to control the roll and pitch values.
  * The yaw and thrust values are still controlled by the touch controls according
  * to the chosen "mode" setting.
+ * GyroscopeController kế thừa TouchController và dùng cảm biến con quay hồi chuyển
+ * của thiết bị để điều khiển giá trị roll và pitch.
+ * Giá trị yaw và lực đẩy vẫn được điều khiển bằng các điều khiển cảm ứng theo
+ * thiết lập "mode" đã chọn.
  *
  */
 public class GyroscopeController extends TouchController {
@@ -94,6 +98,7 @@ public class GyroscopeController extends TouchController {
 
     class AccelerometerListener implements SensorEventListener {
         //It divide back the 90 degree.
+        // Chia ngược lại khoảng 90 độ.
 //        private final float AMPLIFICATION = 1.5f;
         private final float AMPLIFICATION = mControls.getGyroAmplification();
 
@@ -152,10 +157,12 @@ public class GyroscopeController extends TouchController {
     }
 
     // overwrite getRoll() and getPitch() to only use values from gyro sensors
+    // ghi đè getRoll() và getPitch() để chỉ dùng giá trị từ cảm biến con quay
     public float getRoll() {
         float roll = mSensorRoll;
 
         //Filter the overshoot
+        // Lọc phần vượt quá
         roll = (float) Math.min(1.0, Math.max(-1, roll+mControls.getRollTrim()));
 
         return (roll + mControls.getRollTrim()) * mControls.getRollPitchFactor() * mControls.getDeadzone(roll);
@@ -165,12 +172,14 @@ public class GyroscopeController extends TouchController {
         float pitch = mSensorPitch;
 
         //Filter the overshoot
+        // Lọc phần vượt quá
         pitch = (float) Math.min(1.0, Math.max(-1, pitch+mControls.getPitchTrim()));
 
         return (pitch + mControls.getPitchTrim()) * mControls.getRollPitchFactor() * mControls.getDeadzone(pitch);
     }
 
     // map Yaw to the second touch pad
+    // ánh xạ Yaw sang bàn cảm ứng thứ hai
     public float getYaw() {
         float yaw = 0;
         yaw = (mControls.getMode() == 1 || mControls.getMode() == 2) ? mControls.getRightAnalog_X() : mControls.getLeftAnalog_X();

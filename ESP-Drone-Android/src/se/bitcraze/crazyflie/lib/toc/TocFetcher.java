@@ -43,6 +43,7 @@ import se.bitcraze.crazyflie.lib.crtp.CrtpPort;
 
 /**
  * Fetches TOC entries from the Crazyflie
+ * Lấy về các mục TOC từ Crazyflie
  *
  */
 public class TocFetcher {
@@ -84,6 +85,7 @@ public class TocFetcher {
 
     /**
      * Initiate fetching of the TOC
+     * Khởi động việc lấy về TOC
      *
      */
     public void start() {
@@ -105,6 +107,7 @@ public class TocFetcher {
 
     /**
      * Callback for when the TOC fetching is finished
+     * Callback được gọi khi việc lấy TOC hoàn tất
      */
     private void tocFetchFinished() {
         this.mCrazyflie.removeDataListener(mDataListener);
@@ -120,6 +123,7 @@ public class TocFetcher {
     }
 
     // TODO: only for testing?
+    // TODO: chỉ dùng cho kiểm thử?
     public int getNoOfItems() {
         return this.mNoOfItems;
     }
@@ -141,8 +145,10 @@ public class TocFetcher {
         } else if (mState == TocState.GET_TOC_ELEMENT) {
             if (packet.getPayload()[0] == CMD_TOC_ELEMENT) {
                 // Always add new element, but only request new if it's not the last one.
+                // Luôn thêm phần tử mới, nhưng chỉ yêu cầu phần tử mới nếu nó không phải phần tử cuối cùng.
                 // if self.requested_index != ord(payload[0]):
                 // Fix for TOC > 128 items (fixed by Arnaud)
+                // Sửa lỗi cho TOC > 128 mục (do Arnaud sửa)
                 int actualIndex = payloadBuffer.get(0) & 0x00ff;
                 if (this.mRequestedIndex != actualIndex) {
                     /*
@@ -151,6 +157,11 @@ public class TocFetcher {
                         #       but 6 is send back due to timing issues with the resend
                         #       while 7 is lost then we will never resend for 7.
                         #       This is pretty hard to reproduce but happens...
+                        # TODO: Có thể có vấn đề về timing ở đây khi gửi lại các gói tin cũ
+                        #       trong khi làm mất các gói mới. Khi đó nếu yêu cầu 7
+                        #       nhưng 6 được gửi lại do lỗi timing của việc gửi lại
+                        #       trong khi 7 bị mất thì ta sẽ không bao giờ gửi lại cho 7.
+                        #       Cái này khá khó tái hiện nhưng vẫn xảy ra...
                      */
                     mLogger.warn("[" + this.mPort + "]: Was expecting " + this.mRequestedIndex + " but got " + actualIndex + ".");
                     return;
@@ -163,6 +174,7 @@ public class TocFetcher {
     private void handleCmdTocInfo(ByteBuffer payloadBuffer) {
         // [self.nbr_of_items, self._crc] = struct.unpack("<BI", payload[:5])
         // Fix for TOC > 128 items (fixed by Arnaud)
+        // Sửa lỗi cho TOC > 128 mục (do Arnaud sửa)
         this.mNoOfItems = payloadBuffer.get() & 0x00ff;
         this.mCrc = payloadBuffer.getInt();
         mToc.setCrc(mCrc);
@@ -170,10 +182,12 @@ public class TocFetcher {
         mLogger.debug("[{}]: Got TOC CRC, {} items and CRC={}", new Object[] {this.mPort, this.mNoOfItems, String.format("0x%08X", this.mCrc)});
 
         //Try to find toc in cache
+        //Thử tìm toc trong cache
         Toc cacheData = (mTocCache != null) ? mTocCache.fetch(mCrc, mPort) : null;
         if (cacheData != null) {
             // self.toc.toc = cache_data
             // assigning a toc to another toc directly does not work
+            // gán một toc cho một toc khác trực tiếp không hoạt động
             mToc.setTocElementMap(cacheData.getTocElementMap());
             mLogger.info("TOC for port {} found in cache.", mPort);
             tocFetchFinished();
@@ -196,6 +210,7 @@ public class TocFetcher {
             requestTocElement(this.mRequestedIndex);
         } else {
             // No more variables in TOC
+            // Không còn biến nào trong TOC
             mLogger.info("No more variables in TOC.");
             if (mTocCache != null) {
                 mTocCache.insert(mCrc, mPort, mToc);
@@ -208,6 +223,7 @@ public class TocFetcher {
 
     /**
      * Request the TOC CRC
+     * Yêu cầu mã CRC của TOC
      */
     private void requestTocInfo() {
         this.mState = TocState.GET_TOC_INFO;
@@ -217,8 +233,10 @@ public class TocFetcher {
 
     /**
      * Request a TOC element by index
+     * Yêu cầu một phần tử TOC theo chỉ mục
      *
      * @param index of TOC element
+     * @param index chỉ mục của phần tử TOC
      */
     private void requestTocElement(int index) {
         mLogger.debug("Requesting index {} on port {}", index, this.mPort);
@@ -227,8 +245,10 @@ public class TocFetcher {
 
     /**
      * Expected reply is the same as data, so no extra parameter necessary
+     * Phản hồi mong đợi giống với dữ liệu nên không cần tham số bổ sung
      *
      * @param data that should be sent
+     * @param data dữ liệu cần được gửi
      */
     private void sendTocPacket(byte[] data) {
         if (mCrazyflie != null && mTocHeader != null) {
@@ -245,6 +265,7 @@ public class TocFetcher {
     }
 
     // TODO: never used?
+    // TODO: không bao giờ được dùng?
     public void removeTocFetchFinishedListener(TocFetchFinishedListener listener) {
         this.mTocFetchFinishedListeners.remove(listener);
     }

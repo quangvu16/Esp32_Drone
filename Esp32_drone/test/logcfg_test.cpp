@@ -1,19 +1,32 @@
 // Pins the CREATE_LOGCONFIG handler against the exact bytes Logg.create() puts
 // on the wire, and the idempotency the client's resend queue depends on.
+// Chốt handler CREATE_LOGCONFIG với đúng các byte mà Logg.create() đưa lên dây,
+// và tính idempotent mà hàng đợi gửi lại của client phụ thuộc vào.
 //
 // Run with ./run.sh, which checks the copied logic still matches the sketch.
+// Chạy bằng ./run.sh, công cụ này kiểm tra logic được copy còn khớp với sketch.
 //
 // Two things here are not obvious from the protocol:
+// Hai điều ở đây không hiển nhiên từ giao thức:
 //
 // 1. Logg.create() builds its request in a fixed 31-byte ByteBuffer and sends
 //    the whole backing array (CrtpPacket.toByteArray() serialises untrimmed),
 //    so real <type><tocId> pairs are followed by zero padding. Log type codes
 //    start at 1, so a zero type byte is unambiguous padding and must end the
 //    list. Without that the padding parses as repeated element 0.
+// 1. Logg.create() dựng request trong một ByteBuffer cố định 31 byte và gửi
+//    toàn bộ mảng backing (CrtpPacket.toByteArray() tuần tự hóa không cắt),
+//    nên các cặp <type><tocId> thật luôn theo sau bởi padding toàn byte 0.
+//    Mã kiểu log bắt đầu từ 1, nên byte type bằng 0 chắc chắn là padding và
+//    phải kết thúc danh sách. Không có nó thì phần padding sẽ bị phân tích
+//    thành phần tử 0 lặp lại.
 //
 // 2. The client retransmits an unacknowledged command every 500 ms and never
 //    gives up. A repeated CREATE for the same block has to re-ack OK; answering
 //    LOG_ERR_EXISTS surfaces a bogus error to the user and clears nothing.
+// 2. Client gửi lại lệnh chưa được ack mỗi 500 ms và không bao giờ bỏ cuộc.
+//    Một CREATE lặp lại cho cùng block phải được ack lại OK; trả lời
+//    LOG_ERR_EXISTS sẽ đẩy một lỗi ảo tới người dùng và không xóa gì cả.
 
 #include <cassert>
 #include <cstdint>
@@ -22,6 +35,7 @@
 #include <cstring>
 
 // ---- constants copied from Esp32_drone.ino ----
+// ---- các hằng số được copy từ Esp32_drone.ino ----
 #define CRTP_MAX_SIZE     30
 #define LOG_DATA_OVERHEAD 5
 #define LOG_MAX_PAYLOAD   (CRTP_MAX_SIZE - LOG_DATA_OVERHEAD)
@@ -44,6 +58,8 @@ typedef struct {
 } TocEntry;
 
 // LOG_TOC from Esp32_drone.ino — order and sizes are what the parser indexes.
+// LOG_TOC từ Esp32_drone.ino — thứ tự và kích cỡ là thứ bộ phân tích dùng để
+// lập chỉ mục.
 static const TocEntry LOG_TOC[] = {
   { "pm",         "vbat",  LT_FLOAT,  4, 0x40 },
   { "stabilizer", "roll",  LT_FLOAT,  4, 0x40 },
@@ -60,6 +76,7 @@ static const TocEntry LOG_TOC[] = {
 #define LOG_TOC_COUNT ((uint8_t)(sizeof(LOG_TOC) / sizeof(LOG_TOC[0])))
 
 // ---- a minimal stand-in for LogBlock ----
+// ---- bản thay thế tối giản cho LogBlock ----
 typedef struct {
   bool    used;
   uint8_t id;
@@ -84,6 +101,8 @@ static void logReset() { memset(blocks, 0, sizeof(blocks)); }
 
 // ---- the CREATE half of crtpHandleLogging, copied verbatim ----
 // Returns the <err> byte that would go back to the client.
+// ---- nửa CREATE của crtpHandleLogging, copy nguyên văn ----
+// Trả về byte <err> sẽ được gửi lại cho client.
 static int handleCreate(uint8_t id, const uint8_t *p, size_t len) {
   uint8_t  ids[LOG_MAX_VARS];
   uint8_t  n     = 0;
@@ -123,11 +142,13 @@ static int handleCreate(uint8_t id, const uint8_t *p, size_t len) {
 }
 
 // ---- client side: rebuild Logg.create()'s datagram exactly ----
+// ---- phía client: dựng lại đúng datagram của Logg.create() ----
 static size_t buildCreate(uint8_t *out /* CRTP bytes incl. header */,
                           uint8_t logConfigId,
                           const uint8_t *tocIds, uint8_t nvars) {
   uint8_t bb[31];
   memset(bb, 0, sizeof(bb));          // JVM zero-fills the backing array
+                                      // JVM tự điền 0 vào mảng backing
   bb[0] = 0;                          // CMD_CREATE_LOGCONFIG
   bb[1] = logConfigId;
   for (uint8_t i = 0; i < nvars; i++) {
@@ -135,7 +156,9 @@ static size_t buildCreate(uint8_t *out /* CRTP bytes incl. header */,
     bb[2 + 2 * i + 1] = tocIds[i];
   }
   out[0] = 0x51;                      // port 5, channel 1
+                                      // cổng 5, kênh 1
   memcpy(out + 1, bb, 31);            // sendLoggPacket sends ALL 31 bytes
+                                      // sendLoggPacket gửi TẤT CẢ 31 byte
   return 1 + 31;
 }
 
@@ -156,6 +179,7 @@ int main() {
   logReset();
 
   // The app's real config: one variable, "Standard" = pm.vbat.
+  // Cấu hình thật của app: một biến, "Standard" = pm.vbat.
   {
     uint8_t v[] = {0};
     size_t len = buildCreate(pkt, 0, v, 1);
@@ -168,11 +192,15 @@ int main() {
   // The padding trap: without the zero terminator the trailing bytes of the
   // 31-byte buffer parse as repeated element 0. Guard against the test passing
   // vacuously if the terminator ever stops being checked.
+  // Cạm bẫy padding: không có dấu kết thúc bằng 0 thì các byte cuối của bộ đệm
+  // 31 byte sẽ bị phân tích thành phần tử 0 lặp lại. Chốt chặn để bài test
+  // không pass rỗng tuếch nếu dấu kết thúc không còn được kiểm.
   {
     uint8_t v[] = {0};
     size_t len = buildCreate(pkt, 0, v, 1);
     int naive = 0;
     for (size_t i = 3; i + 1 < len; i += 2) naive++;   // no `if (p[i]==0) break`
+                                                      // không có `if (p[i]==0) break`
     if (naive <= 1) {
       printf("FAIL regression guard: no padding, the test is vacuous\n");
       return 1;
@@ -183,6 +211,7 @@ int main() {
   }
 
   // Idempotency: the client resends every 500 ms until something matches.
+  // Tính idempotent: client gửi lại mỗi 500 ms cho tới khi có thứ khớp.
   {
     uint8_t v[] = {0};
     size_t len = buildCreate(pkt, 0, v, 1);
@@ -193,6 +222,7 @@ int main() {
   }
 
   // A genuinely different list on a used id is a real conflict.
+  // Một danh sách thực sự khác trên id đã dùng là xung đột thật.
   {
     uint8_t v[] = {1};
     size_t len = buildCreate(pkt, 0, v, 1);
@@ -204,6 +234,7 @@ int main() {
   }
 
   // Size ceiling: 7 floats + 4 uint16 = 36 > 25 bytes of payload.
+  // Trần kích cỡ: 7 float + 4 uint16 = 36 > 25 byte phần dữ liệu.
   {
     logReset();
     uint8_t v[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -214,6 +245,7 @@ int main() {
   }
 
   // 5 floats (20) + 2 uint16 (4) = 24 bytes, which just fits.
+  // 5 float (20) + 2 uint16 (4) = 24 byte, vừa khít.
   {
     logReset();
     uint8_t v[] = {0, 1, 2, 3, 4, 7, 8};
@@ -222,11 +254,13 @@ int main() {
     LogBlock *b = logFind(9);
     expect("  seven elements", 7, b ? b->nvars : -1);
     // and the same request again must still be OK
+    // và cùng request đó lặp lại vẫn phải OK
     expect("  retransmission re-acks OK", LOG_ERR_OK, handleCreate(9, pkt, len));
     expect("  still seven elements", 7, logFind(9)->nvars);
   }
 
   // Independent ids do not collide.
+  // Các id độc lập không va nhau.
   {
     logReset();
     uint8_t a[] = {0}, bb[] = {1};

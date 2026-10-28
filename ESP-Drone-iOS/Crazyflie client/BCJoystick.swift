@@ -103,6 +103,7 @@ final class BCJoystick: UIControl {
             
             let pathAnimation = CABasicAnimation(keyPath: "path")
             pathAnimation.fromValue = UIBezierPath(cgPath: shapeLayer.path!) //TODO: fix forced unwrapping!!!
+                                                                             //TODO: sửa lỗi unwrap cưỡng bức!!!
             pathAnimation.toValue = endPath.cgPath
             pathAnimation.duration = 0.1
             pathAnimation.delegate = self

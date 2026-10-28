@@ -52,12 +52,20 @@ METRIC_FIELDS = ["angle_mean", "angle_std", "rate_rms", "motor_rms",
 LOG_FIELDS = ["trial", "stage"] + ["gain%d" % k for k in range(3)] \
     + ["cost", "fell"] + METRIC_FIELDS
 COST_CAP = 300                      # tips score 100 + 10 x seconds lost; cap before the log
+                                    # nghiêng bị 100 + 10 x số giây mất; chặn trước khi ghi vào log
 
 
 class Stopped(Exception):
     pass
 
 
+# The transform the model is fitted in: log(1 + cost), capped at COST_CAP. A
+# tip (cost >= 100) reads as "much worse" than any clean flight, while small
+# differences between good trials stay visible; from_y() is its exact inverse.
+# Biến đổi mà mô hình được fit trên đó: log(1 + cost), cắt ở COST_CAP. Một lần
+# nghiêng (cost >= 100) được đọc là "tệ hơn nhiều" so với mọi chuyến bay sạch,
+# còn các khác biệt nhỏ giữa các lần thử tốt vẫn hiển thị; from_y() là nghịch
+# đảo chính xác của nó.
 def to_y(cost):
     return math.log1p(min(cost, COST_CAP))
 
@@ -82,6 +90,7 @@ class GaussianProcess:
     """Zero-mean GP on standardised targets, RBF kernel shared over the unit-cube inputs."""
     LENGTHS = (0.08, 0.15, 0.25, 0.4, 0.7, 1.2)
     NOISES = (0.01, 0.05, 0.15, 0.4)            # variance, in units of the target variance
+                                                # phương sai, theo đơn vị của phương sai mục tiêu
 
     def __init__(self, X, y):
         self.X = np.asarray(X, float)
@@ -284,6 +293,7 @@ class GuiTuner:
         cost, m = self.evaluate(self.stage, p)
         self.k += 1
         # the firmware clamps each write into [lo, hi]: learn what was applied
+        # firmware kẹp mỗi lần ghi vào [lo, hi]: học theo giá trị đã được áp dụng
         tried = self.space.to_unit([self.tried[i] for i in self.ids])
         if tried is None:
             tried = x
@@ -360,6 +370,16 @@ class BayesTuner(GuiTuner):
                 p[i] = v
             self.trial(p, x)
 
+    # Called after every trial and also at the end: it sets self.best, which is
+    # what a tip recovery re-applies and what run() leaves on the drone. The
+    # winner is the tried set of THIS run that did not tip with the lowest GP
+    # *predicted* cost — not the single luckiest observation — so one noisy
+    # low score cannot win the run.
+    # Gọi sau mỗi lần thử và cả khi kết thúc: nó đặt self.best, thứ mà khôi phục
+    # sau nghiêng sẽ ghi lại và run() để lại trên drone. Người thắng là bộ tham số
+    # đã thử của LƯỢT NÀY, không nghiêng, có chi phí *dự đoán* của GP thấp nhất —
+    # không phải quan sát may mắn nhất — để một điểm số thấp do nhiễu không thắng
+    # cả lượt.
     def choose_best(self):
         """The tried set (this run, did not tip) with the lowest predicted cost."""
         mean = self.gp.predict(np.array(self.X))[0]
@@ -416,6 +436,10 @@ class TwiddleTuner(GuiTuner):
                     break
         self.post("status", "steps below 4 %: converged" if self.k < self.trials else "trial budget used")
 
+    # Unlike BayesTuner, the reported cost is the measured mean of the confirm
+    # re-run; the GP plays no part in picking the winner.
+    # Khác BayesTuner, chi phí báo ra là trung bình đo được của lượt đo xác nhận;
+    # GP không tham gia chọn người thắng.
     def choose_best(self):
         self.best_x = self.space.to_unit([self.best[i] for i in self.ids])
         self.best_pred = self.best_cost
@@ -427,6 +451,11 @@ class TwiddleTuner(GuiTuner):
 # lowest *predicted* cost of the GP that is fitted for the model window anyway, so a lucky
 # trial never wins on its own. Each optimise() is written as an endless loop; f() raises
 # Budget when the trials are used up.
+# Tất cả đều tìm trong cùng khối đơn vị như BayesTuner, chấm một lần thử theo to_y(cost)
+# (nghiêng đơn giản là một điểm số rất cao) và báo kết quả như BayesTuner: bộ tham số đã
+# thử có chi phí *dự đoán* thấp nhất của GP — vốn được fit cho cửa sổ mô hình — nên một
+# lần thử may mắn không bao giờ tự thắng. Mỗi optimise() được viết như vòng lặp vô hạn;
+# f() ném Budget khi đã dùng hết số lần thử.
 
 class Budget(Exception):
     pass
@@ -510,6 +539,7 @@ class NelderMeadTuner(SearchTuner):
                 if fc < min(fr, fw):
                     S[-1] = (fc, xc)
                 else:                               # shrink towards the best, re-measured
+                                                    # co dần về điểm tốt nhất, có đo lại
                     b = S[0][1]
                     S = [((S[0][0] + self.f(b)) / 2, b)] + [
                         (self.f(b + 0.5 * (x - b)), b + 0.5 * (x - b)) for _, x in S[1:]]
@@ -528,6 +558,7 @@ class SpsaTuner(SearchTuner):
             delta = self.rng.choice([-1.0, 1.0], self.d)
             g = (self.f(x + ck * delta) - self.f(x - ck * delta)) / (2 * ck) * delta
             if a is None:                           # first step moves ~0.1 of the box
+                                                    # bước đầu di chuyển ~0.1 của miền
                 a = 0.1 * (A + 1) ** 0.602 / max(np.abs(g).max(), 1e-6)
             step = a / (k + 1 + A) ** 0.602 * g
             x = np.clip(x - np.clip(step, -0.15, 0.15), 0, 1)
@@ -628,6 +659,7 @@ class CmaesTuner(SearchTuner):
             Y = Z @ (B * D).T
             X = np.clip(m + sigma * Y, 0, 1)
             Y = (X - m) / sigma                     # the clipped steps are the ones learned from
+                                                    # các bước đã bị kẹp mới là thứ được học
             order = np.argsort([self.f(x) for x in X])[:mu]
             yw = w @ Y[order]
             m = m + sigma * yw

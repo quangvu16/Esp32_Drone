@@ -45,6 +45,7 @@ import se.bitcraze.crazyflie.lib.usb.CrazyUsbInterface;
 
 /**
  * Crazyradio link driver
+ * Trình điều khiển liên kết Crazyradio
  *
  */
 public class RadioDriver extends CrtpDriver {
@@ -58,12 +59,14 @@ public class RadioDriver extends CrtpDriver {
 
     private final BlockingQueue<CrtpPacket> mOutQueue = new LinkedBlockingQueue<CrtpPacket>();
     //TODO: Limit size of out queue to avoid "ReadBack" effect?
+    //TODO: có nên giới hạn kích thước hàng đợi đầu ra để tránh hiệu ứng "ReadBack"?
     private final BlockingQueue<CrtpPacket> mInQueue = new LinkedBlockingQueue<CrtpPacket>();
 
     private ConnectionData mConnectionData;
     
     /**
      * Create the link driver
+     * Tạo trình điều khiển liên kết
      */
     public RadioDriver(CrazyUsbInterface usbInterface) {
         this.mUsbInterface = usbInterface;
@@ -96,6 +99,7 @@ public class RadioDriver extends CrtpDriver {
         else:
             raise Exception("Link already open!")
         */
+        // (Python: tự tạo Crazyradio nếu chưa mở, báo lỗi nếu liên kết đã mở)
 
         if (this.mCradio.getVersion() >= 0.4) {
             this.mCradio.setArc(10);
@@ -112,15 +116,19 @@ public class RadioDriver extends CrtpDriver {
             new_addr = struct.unpack("<BBBBB", binascii.unhexlify(addr))
             self.cradio.set_address(new_addr)
          */
+        // (Python: nếu URI có địa chỉ thì giải mã thành 5 byte rồi gọi set_address)
 
         // Launch the comm thread
+        // Khởi động luồng truyền thông
         startSendReceiveThread();
     }
 
     /**
      * Sets the connection data (channel and data rate)
+     * Đặt dữ liệu kết nối (kênh và tốc độ dữ liệu)
      * 
      * @param connectionData channel and data rate
+     * @param connectionData kênh và tốc độ dữ liệu
      */
     public void setConnectionData(ConnectionData connectionData) {
         this.mConnectionData = connectionData;
@@ -129,6 +137,8 @@ public class RadioDriver extends CrtpDriver {
     /*
      *  Receive a packet though the link. This call is blocking but will
      *  timeout and return None if a timeout is supplied.
+     *  Nhận một gói tin qua liên kết. Lời gọi này bị chặn nhưng sẽ hết thời
+     *  gian chờ và trả về None nếu có truyền vào thời gian chờ.
      */
     @Override
     public CrtpPacket receivePacket(int time) {
@@ -142,6 +152,7 @@ public class RadioDriver extends CrtpDriver {
 
     /*
      * Send the packet though the link
+     * Gửi gói tin qua liên kết
      *
      *  (non-Javadoc)
      * @see cflib.crtp.CrtpDriver#sendPacket(cflib.crtp.CrtpPacket)
@@ -154,6 +165,8 @@ public class RadioDriver extends CrtpDriver {
 
         //TODO: does it make sense to be able to queue packets even though
         //the connection is not established yet?
+        //TODO: liệu có hợp lý khi cho phép xếp gói tin vào hàng đợi ngay cả
+        // khi kết nối chưa được thiết lập không?
 
         /*
         try:
@@ -162,6 +175,8 @@ public class RadioDriver extends CrtpDriver {
             if self.link_error_callback:
                 self.link_error_callback("RadioDriver: Could not send packet to copter")
         */
+        // (Python: đưa gói tin vào out_queue với timeout 2 giây, báo lỗi qua
+        // link_error_callback nếu hàng đợi đầy)
 
         // this.mOutQueue.addLast(packet);
         try {
@@ -173,6 +188,7 @@ public class RadioDriver extends CrtpDriver {
 
     /*
      *  Close the link.
+     *  Đóng liên kết.
      *
      * (non-Javadoc)
      * @see cflib.crtp.CrtpDriver#close()
@@ -181,8 +197,10 @@ public class RadioDriver extends CrtpDriver {
     public void disconnect() {
         mLogger.debug("disconnect()");
         // Stop the comm thread
+        // Dừng luồng truyền thông
         stopSendReceiveThread();
         // Avoid NPE because packets are still processed
+        // Tránh NPE vì các gói tin vẫn đang được xử lý
         try {
             Thread.sleep(100);
         } catch (InterruptedException e) {
@@ -201,6 +219,7 @@ public class RadioDriver extends CrtpDriver {
 
     /**
      * Scan interface for Crazyflies
+     * Quét giao diện để tìm Crazyflie
      */
     private static List<ConnectionData> scanInterface(Crazyradio crazyRadio, CrazyUsbInterface crazyUsbInterface) {
         List<ConnectionData> connectionDataList = new ArrayList<ConnectionData>();
@@ -210,6 +229,7 @@ public class RadioDriver extends CrtpDriver {
         } else {
             mLogger.error("Cannot scan for links while the link is open!");
             //TODO: throw exception?
+            //TODO: có nên ném ngoại lệ không?
         }
 
         mLogger.info("Found Crazyradio with version " + crazyRadio.getVersion() + " and serial number " + crazyRadio.getSerialNumber());
@@ -257,11 +277,15 @@ public class RadioDriver extends CrtpDriver {
             return false;
         }
         // self.link.pause()
+        // (Python: tạm dừng liên kết)
         stopSendReceiveThread();
 
         int SET_BOOTLOADER_ADDRESS = 0x11; // Only implemented on Crazyflie version 0x00
+        // Chỉ được triển khai trên Crazyflie phiên bản 0x00
         //TODO: is there a more elegant way to do this?
+        //TODO: có cách nào tinh tế hơn để làm việc này không?
         //pkdata = (0xFF, 0xFF, 0x11) + tuple(new_address)
+        // (Python: ghép 0xFF, 0xFF, 0x11 với địa chỉ mới)
         byte[] pkData = new byte[newAddress.length + 3];
         pkData[0] = (byte) 0xFF;
         pkData[1] = (byte) 0xFF;
@@ -271,11 +295,14 @@ public class RadioDriver extends CrtpDriver {
         for (int i = 0; i < 10; i++) {
             mLogger.debug("Trying to set new radio address");
             //self.link.cradio.set_address((0xE7,) * 5)
+            // (Python: đặt địa chỉ radio thành 5 byte 0xE7)
             mCradio.setAddress(new byte[]{(byte) 0xE7, (byte) 0xE7, (byte) 0xE7, (byte) 0xE7, (byte) 0xE7});
             mCradio.sendPacket(pkData);
             //self.link.cradio.set_address(tuple(new_address))
+            // (Python: đặt địa chỉ radio thành địa chỉ mới)
             mCradio.setAddress(newAddress);
             //if self.link.cradio.send_packet((0xff,)).ack:
+            // (Python: gửi gói tin 0xff và kiểm tra ack)
             RadioAck ack = mCradio.sendPacket(new byte[] {(byte) 0xFF});
             if (ack != null) {
                 mLogger.info("Bootloader set to radio address " + Utilities.getHexString(newAddress));
@@ -291,6 +318,7 @@ public class RadioDriver extends CrtpDriver {
     private void startSendReceiveThread() {
         if (mRadioDriverThread == null) {
             //self._thread = _RadioDriverThread(self.cradio, self.in_queue, self.out_queue, link_quality_callback, link_error_callback)
+            // (Python: tạo _RadioDriverThread với các hàng đợi và callback)
             RadioDriverThread rDT = new RadioDriverThread();
             mRadioDriverThread = new Thread(rDT);
             mRadioDriverThread.start();
@@ -306,6 +334,7 @@ public class RadioDriver extends CrtpDriver {
 
     /**
      * Radio link receiver thread is used to read data from the Crazyradio USB driver.
+     * Luồng nhận của liên kết radio dùng để đọc dữ liệu từ trình điều khiển USB của Crazyradio.
      */
     private class RadioDriverThread implements Runnable {
 
@@ -316,6 +345,7 @@ public class RadioDriver extends CrtpDriver {
 
         /**
          * Create the object
+         * Tạo đối tượng
          */
         public RadioDriverThread() {
             this.mRetryBeforeDisconnect = RETRYCOUNT_BEFORE_DISCONNECT;
@@ -323,6 +353,7 @@ public class RadioDriver extends CrtpDriver {
 
         /**
          * Run the receiver thread
+         * Chạy luồng nhận
          *
          * (non-Javadoc)
          * @see java.lang.Runnable#run()
@@ -346,9 +377,12 @@ public class RadioDriver extends CrtpDriver {
                                                  "Exception:%s\n\n%s" % (e,
                                                  traceback.format_exc()))
                     */
+                    // (Python: gửi gói tin và bắt ngoại lệ, báo lỗi qua
+                    // link_error_callback nếu không liên lạc được với dongle)
                     RadioAck ackStatus = mCradio.sendPacket(dataOut);
 
                     // Analyze the data packet
+                    // Phân tích gói tin dữ liệu
                     if (ackStatus == null) {
                         notifyConnectionLost("Dongle communication error (ackStatus == null)");
                         mLogger.warn("Dongle communication error (ackStatus == null)");
@@ -358,7 +392,9 @@ public class RadioDriver extends CrtpDriver {
                     notifyLinkQualityUpdated((10 - ackStatus.getRetry()) * 10);
 
                     // If no copter, retry
+                    // Nếu không có copter thì gửi lại
                     //TODO: how is this actually possible?
+                    //TODO: điều này thực sự có thể xảy ra sao?
                     if (!ackStatus.isAck()) {
                         this.mRetryBeforeDisconnect--;
                         if (this.mRetryBeforeDisconnect == 0) {
@@ -372,6 +408,7 @@ public class RadioDriver extends CrtpDriver {
                     byte[] data = ackStatus.getData();
 
                     // if there is a copter in range, the packet is analyzed and the next packet to send is prepared
+                    // nếu có copter trong tầm, gói tin được phân tích và gói tin tiếp theo cần gửi được chuẩn bị
                     if (data != null && data.length > 0) {
                         CrtpPacket inPacket = new CrtpPacket(data);
                         mInQueue.put(inPacket);
@@ -383,6 +420,7 @@ public class RadioDriver extends CrtpDriver {
                         if (emptyCtr > 10) {
                             emptyCtr = 10;
                             // Relaxation time if the last 10 packets where empty
+                            // Thời gian nghỉ nếu 10 gói tin gần nhất đều rỗng
                             waitTime = 0.01;
                         } else {
                             waitTime = 0;
@@ -390,6 +428,7 @@ public class RadioDriver extends CrtpDriver {
                     }
 
                     // get the next packet to send after relaxation (wait 10ms)
+                    // lấy gói tin tiếp theo cần gửi sau thời gian nghỉ (chờ 10ms)
                     CrtpPacket outPacket = mOutQueue.poll((long) waitTime, TimeUnit.SECONDS);
 
                     if (outPacket != null) {

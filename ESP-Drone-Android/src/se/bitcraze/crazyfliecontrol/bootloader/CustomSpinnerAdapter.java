@@ -64,6 +64,7 @@ public class CustomSpinnerAdapter extends ArrayAdapter<FirmwareRelease> {
     }
 
     // this function is called for each row (Called data.size() times)
+    // hàm này được gọi cho mỗi hàng (được gọi data.size() lần)
     private View getCustomView(int position, View convertView, ViewGroup parent) {
         View row = inflater.inflate(R.layout.spinner_rows, parent, false);
         FirmwareRelease firmwareRelease = mFirmwareReleases.get(position);
@@ -74,6 +75,7 @@ public class CustomSpinnerAdapter extends ArrayAdapter<FirmwareRelease> {
         TextView date = (TextView) row.findViewById(R.id.date);
         TextView type = (TextView) row.findViewById(R.id.type);
         // Set values for each spinner row
+        // Đặt giá trị cho mỗi hàng của spinner
         label.setText(firmwareRelease.getTagName());
         date.setText(firmwareRelease.getCreatedAt());
         type.setText(firmwareRelease.getType());

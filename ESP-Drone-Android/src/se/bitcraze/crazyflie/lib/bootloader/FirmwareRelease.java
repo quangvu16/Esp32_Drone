@@ -101,6 +101,7 @@ public class FirmwareRelease implements Comparable<FirmwareRelease> {
 
     public String getType() {
         // TODO: make this more reliable
+        // TODO: làm cho phần này đáng tin cậy hơn
         String lcAssetName = mAssetName.toLowerCase(Locale.US);
         if (lcAssetName.startsWith("cf1") || lcAssetName.startsWith("crazyflie1")) {
             return "CF1";

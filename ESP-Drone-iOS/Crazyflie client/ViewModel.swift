@@ -22,8 +22,11 @@ final class ViewModel {
     private var crazyFlie: CrazyFlie?
     /// Owns the CrazyFlie + CrtpClient pair and fans log samples out to the
     /// screens. A transport change rebuilds it via `reconnect`.
+    /// Sở hữu cặp CrazyFlie + CrtpClient và phân phối các mẫu log tới các màn
+    /// hình. Đổi tầng truyền sẽ dựng lại nó qua `reconnect`.
     private(set) var session: DroneSession!
     /// Tilt-to-fly, when the user selects that control mode.
+    /// Nghiêng để bay, khi người dùng chọn chế độ điều khiển đó.
     let tiltControl = TiltControl()
     private var sensitivity: Sensitivity = .slow
     private var controlMode: ControlMode = ControlMode.current ?? .mode1
@@ -89,6 +92,8 @@ final class ViewModel {
 
     /// Tears down and rebuilds the link from the current LinkSettings. Called
     /// when the connection picker saves.
+    /// Gỡ và dựng lại liên kết từ LinkSettings hiện tại. Được gọi khi trình
+    /// chọn kết nối lưu thiết lập.
     func applyConnectionSettings() {
         session.reconnect(delegate: self)
         crazyFlie = session.crazyFlie
@@ -107,6 +112,9 @@ final class ViewModel {
         // CMDeviceMotion attitude (TiltControl) is the tilt-to-fly source
         // (PROTOCOL.md §9). The legacy MotionLink accelerometer path stays
         // wired for the other control modes that reference it.
+        // Tư thế CMDeviceMotion (TiltControl) là nguồn cho nghiêng-để-bay
+        // (PROTOCOL.md §9). Đường dẫn gia tốc kế MotionLink cũ vẫn được nối
+        // cho các chế độ điều khiển khác có tham chiếu đến nó.
         if motionLink == nil {
             motionLink = MotionLink()
         }
@@ -161,11 +169,15 @@ final class ViewModel {
             // TiltControl is itself a CrazyFlieCommander: roll/pitch/yaw come
             // from the phone's CMDeviceMotion attitude, thrust stays on the
             // existing stick (PROTOCOL.md §9).
+            // TiltControl vốn là một CrazyFlieCommander: roll/pitch/yaw lấy từ
+            // tư thế CMDeviceMotion của điện thoại, lực đẩy vẫn ở trên cần điều
+            // khiển hiện có (PROTOCOL.md §9).
             rightJoystickProvider.thrustControl = .y
             leftJoystickProvider.thrustControl = .none
             tiltControl.thrustProvider = { [weak self] in
                 guard let self = self else { return 0 }
                 // Reuse the stick's thrust scaling path.
+                // Dùng lại đường tỷ lệ lực đẩy của cần điều khiển.
                 return self.tiltThrust()
             }
             crazyFlie?.commander = tiltControl
@@ -180,10 +192,14 @@ final class ViewModel {
 
     /// Thrust from the right stick, scaled exactly as SimpleCrazyFlieCommander
     /// does, so tilt mode and stick modes command the same wire values.
+    /// Lực đẩy lấy từ cần bên phải, tỷ lệ đúng như SimpleCrazyFlieCommander làm,
+    /// để chế độ nghiêng và chế độ cần điều khiển ra cùng giá trị trên đường truyền.
     private func tiltThrust() -> Float {
         guard let settings = sensitivity.settings else { return 0 }
         // With thrustControl == .y the view model already maps the stick into
         // 0…1; that is the same input SimpleCrazyFlieCommander.thrust reads.
+        // Với thrustControl == .y, view model đã ánh xạ cần vào 0…1; đó là cùng
+        // đầu vào mà SimpleCrazyFlieCommander.thrust đọc.
         let control = rightJoystickProvider.y
         var thrust = control * 65535 * (settings.maxThrust / 100)
         if thrust > 65535 { thrust = 65535 }

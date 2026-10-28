@@ -44,6 +44,9 @@ import com.espressif.espdrone.android.R;
  * The GamepadController deals with external controllers (e.g. a PS3 or XBox game pad).
  * When the split axis yaw setting is activated, the shoulder buttons of the game pads
  * can be used to control the yaw axis.
+ * GamepadController xử lý các bộ điều khiển ngoài (ví dụ tay cầm PS3 hoặc XBox).
+ * Khi thiết lập yaw tách trục được kích hoạt, các nút vai của tay cầm có thể
+ * được dùng để điều khiển trục yaw.
  *
  */
 public class GamepadController extends AbstractController {
@@ -52,6 +55,7 @@ public class GamepadController extends AbstractController {
     private SharedPreferences mPreferences;
 
     //Gamepad axis/buttons
+    // Trục/nút của gamepad
     private int mRightAnalogXAxis;
     private int mRightAnalogYAxis;
     private int mLeftAnalogXAxis;
@@ -71,11 +75,13 @@ public class GamepadController extends AbstractController {
     private int mLeftAnalogYAxisInvertFactor = -1;
 
     //Split axis
+    // Trục tách
     private float mSplit_axis_yaw_right;
     private float mSplit_axis_yaw_left;
     private boolean mUseSplitAxisYaw = false;
 
     //Default gamepad axis/buttons
+    // Trục/nút mặc định của gamepad
     private String mRightAnalogXAxisDefaultValue;
     private String mRightAnalogYAxisDefaultValue;
     private String mLeftAnalogXAxisDefaultValue;
@@ -106,6 +112,8 @@ public class GamepadController extends AbstractController {
         //Log.i(LOG_TAG, "Input device: " + event.getDevice().getName());
         /*if axis has a range of 1 (0 -> 1) instead of 2 (-1 -> 0) do not invert axis value,
         this is necessary for analog R1 (Brake) or analog R2 (Gas) shoulder buttons on PS3 controller*/
+        /*nếu trục có biên độ 1 (0 -> 1) thay vì 2 (-1 -> 0) thì không đảo giá trị trục,
+        điều này là cần thiết cho các nút vai analog R1 (Brake) hoặc R2 (Gas) trên tay cầm PS3*/
         if (event != null) {
             InputDevice device = event.getDevice();
             if (device != null) {
@@ -116,6 +124,7 @@ public class GamepadController extends AbstractController {
             }
 
             // default axis are set to work with PS3 controller
+            // các trục mặc định được đặt để hoạt động với tay cầm PS3
             mControls.setRightAnalogX((float) event.getAxisValue(mRightAnalogXAxis));
             mControls.setRightAnalogY((float) (event.getAxisValue(mRightAnalogYAxis)) * mRightAnalogYAxisInvertFactor);
             mControls.setLeftAnalogX((float) event.getAxisValue(mLeftAnalogXAxis));
@@ -136,6 +145,7 @@ public class GamepadController extends AbstractController {
         case KeyEvent.ACTION_DOWN:
             if (event.getKeyCode() == mEmergencyBtn){
                 //quick solution
+                // giải pháp nhanh
                 mControls.resetAxisValues();
                 mActivity.getPresenter().disconnect();
                 Toast.makeText(mActivity, "Emergency Stop", Toast.LENGTH_SHORT).show();
@@ -153,6 +163,7 @@ public class GamepadController extends AbstractController {
                 mActivity.getPresenter().runAltAction(mControls.getAlt2Action());
             } else if (event.getKeyCode() == mHoverBtn) {
                 // workaround until BleLink supports param subsystem
+                // giải pháp tạm thời cho đến khi BleLink hỗ trợ hệ thống tham số
                 if (mActivity.getPresenter() != null && mActivity.getPresenter().getCrazyflie() != null && mActivity.getPresenter().getCrazyflie().getDriver() instanceof RadioDriver) {
                     mHover = true;
                     mActivity.getPresenter().enableAltHoldMode(mHover);
@@ -162,6 +173,7 @@ public class GamepadController extends AbstractController {
         case KeyEvent.ACTION_UP:
             if(event.getKeyCode() == mHoverBtn) {
                 // workaround until BleLink supports param subsystem
+                // giải pháp tạm thời cho đến khi BleLink hỗ trợ hệ thống tham số
                 if (mActivity.getPresenter() != null && mActivity.getPresenter().getCrazyflie() != null && mActivity.getPresenter().getCrazyflie().getDriver() instanceof RadioDriver) {
                     mHover = false;
                     mActivity.getPresenter().enableAltHoldMode(mHover);
@@ -216,6 +228,7 @@ public class GamepadController extends AbstractController {
 
     /*
      * Handles split axis
+     * Xử lý trục tách
      * (non-Javadoc)
      * @see se.bitcraze.crazyfliecontrol.controller.AbstractController#getYaw()
      */
@@ -236,10 +249,12 @@ public class GamepadController extends AbstractController {
 
     /*
      * Thrust value in percent (used in the UI)
+     * Giá trị lực đẩy tính theo phần trăm (dùng trong UI)
      */
     public float getThrust() {
         float thrust = ((mControls.getMode() == 1 || mControls.getMode() == 3) ? mControls.getRightAnalog_Y() : mControls.getLeftAnalog_Y());
         //Hacky Hover Mode
+        // Chế độ hover kiểu hack
         if (isHover() && mControls.getDeadzone(thrust) == 1) {
             float minThrust = mControls.getMinThrust();
             if (thrust < 0) {
@@ -254,12 +269,14 @@ public class GamepadController extends AbstractController {
 
     /*
      * Absolute thrust value (gets send to the Crazyflie)
+     * Giá trị lực đẩy tuyệt đối (được gửi tới Crazyflie)
      */
     public float getThrustAbsolute() {
         float thrust = getThrust();
         float absThrust = thrust/100 * MAX_THRUST;
 
         //Hacky Hover Mode
+        // Chế độ hover kiểu hack
         if(isHover()) {
             return 32767 + ((absThrust/65535)*32767);
         } else {
@@ -272,6 +289,7 @@ public class GamepadController extends AbstractController {
 
     /**
      * Used for height hold with zRanger sensor
+     * Dùng cho việc giữ độ cao với cảm biến zRanger
      *
      * @return
      */

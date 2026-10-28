@@ -54,19 +54,27 @@ import se.bitcraze.crazyfliecontrol2.FlyHeader;
  * PID tuning screen: six strip charts (angle/controller and P/I/D terms per axis), live
  * statistics, the 13 parameter editors with -10%/+10% nudges, Save/Load/Defaults, and a
  * safety-gated auto-tuner for one axis at a time.
+ * Màn hình tinh chỉnh PID: sáu biểu đồ dải (góc/đầu ra điều khiển và các thành phần P/I/D theo
+ * từng trục), thống kê trực tiếp, 13 trình sửa tham số với các nút -10%/+10%, Save/Load/Defaults,
+ * và bộ tự tinh chỉnh có kiểm tra an toàn, mỗi lần một trục.
  *
  * <p>Telemetry comes from two log blocks at 20 Hz (PROTOCOL.md section 4): a Status block
  * that is always running and an axis tune block that follows whichever axis is selected.
  * The charts of a non-selected axis therefore show "Waiting for telemetry" until their
  * block is streaming.
+ * <p>Dữ liệu từ xa đến từ hai khối log ở tần số 20 Hz (PROTOCOL.md mục 4): một khối Status
+ * luôn chạy và một khối tune theo trục bám theo trục đang được chọn. Vì thế biểu đồ của trục
+ * không được chọn sẽ hiển thị "Waiting for telemetry" cho đến khi khối của nó phát dữ liệu.
  *
  * <p>The connection is shared through {@link DroneSession}; nothing here owns the link.
+ * <p>Kết nối được dùng chung qua {@link DroneSession}; không phần nào ở đây sở hữu liên kết.
  */
 public class TuneActivity extends AppCompatActivity {
 
     private static final String LOG_TAG = "Crazyflie-TuneActivity";
 
     private static final int TUNE_PERIOD_MS = 50;          // 20 Hz charts
+    // biểu đồ 20 Hz
     private static final int STATS_PERIOD_MS = 500;
     private static final int HOLD_TO_START_MS = 2000;
     private static final String STATUS_LOG_NAME = "TuneStatus";
@@ -76,6 +84,7 @@ public class TuneActivity extends AppCompatActivity {
     private static final String[] MODE_NAMES = {"MANUAL", "HOLD", "AUTO", "FOLLOW", "RTH"};
 
     // Colour-blind tolerant series colours (hard-coded on purpose: no res/values edits).
+    // Màu chuỗi thân thiện với người mù màu (ghi cứng có chủ đích: không sửa res/values).
     private static final int COLOR_BLUE = 0xFF2196F3;
     private static final int COLOR_RED = 0xFFF44336;
     private static final int COLOR_GREEN = 0xFF4CAF50;
@@ -83,6 +92,7 @@ public class TuneActivity extends AppCompatActivity {
     private static final int COLOR_PURPLE = 0xFF9C27B0;
 
     /** Public entry point; no extras needed, the link comes from {@link DroneSession}. */
+    /** Điểm vào công khai; không cần extras, liên kết lấy từ {@link DroneSession}. */
     public static Intent newIntent(Context context) {
         return new Intent(context, TuneActivity.class);
     }
@@ -129,6 +139,7 @@ public class TuneActivity extends AppCompatActivity {
     private AutoTuner mTuner;
 
     // Windows for the live cost panel (the charts own their own buffers).
+    // Các cửa sổ cho panel chi phí trực tiếp (các biểu đồ tự giữ bộ đệm riêng).
     private final Stats.Ring mAngleRing = new Stats.Ring(ChartView.CAPACITY);
     private final Stats.Ring mRateRing = new Stats.Ring(ChartView.CAPACITY);
     private final Stats.Ring mMotorRing = new Stats.Ring(ChartView.CAPACITY);
@@ -191,6 +202,7 @@ public class TuneActivity extends AppCompatActivity {
     }
 
     /** Shared header (sections, status, CUT MOTORS) with the tuner's status line under it. */
+    /** Header dùng chung (các mục, trạng thái, CUT MOTORS) với dòng trạng thái của bộ tinh chỉnh bên dưới. */
     private View buildTopBar() {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.VERTICAL);
@@ -271,6 +283,8 @@ public class TuneActivity extends AppCompatActivity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         // Chart tools are routine and reversible, so they are icon-only (with a
         // content description + long-press tooltip). Flight commands keep their text.
+        // Các công cụ biểu đồ là thường quy và hoàn tác được, nên chỉ dùng icon (kèm
+        // content description + tooltip khi nhấn giữ). Các lệnh bay vẫn giữ nguyên chữ.
         mPauseBtn = iconButton(R.drawable.ic_btn_pause, "Pause charts");
         mPauseBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -343,6 +357,7 @@ public class TuneActivity extends AppCompatActivity {
                 }
                 if (mTuner != null && mTuner.isRunning()) {
                     // one axis at a time: switching mid-run is blocked
+                    // mỗi lần một trục: đổi trục giữa chừng bị chặn
                     mAxisSpinner.setSelection(axisIndex(mAxis));
                     Toast.makeText(TuneActivity.this,
                             "Auto-tune is running on " + mAxis + " - stop it first", Toast.LENGTH_LONG).show();
@@ -457,6 +472,7 @@ public class TuneActivity extends AppCompatActivity {
         panel.addView(mTunerStatus, matchWrap());
 
         // Save / Load / Defaults (NVS; idempotent, the client retransmits every 500 ms)
+        // Save / Load / Defaults (NVS; idempotent, client gửi lại mỗi 500 ms)
         LinearLayout nvRow = new LinearLayout(this);
         nvRow.setOrientation(LinearLayout.HORIZONTAL);
         nvRow.addView(nvsButton("Save", FlightControlPacket.CMD_SAVE));
@@ -544,6 +560,7 @@ public class TuneActivity extends AppCompatActivity {
     // ------------------------------------------------------------- auto-tune control
 
     /** The hold-to-confirm completed; now the armed gate decides. */
+    /** Việc giữ nút để xác nhận đã hoàn tất; giờ cổng kiểm tra armed quyết định. */
     private void onStartConfirmed() {
         resetStartButton();
         if (mTuner != null && mTuner.isRunning()) {
@@ -580,9 +597,14 @@ public class TuneActivity extends AppCompatActivity {
         ids.add("pid." + mAxis + "_kd");
         AutoTuner.Config cfg = new AutoTuner.Config(method, ids, trials, trialS,
                 0 /* no nudge: the drone sits on its stand */, method.defaultRange,
+                /* không nudge: drone đặt trên giá đỡ */
                 false /* no balance-angle trim */, false /* no cross-run history */);
+                /* không chỉnh góc balance */
+                /* không dùng lịch sử giữa các lần chạy */
         // One trial log per axis: rows from a roll run seed the next roll run and are
         // never matched against a pitch one.
+        // Một file log lần thử cho mỗi trục: các hàng từ lần chạy roll khởi tạo cho
+        // lần chạy roll kế tiếp và không bao giờ bị ghép với dữ liệu của pitch.
         mTuner = new AutoTuner(cfg, mParam,
                 new java.io.File(getFilesDir(), "pid-tune-" + mAxis + ".csv"), mTunerListener);
         mTuner.start();
@@ -621,6 +643,7 @@ public class TuneActivity extends AppCompatActivity {
                 return;
             }
             // ModelView is not built yet; surface what the model believes as text.
+            // ModelView chưa được xây dựng; hiển thị điều mô hình dự đoán dưới dạng văn bản.
             setTunerStatus(mTunerStatus.getText() + String.format(Locale.US,
                     "\nbest predicted cost %.2f", report.bestPred));
         }
@@ -652,6 +675,7 @@ public class TuneActivity extends AppCompatActivity {
             mTuner.stop();
         }
         // Halting the tuner is not enough: cut the motors now. EMERGENCY is always honoured.
+        // Dừng bộ tinh chỉnh là chưa đủ: cắt động cơ ngay. EMERGENCY luôn được chấp hành.
         sendFlightControl(FlightControlPacket.emergency());
         setTunerStatus("CUT MOTORS sent - motors off, tuner halted.");
     }
@@ -678,6 +702,8 @@ public class TuneActivity extends AppCompatActivity {
             public void logDataReceived(LogConfig logConfig, Map<String, Number> data, int timestamp) {
                 // This listener sees every block on the link (the main screen's battery
                 // block too); only ours are handled here.
+                // Listener này thấy mọi khối trên liên kết (cả khối pin của màn hình chính);
+                // chỉ các khối của chúng ta được xử lý tại đây.
                 if (STATUS_LOG_NAME.equals(logConfig.getName())) {
                     handleStatusData(data);
                 } else if (logConfig == mTuneLogConfig) {
@@ -702,6 +728,9 @@ public class TuneActivity extends AppCompatActivity {
      * Logg's own config-id counter never increments (every addConfig() would hand out id
      * 1 and the blocks would collide on the wire), so the id is pinned by hand here, above
      * anything already registered (e.g. the main screen's "Standard" block).
+     * Bộ đếm config-id của chính Logg không bao giờ tăng (mọi addConfig() sẽ phát ra id
+     * 1 và các khối sẽ đụng nhau trên đường truyền), nên id được ghim thủ công tại đây, cao
+     * hơn mọi thứ đã đăng ký (ví dụ khối "Standard" của màn hình chính).
      */
     private void startLogConfig(LogConfig config) {
         mLogg.addConfig(config);
@@ -737,6 +766,9 @@ public class TuneActivity extends AppCompatActivity {
         // motor.m1 rides along on every axis block (22 B of the 25 B budget): the cost
         // function needs the motor RMS and the saturation share no matter which axis is
         // being tuned, and the brief's yaw block left it out.
+        // motor.m1 đi kèm mọi khối theo trục (22 B trong ngân sách 25 B): hàm chi phí
+        // cần motor RMS và tỷ lệ bão hòa bất kể trục nào đang được tinh chỉnh, còn khối
+        // yaw trong đặc tả đã bỏ sót nó.
         cfg.addVariable("motor.m1", VariableType.UINT16_T);
         mTuneLogConfig = cfg;
         startLogConfig(cfg);
@@ -792,6 +824,9 @@ public class TuneActivity extends AppCompatActivity {
         // The drone logs no roll/pitch gyro rates (only stabilizer.yaw is a rate), so the
         // rate is finite-differenced from consecutive angle samples at the 20 Hz sample
         // rate. A deliberate, honest substitution - not a bug.
+        // Drone không log tốc độ góc roll/pitch từ gyro (chỉ stabilizer.yaw là một tốc độ
+        // góc), nên tốc độ góc được sai phân hữu hạn từ các mẫu góc liên tiếp ở tần số lấy
+        // mẫu 20 Hz. Một sự thay thế có chủ đích và trung thực - không phải lỗi.
         float rate;
         if ("yaw".equals(mAxis)) {
             rate = angle;
@@ -837,6 +872,7 @@ public class TuneActivity extends AppCompatActivity {
                 @Override
                 public void updated(String name, Number value) {
                     // Echo for the tuner first (it polls on its own thread), then the UI.
+                    // Echo cho bộ tinh chỉnh trước (nó poll trên luồng riêng), sau đó là UI.
                     if (mTuner != null) {
                         mTuner.onParam(name, value.floatValue());
                     }
@@ -859,6 +895,8 @@ public class TuneActivity extends AppCompatActivity {
             };
             // Param keeps only ONE listener per complete name, so the activity owns a
             // single dispatcher per parameter and fans out from there.
+            // Param chỉ giữ MỘT listener cho mỗi complete name, nên activity sở hữu một
+            // bộ phân phối duy nhất cho từng tham số rồi lan ra từ đó.
             mParamListeners.add(listener);
             mParam.addParamListener(listener);
             mParam.requestParamUpdate(spec.completeName);
@@ -887,6 +925,7 @@ public class TuneActivity extends AppCompatActivity {
         }
 
         // Cost components of the active axis over the same visible window.
+        // Các thành phần chi phí của trục đang hoạt động trên cùng cửa sổ hiển thị.
         float[] angle = new float[ChartView.CAPACITY];
         float[] rate = new float[ChartView.CAPACITY];
         float[] motor = new float[ChartView.CAPACITY];
@@ -990,6 +1029,7 @@ public class TuneActivity extends AppCompatActivity {
     }
 
     /** Put an icon at the start of a text button, tinted to match its text. */
+    /** Đặt icon ở đầu nút có chữ, tô màu khớp với màu chữ của nút. */
     private void setButtonIcon(Button b, int resId, int tint) {
         Drawable d = ContextCompat.getDrawable(this, resId);
         if (d == null) {
@@ -1004,6 +1044,7 @@ public class TuneActivity extends AppCompatActivity {
     }
 
     /** Icon-only button: the label lives in the content description and a long-press tooltip. */
+    /** Nút chỉ có icon: nhãn nằm trong content description và tooltip khi nhấn giữ. */
     private ImageButton iconButton(int resId, String label) {
         ImageButton b = new ImageButton(this);
         b.setImageResource(resId);
@@ -1060,6 +1101,7 @@ public class TuneActivity extends AppCompatActivity {
         if (mTuner != null) {
             if (mTuner.isRunning()) {
                 // Leaving a self-tuning, spinning drone unattended is not an option.
+                // Không thể bỏ mặc drone đang tự tinh chỉnh với cánh quạt đang quay.
                 Log.w(LOG_TAG, "auto-tune still running at exit - emergency stop");
                 mTuner.stop();
                 sendFlightControl(FlightControlPacket.emergency());

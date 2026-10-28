@@ -36,6 +36,8 @@ import se.bitcraze.crazyflie.lib.crazyflie.ConnectionListener;
 /**
  * CTRP Driver main class
  * This class is inherited by all the CRTP link drivers.
+ * Lớp chính của trình điều khiển CRTP.
+ * Mọi trình điều khiển liên kết CRTP đều kế thừa lớp này.
  *
  */
 public abstract class CrtpDriver {
@@ -44,12 +46,14 @@ public abstract class CrtpDriver {
 
     /**
      * Driver constructor. Throw an exception if the driver is unable to open the URI
+     * Hàm tạo của trình điều khiển. Ném ngoại lệ nếu trình điều khiển không mở được URI.
      */
     public CrtpDriver() {
     }
 
     /**
      * Connect the driver
+     * Kết nối trình điều khiển.
      *
      * @throws IOException
      */
@@ -57,18 +61,22 @@ public abstract class CrtpDriver {
 
     /**
      * Close the link
+     * Đóng liên kết.
      */
     public abstract void disconnect();
 
     /**
      * Check whether the link is connected.
+     * Kiểm tra xem liên kết đã được kết nối chưa.
      *
      * @return <code>true</code> if the link is connected.
+     * @return <code>true</code> nếu liên kết đã kết nối.
      */
     public abstract boolean isConnected();
 
     /**
      * Send a CRTP packet
+     * Gửi một gói tin CRTP.
      *
      * @param packet
      */
@@ -76,9 +84,12 @@ public abstract class CrtpDriver {
 
     /**
      * Receive a CRTP packet.
+     * Nhận một gói tin CRTP.
      *
      * @param wait The time to wait for a packet in milliseconds. -1 means forever
+     * @param wait Thời gian chờ gói tin theo mili giây. -1 nghĩa là chờ mãi mãi
      * @return One CRTP packet or None if no packet has been received.
+     * @return Một gói tin CRTP hoặc None nếu không nhận được gói tin nào.
      */
     public abstract CrtpPacket receivePacket(int wait);
 
@@ -86,8 +97,12 @@ public abstract class CrtpDriver {
      * Whether this link carries the full CRTP protocol (TOC, parameters and
      * logging) or only the flight-control subset. Connection setup downloads
      * the TOCs only for links that can answer TOC queries.
+     * Liên kết này mang toàn bộ giao thức CRTP (TOC, tham số và logging)
+     * hay chỉ phần điều khiển bay. Quá trình thiết lập kết nối chỉ tải TOC
+     * cho những liên kết có thể trả lời truy vấn TOC.
      *
      * @return <code>true</code> if TOC-based setup should run over this link
+     * @return <code>true</code> nếu phần thiết lập dựa trên TOC nên chạy qua liên kết này
      */
     public boolean supportsToc() {
         return true;
@@ -105,6 +120,7 @@ public abstract class CrtpDriver {
 
     /**
      * Notify all registered listeners about a requested connection
+     * Thông báo cho tất cả listener đã đăng ký về một yêu cầu kết nối
      */
     protected void notifyConnectionRequested(){
         for (ConnectionListener cl : this.mConnectionListeners) {
@@ -114,6 +130,7 @@ public abstract class CrtpDriver {
 
     /**
      * Notify all registered listeners about a connect.
+     * Thông báo cho tất cả listener đã đăng ký về một kết nối.
      */
     public void notifyConnected(){
         for (ConnectionListener cl : this.mConnectionListeners) {
@@ -122,6 +139,7 @@ public abstract class CrtpDriver {
     }
     /**
      * Notify all registered listeners about a finished setup.
+     * Thông báo cho tất cả listener đã đăng ký về một lần thiết lập hoàn tất.
      */
     public void notifySetupFinished(){
         for (ConnectionListener cl : this.mConnectionListeners) {
@@ -131,6 +149,7 @@ public abstract class CrtpDriver {
 
     /**
      * Notify all registered listeners about a failed connection attempt.
+     * Thông báo cho tất cả listener đã đăng ký về một lần thử kết nối thất bại.
      *
      * @param msg
      */
@@ -142,6 +161,7 @@ public abstract class CrtpDriver {
 
     /**
      * Notify all registered listeners about a lost connection.
+     * Thông báo cho tất cả listener đã đăng ký về một kết nối bị mất.
      *
      * @param msg
      */
@@ -153,6 +173,7 @@ public abstract class CrtpDriver {
 
     /**
      * Notify all registered listeners about a disconnect.
+     * Thông báo cho tất cả listener đã đăng ký về một lần ngắt kết nối.
      */
     protected void notifyDisconnected() {
         for (ConnectionListener cl : this.mConnectionListeners) {
@@ -162,8 +183,10 @@ public abstract class CrtpDriver {
 
     /**
      * Notify all registered listeners about a link quality update.
+     * Thông báo cho tất cả listener đã đăng ký về một bản cập nhật chất lượng liên kết.
      *
      * @param percent quality of the link (0 = connection lost, 100 = good)
+     * @param percent chất lượng của liên kết (0 = mất kết nối, 100 = tốt)
      */
     protected void notifyLinkQualityUpdated(int percent) {
         for (ConnectionListener cl : this.mConnectionListeners) {

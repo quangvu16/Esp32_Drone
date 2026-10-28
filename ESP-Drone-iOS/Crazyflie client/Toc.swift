@@ -6,16 +6,27 @@
 //  (PROTOCOL.md §2): info request -> nItems + crc, then one element request
 //  per id. The drone answers only existing ids, so a request for a missing id
 //  is simply never acknowledged — the retransmit queue ages those out.
+//  Máy trạng thái nạp TOC cho TOC tham số (port 2) và TOC log (port 5)
+//  (PROTOCOL.md §2): yêu cầu info -> nItems + crc, rồi mỗi id một yêu cầu
+//  element. Drone chỉ trả lời các id hiện có, nên yêu cầu cho id bị thiếu
+//  đơn giản là không bao giờ được ack — hàng đợi gửi lại sẽ loại dần các yêu
+//  cầu đó.
 //
 //  Retransmitted requests and duplicated replies must not corrupt state: an
 //  element reply for an id already stored is ignored, and the info reply is
 //  only acted on once (a second one just re-arms the same element walk).
+//  Các yêu cầu được gửi lại và câu trả lời trùng lặp không được làm hỏng
+//  trạng thái: câu trả lời element cho id đã lưu bị bỏ qua, và câu trả lời
+//  info chỉ được xử lý một lần (lần thứ hai chỉ kích hoạt lại cùng một lượt
+//  duyệt element).
 //
 
 import Foundation
 
 /// One TOC entry: `type|access` byte split into the type code and read-only
 /// flag, plus the two NUL-terminated strings (PROTOCOL.md §2).
+/// Một mục TOC: byte `type|access` tách thành mã kiểu và cờ chỉ đọc, cộng
+/// thêm hai chuỗi kết thúc bằng NUL (PROTOCOL.md §2).
 struct TocElement: Equatable {
     let id: UInt8
     let group: String
@@ -25,6 +36,8 @@ struct TocElement: Equatable {
 
     /// Element byte width, derived from the type code. Parameter and log TOCs
     /// use different code tables, so the caller passes which one applies.
+    /// Bề rộng byte của phần tử, suy ra từ mã kiểu. TOC tham số và TOC log dùng
+    /// các bảng mã khác nhau, nên nơi gọi truyền vào bảng nào được áp dụng.
     func size(isLog: Bool) -> Int {
         if isLog {
             return LogType(rawValue: typeCode)?.size ?? 0
@@ -36,6 +49,7 @@ struct TocElement: Equatable {
 }
 
 /// The elements of one TOC, keyed by id.
+/// Các phần tử của một TOC, được đánh khóa theo id.
 final class Toc {
     let isLog: Bool
     private(set) var elements: [UInt8: TocElement] = [:]
@@ -69,6 +83,8 @@ final class Toc {
 
     /// Idempotent: a duplicate reply for a stored id leaves the TOC unchanged
     /// and reports `false` so callers can ignore the repeat.
+    /// Idempotent: một câu trả lời trùng cho id đã lưu giữ TOC không đổi và
+    /// trả về `false` để nơi gọi có thể bỏ qua lần lặp lại.
     @discardableResult
     func apply(element: TocElement) -> Bool {
         guard elements[element.id] == nil else { return false }
@@ -84,6 +100,11 @@ final class Toc {
 /// `handle`. State transitions:
 ///
 ///     idle --start--> waitingInfo --info reply--> fetchingElements --done--> complete
+/// Phân tích câu trả lời trên channel TOC và điều khiển lượt duyệt element.
+///
+/// Nơi gọi làm chủ đường truyền: `requestInfo` / `requestElement` được gửi qua
+/// hàng đợi gửi lại, và mọi gói tin đến trên channel TOC được chuyển cho
+/// `handle`. Các chuyển trạng thái xem sơ đồ trên.
 final class TocFetcher {
     enum State {
         case idle
@@ -96,11 +117,14 @@ final class TocFetcher {
     let toc: Toc
 
     /// Sent when the whole TOC has been walked.
+    /// Được gọi khi đã duyệt xong toàn bộ TOC.
     var onCompleted: ((Toc) -> Void)?
     /// Called for each stored element (UI progress).
+    /// Được gọi cho mỗi phần tử đã lưu (tiến trình trên UI).
     var onElement: ((TocElement) -> Void)?
 
     /// The next id to request, or nil when the walk is finished.
+    /// Id tiếp theo cần yêu cầu, hoặc nil khi lượt duyệt đã kết thúc.
     private(set) var nextId: UInt8?
 
     init(isLog: Bool) {
@@ -108,12 +132,15 @@ final class TocFetcher {
     }
 
     /// Bytes for a TOC info request: `<1>` on channel 0.
+    /// Byte cho yêu cầu TOC info: `<1>` trên channel 0.
     static var infoRequest: Data { Data([1]) }
 
     /// Bytes for an element request: `<0><id>`.
+    /// Byte cho yêu cầu element: `<0><id>`.
     static func elementRequest(_ id: UInt8) -> Data { Data([0, id]) }
 
     /// True while the fetcher wants the resend queue to keep the given request alive.
+    /// Trả về true khi fetcher muốn hàng đợi gửi lại giữ cho yêu cầu đã cho còn hiệu lực.
     func wants(_ kind: Request) -> Bool {
         switch (state, kind) {
         case (.waitingInfo, .info): return true
@@ -129,6 +156,8 @@ final class TocFetcher {
 
     /// Handles one packet from the TOC channel (the `<cmd>` byte is payload[0]).
     /// Returns the request that should be (re)sent next, if any.
+    /// Xử lý một gói tin từ channel TOC (byte `<cmd>` là payload[0]).
+    /// Trả về yêu cầu cần (gửi lại) tiếp theo, nếu có.
     func handle(payload: Data) -> Request? {
         guard payload.count >= 1 else { return nil }
         switch payload[payload.startIndex] {
@@ -158,6 +187,8 @@ final class TocFetcher {
         state = .fetchingElements
         // A repeated info reply restarts the walk from the first missing id,
         // which is where we already are — harmless.
+        // Câu trả lời info lặp lại sẽ khởi động lại lượt duyệt từ id bị thiếu
+        // đầu tiên, mà đó chính là vị trí hiện tại — vô hại.
         advance()
         return nextId.map { .element($0) }
     }
@@ -169,6 +200,8 @@ final class TocFetcher {
         guard state == .fetchingElements, id == nextId else {
             // Duplicate or stale reply: already stored, or not what we asked
             // for. Either way it must not move the walk.
+            // Câu trả lời trùng hoặc cũ: đã lưu rồi, hoặc không phải thứ ta yêu
+            // cầu. Dù thế nào cũng không được làm dịch chuyển lượt duyệt.
             return nil
         }
 
@@ -195,6 +228,7 @@ final class TocFetcher {
     }
 
     /// Points `nextId` at the first id not yet stored.
+    /// Trỏ `nextId` tới id đầu tiên chưa được lưu.
     private func advance() {
         var id: UInt16 = 0
         while id < UInt16(toc.count) {

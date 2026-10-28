@@ -51,6 +51,7 @@ public class ConsoleListener extends DataListener {
     @Override
     public void dataReceived(CrtpPacket packet) {
         //skip packet when it only contains zeros
+        // bỏ qua gói tin khi nó chỉ chứa số không
         if (containsOnly00(packet.getPayload())) {
             return;
         }

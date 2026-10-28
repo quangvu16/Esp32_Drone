@@ -78,6 +78,7 @@ public class SliderPreference extends Preference {
         });
 
         //Percent was set by onSetInitialValue. ChangeListener will be triggered here
+        // Phần trăm đã được onSetInitialValue đặt. ChangeListener sẽ bị kích hoạt tại đây
         slider.setProgress((int) ((setting - min) / stepSize.floatValue()));
     }
 

@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Container for TocElements
+ * Vùng chứa các TocElement
  */
 public class Toc {
 
@@ -69,6 +70,7 @@ public class Toc {
 
     /**
      * Clear the TOC
+     * Làm trống TOC
      */
     public void clear() {
         this.mTocElementMap.clear();
@@ -76,6 +78,7 @@ public class Toc {
 
     /**
      * Add a new TocElement to the TOC container
+     * Thêm một TocElement mới vào vùng chứa TOC
      *
      * @param tocElement
      */
@@ -88,6 +91,7 @@ public class Toc {
 
     /**
      * Get a TocElement element identified by complete name from the container.
+     * Lấy một phần tử TocElement được xác định bằng tên đầy đủ từ vùng chứa.
      *
      * @param completeName
      * @return
@@ -98,6 +102,7 @@ public class Toc {
 
     /**
      * Get the TocElement element id-number of the element with the supplied name.
+     * Lấy số id của phần tử TocElement với tên được cung cấp.
      *
      * @param completeName
      * @return
@@ -113,6 +118,7 @@ public class Toc {
 
     /**
      * Get a TocElement element identified by name and group from the container
+     * Lấy một phần tử TocElement được xác định bằng tên và group từ vùng chứa
      *
      * @param group
      * @param name
@@ -124,6 +130,7 @@ public class Toc {
 
     /**
      * Get a TocElement element identified by index number from the container
+     * Lấy một phần tử TocElement được xác định bằng số chỉ mục từ vùng chứa
      *
      * @param ident
      * @return
@@ -140,10 +147,13 @@ public class Toc {
 
     /**
      * Get TocElements as list sorted by ID
+     * Lấy các TocElement dưới dạng danh sách sắp xếp theo ID
      *
      * @return list of TocElements sorted by ID
+     * @return danh sách các TocElement sắp xếp theo ID
      */
     //TODO: generate list not every time
+    //TODO: không tạo danh sách mỗi lần
     public List<TocElement> getElements() {
         List<TocElement> values = new ArrayList<TocElement>(mTocElementMap.values());
         Collections.sort(values);

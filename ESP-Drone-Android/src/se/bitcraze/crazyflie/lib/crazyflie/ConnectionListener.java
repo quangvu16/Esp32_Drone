@@ -29,47 +29,58 @@ package se.bitcraze.crazyflie.lib.crazyflie;
 
 /**
  * Interface for receiving notifications about the connection status.
+ * Giao diện để nhận thông báo về trạng thái kết nối.
  */
 public interface ConnectionListener {
 
     /**
      * Callback when the user requests a connection
+     * Callback khi người dùng yêu cầu kết nối
      */
     public void connectionRequested();
 
     /**
      * Callback when the first packet in a new link is received
+     * Callback khi gói tin đầu tiên trong một liên kết mới được nhận
      */
     public void connected();
 
     /**
      * Callback when a Crazyflie has been connected and the TOCs have been downloaded.
+     * Callback khi một Crazyflie đã được kết nối và các TOC đã được tải về.
      */
     public void setupFinished();
 
     /**
      * Callback when initial connection fails (i.e no Crazyflie at the specified address)
+     * Callback khi kết nối ban đầu thất bại (tức là không có Crazyflie tại địa chỉ đã chỉ định)
      *
      * @param msg error message
+     * @param msg thông báo lỗi
      */
     public void connectionFailed(String msg);
 
     /**
      * Callback when disconnected after a connection has been made (i.e Crazyflie moves out of range)
+     * Callback khi bị ngắt kết nối sau khi đã thiết lập kết nối (tức là Crazyflie di chuyển ra ngoài tầm phủ sóng)
      *
      * @param msg error message
+     * @param msg thông báo lỗi
      */
     public void connectionLost(String msg);
 
     /**
      * Callback when the Crazyflie is disconnected (called in all cases)
+     * Callback khi Crazyflie bị ngắt kết nối (được gọi trong mọi trường hợp)
      */
     public void disconnected();
 
     /**
      * Called when the link driver updates the link quality measurement
+     * Được gọi khi trình điều khiển liên kết cập nhật phép đo chất lượng liên kết
      *
      * @param percent link quality in percent
+     * @param percent chất lượng liên kết theo phần trăm
      */
     public void linkQualityUpdated(int percent);
 

@@ -26,6 +26,8 @@ import se.bitcraze.crazyflie.lib.param.Param;
 /**
  * Auto-tune of one axis' rate-PID gains while the drone sits on a stand with the props
  * spinning. Port of the balance tuner's AutoTuner trial framework (itself ml_tune.py):
+ * Tự tinh chỉnh các gain của PID rate cho một trục trong khi drone đặt trên giá, cánh quạt
+ * đang quay. Port từ khung lần thử AutoTuner của bộ tinh chỉnh balance (vốn là ml_tune.py):
  *
  * <ul>
  *   <li>{@link Method#ML} - Bayesian optimisation: a Gaussian process over the tried
@@ -43,20 +45,45 @@ import se.bitcraze.crazyflie.lib.param.Param;
  *       re-measured on a shrink.</li>
  *   <li>{@link Method#RANDOM} - Latin-hypercube samples: the baseline the others must
  *       beat.</li>
+ *   <li>{@link Method#ML} - tối ưu Bayesian: một quy trình Gaussian trên các gain đã thử
+ *       học log(1 + cost), lần thử kế tiếp cực đại hóa expected improvement.</li>
+ *   <li>{@link Method#NEURAL} - mô hình thay thế deep-learning: một {@link MlpEnsemble} học
+ *       chi phí, lần thử kế tiếp cực tiểu hóa lower confidence bound của nó.</li>
+ *   <li>{@link Method#RL} - PGPE policy gradient trên chính các gain.</li>
+ *   <li>{@link Method#CMA_ES}, {@link Method#PSO}, {@link Method#GENETIC},
+ *       {@link Method#DIFFERENTIAL_EVOLUTION}, {@link Method#SPSA} - các đường cơ sở tiến
+ *       hóa / tìm kiếm trực tiếp của ml_tune.py, để UI so sánh đối chiếu.</li>
+ *   <li>{@link Method#TWIDDLE} - hạ dần theo tọa độ: +-25 % trên từng gain một (x1.3 khi
+ *       thắng, x0.6 nếu không, dưới 4 % = hội tụ), các lần thắng được đo lại để nhiễu
+ *       không thể thắng.</li>
+ *   <li>{@link Method#NELDER_MEAD} - simplex đi xuống trên khối lập phương đơn vị, đỉnh tốt
+ *       nhất được đo lại khi thu nhỏ.</li>
+ *   <li>{@link Method#RANDOM} - mẫu Latin-hypercube: đường cơ sở mà các phương pháp khác
+ *       phải đánh bại.</li>
  * </ul>
  *
  * <p>Every search method but TWIDDLE reports like ML does: the tried set with the lowest
  * GP-*predicted* cost wins, so a lucky trial never wins on its own. The GP is fitted over
  * every trial anyway and draws the model window ({@link ModelView}).
+ * <p>Mọi phương pháp tìm kiếm trừ TWIDDLE đều báo cáo như ML: tập đã thử có chi phí
+ * GP-*dự đoán* thấp nhất sẽ thắng, nên một lần thử may mắn không bao giờ tự nó thắng. GP
+ * vẫn luôn được khớp trên mọi lần thử và vẽ cửa sổ mô hình ({@link ModelView}).
  *
  * Every trial waits for the drone to be level on its stand, applies the candidate gains,
  * settles, measures a window at 20 Hz and scores it with {@link #costOf}. A trial that
  * tips the drone over is "bad": the best gains are put back immediately. Everything the
  * tuner sends is idempotent ({@link Param#setValue} re-applies and re-acks the same
  * value), so the client's 500 ms resend queue is safe.
+ * Mỗi lần thử đợi drone nằm ngang trên giá, ghi các gain ứng viên, chờ ổn định, đo một
+ * cửa sổ ở 20 Hz và chấm điểm bằng {@link #costOf}. Một lần thử làm drone nghiêng là
+ * "bad": các gain tốt nhất được ghi lại ngay. Mọi thứ bộ tinh chỉnh gửi đều idempotent
+ * ({@link Param#setValue} ghi lại và ack lại cùng giá trị), nên hàng đợi gửi lại 500 ms
+ * của client là an toàn.
  *
  * <p>Runs on its own thread; {@link Listener} callbacks are posted to the main thread and
  * telemetry is fed in from the activity with {@link #onTelemetry}.
+ * <p>Chạy trên luồng riêng; các callback {@link Listener} được post lên luồng chính và
+ * dữ liệu từ xa được nạp vào từ activity qua {@link #onTelemetry}.
  */
 public class AutoTuner {
 
@@ -66,14 +93,19 @@ public class AutoTuner {
     /**
      * Tip-over threshold for the drone on its stand, in degrees of roll or pitch. The
      * firmware's MAX_TILT_DEG (25), so a run scores the same here and in tools/pid-tune.
+     * Ngưỡng nghiêng cho drone trên giá, theo độ của roll hoặc pitch. Bằng MAX_TILT_DEG (25)
+     * của firmware, nên một lần chạy được chấm điểm như nhau tại đây và trong tools/pid-tune.
      */
     private static final float TIP_DEG = 25f;
     /** Upright window for {@link #waitUpright}: within 15 deg for 1.5 s. */
+    /** Cửa sổ đứng thẳng cho {@link #waitUpright}: trong vòng 15 độ suốt 1.5 s. */
     private static final float UPRIGHT_DEG = 15f;
 
     /**
      * The 9 PID gains, the multiplicative gains of ml_tune.py's GAINS: the trial log records
      * all of them so {@link #seed} can match a past row's untuned gains within 10 %.
+     * 9 gain PID, các gain nhân của GAINS trong ml_tune.py: file log lần thử ghi lại tất cả
+     * để {@link #seed} khớp các gain chưa tinh chỉnh của một hàng cũ trong khoảng 10 %.
      */
     private static final String[] PID_GAINS = {
             "pid.roll_kp", "pid.roll_ki", "pid.roll_kd",
@@ -87,6 +119,7 @@ public class AutoTuner {
             + ",cost,fell,angle_mean,angle_std,rate_rms,motor_rms,ctrl,sat";
 
     /** The optimizers; the hints are shown under the method picker. */
+    /** Các bộ tối ưu; phần gợi ý hiển thị dưới ô chọn phương pháp. */
     public enum Method {
         ML("ML (Bayesian)", 2.0, "ml",
                 "Gaussian process + expected improvement. Fewest trials; the default."),
@@ -113,6 +146,7 @@ public class AutoTuner {
 
         public final String label;
         /** Search box half-width as a factor on the starting gains. */
+        /** Nửa bề rộng hộp tìm kiếm, tính theo bội số trên các gain khởi đầu. */
         public final double defaultRange;
         public final String tag;
         public final String hint;
@@ -133,6 +167,14 @@ public class AutoTuner {
      * @param trimAngle0 kept for parity; a quad has no balance-angle trim
      * @param learn  cross-run history seeding: trial rows of the log whose other gains match
      *               the current ones (within 10 %) seed the model as unit-cube points
+     * @param ids    tên đầy đủ của ba gain trên trục đang chọn
+     *               (ví dụ pid.roll_kp, pid.roll_ki, pid.roll_kd)
+     * @param nudge  giữ để đồng cấu trúc với bản tham chiếu; drone không có bánh xe để
+     *               nudge, nên các lần thử đo drone khi nó đặt trên giá
+     * @param trimAngle0 giữ để đồng cấu trúc; quadcopter không có bước chỉnh góc balance
+     * @param learn  gieo hạt lịch sử giữa các lần chạy: các hàng lần thử trong log mà các
+     *               gain khác khớp với hiện tại (trong khoảng 10 %) sẽ gieo hạt cho mô hình
+     *               dưới dạng các điểm trên khối lập phương đơn vị
      */
     public static class Config {
         public final Method method;
@@ -161,9 +203,11 @@ public class AutoTuner {
         void onStatus(String text);
 
         /** Trial {@code trialNo} ran with {@code candidates}; live status for the panel. */
+        /** Lần thử {@code trialNo} chạy với {@code candidates}; trạng thái trực tiếp cho panel. */
         void onTrial(int trialNo, float[] candidates, double cost);
 
         /** The model after that trial (ml_tune.py's {@code post("trial", ...)}), for ModelView. */
+        /** Mô hình sau lần thử đó ({@code post("trial", ...)} của ml_tune.py), dùng cho ModelView. */
         void onModel(Report report);
 
         void onDone(Report report);
@@ -175,6 +219,12 @@ public class AutoTuner {
      * model window: ml_tune.py's {@code post("trial", ...)} payload ({@code gp, space, X, Y,
      * own, fell_mask, best_x}) plus the predicted-cost grid ModelView draws. {@code bestGains}
      * is that payload's {@code best}; {@code reason} is null on the per-trial reports.
+     * Kết quả của một lần chạy: chi phí tốt nhất, gain tốt nhất và mọi lần thử đã thử. Cũng
+     * được gửi sau mỗi lần thử (qua {@link Listener#onModel}), nơi các trường cuối mang cửa
+     * sổ mô hình: payload {@code post("trial", ...)} của ml_tune.py ({@code gp, space, X, Y,
+     * own, fell_mask, best_x}) cộng với lưới chi phí dự đoán mà ModelView vẽ. {@code bestGains}
+     * là trường {@code best} của payload đó; {@code reason} bằng null trong các báo cáo theo
+     * từng lần thử.
      */
     public static class Report {
         public final Method method;
@@ -193,15 +243,19 @@ public class AutoTuner {
         public final Double bestPred;
         public final Space space;
         /** Unit-cube points the model was fitted on. */
+        /** Các điểm trên khối lập phương đơn vị mà mô hình được khớp. */
         public final List<double[]> xs;
         /** Their costs (in cost units, not log). */
+        /** Chi phí của chúng (đơn vị chi phí, không phải log). */
         public final double[] costs;
         /** False for points seeded from earlier runs. */
+        /** False với các điểm được gieo hạt từ các lần chạy trước. */
         public final boolean[] own;
         public final boolean[] fellMask;
         public final double[] bestX;
         public final GaussianProcess model;
         /** Predicted cost over the tuned gains (see ModelView); null when there is no model. */
+        /** Chi phí dự đoán trên các gain được tinh chỉnh (xem ModelView); null khi không có mô hình. */
         public final int gridN;
         public final double[] grid;
         public final double[] gridLo;
@@ -242,16 +296,22 @@ public class AutoTuner {
     }
 
     /** One 20 Hz sample, fed by the activity from the axis tune log block. */
+    /** Một mẫu 20 Hz, do activity nạp vào từ khối log tune theo trục. */
     public static class Telemetry {
         /** The axis' stabilizer.* value (deg for roll/pitch; yaw is logged as a rate). */
+        /** Giá trị stabilizer.* của trục (độ với roll/pitch; yaw được log dạng tốc độ góc). */
         public final float angle;
         /** Gyro rate in deg/s. See {@link #costOf}: derived for roll/pitch, direct for yaw. */
+        /** Tốc độ góc gyro theo deg/s. Xem {@link #costOf}: dẫn xuất cho roll/pitch, lấy trực tiếp cho yaw. */
         public final float rate;
         /** The axis' controller.* output. */
+        /** Đầu ra controller.* của trục. */
         public final float control;
         /** motor.m1, 1000..2000 us convention. */
+        /** motor.m1, quy ước 1000..2000 us. */
         public final float motorM1;
         /** Level angles from the status block, for the upright / tip-over checks. */
+        /** Góc nằm ngang từ khối trạng thái, dùng cho các kiểm tra đứng thẳng / nghiêng. */
         public final float roll;
         public final float pitch;
 
@@ -266,6 +326,7 @@ public class AutoTuner {
     }
 
     /** What one trial window measured. */
+    /** Những gì cửa sổ của một lần thử đo được. */
     public static class Metrics {
         public final double angleMean;
         public final double angleStd;
@@ -309,6 +370,22 @@ public class AutoTuner {
      *       not part of this pure window score; {@link #measure} applies it, because it
      *       needs to know how much of the trial was lost.</li>
      * </ul>
+     * Chi phí của một lần thử, chuyển thể từ {@code measure()} của bộ tinh chỉnh balance:
+     *
+     * <p>Những điều chỉnh có chủ đích (không phải lỗi):
+     * <ul>
+     *   <li>{@code rateRms}: drone không log tốc độ góc roll/pitch từ gyro (chỉ stabilizer.yaw
+     *       là tốc độ góc), nên tốc độ góc roll/pitch được tính bằng sai phân hữu hạn từ các
+     *       mẫu góc stabilizer.* liên tiếp ở tần số lấy mẫu 20 Hz; stabilizer.yaw được dùng
+     *       trực tiếp làm tốc độ góc của yaw.</li>
+     *   <li>{@code motorRms}: RMS của (motor.m1 - 1500), quy ước 1000..2000 us, thay cho RMS
+     *       tốc độ bánh xe của robot.</li>
+     *   <li>{@code saturatedShare}: tỷ lệ mẫu mà motor.m1 nằm ở biên
+     *       (&gt;= 1990 hoặc &lt;= 1010).</li>
+     *   <li>Hạng mục hành trình từ encoder bánh xe bị loại bỏ hoàn toàn. Phạt nghiêng của bản
+     *       tham chiếu không thuộc điểm số cửa sổ thuần túy này; {@link #measure} áp dụng nó,
+     *       vì cần biết phần nào của lần thử đã bị mất.</li>
+     * </ul>
      */
     public static Metrics costOf(float[] angle, float[] rate, float[] motorM1, float[] control, int n) {
         if (n <= 0) {
@@ -345,12 +422,15 @@ public class AutoTuner {
     }
 
     /** GP target: log(1 + cost), capped so one disaster trial cannot blow up the model. */
+    /** Mục tiêu của GP: log(1 + cost), có trần để một lần thử thảm họa không làm hỏng mô hình. */
     public static double toY(double cost) {
         return Math.log1p(Math.min(cost, COST_CAP));
     }
 
     // Unchecked on purpose: the searches are endless loops that unwind through these,
     // exactly like the Kotlin original, and run() turns them into a report.
+    // Cố ý là unchecked: các phép tìm là các vòng lặp vô hạn unwind qua các ngoại lệ này,
+    // đúng như bản Kotlin gốc, và run() biến chúng thành báo cáo.
     private static class Stopped extends RuntimeException {
     }
 
@@ -378,14 +458,20 @@ public class AutoTuner {
     private Thread mThread;
 
     private float[] mParams;   // current applied values, aligned with cfg.ids
+    // các giá trị đang được áp dụng, khớp với cfg.ids
     private float[] mTried;    // what the last trial really ran with
+    // những gì lần thử trước thực sự chạy
     private float[] mBest;
     private double mBestCost = Double.POSITIVE_INFINITY;
     private Double mBestPred;  // the model's predicted cost at the best point
+    // chi phí mô hình dự đoán tại điểm tốt nhất
     private double mLastCost;  // the trial the current report was built after
+    // chi phí của lần thử mà báo cáo hiện tại được dựng sau đó
 
     private int mK;                                // trials completed
+    // số lần thử đã hoàn thành
     private boolean mLastBad;                      // the last trial tipped the drone
+    // lần thử vừa rồi làm drone nghiêng
     private Space mSpace;
     private String mStage;
     private final List<double[]> mXs = new ArrayList<>();
@@ -396,6 +482,7 @@ public class AutoTuner {
     private double[] mBestX;
 
     // state of the searchOther() optimisers
+    // trạng thái của các bộ tối ưu searchOther()
     private int mD;
     private double[] mX0;
 
@@ -424,6 +511,7 @@ public class AutoTuner {
     }
 
     /** Takes effect after the current trial; for an immediate halt use Panic Stop. */
+    /** Có hiệu lực sau lần thử hiện tại; muốn dừng ngay hãy dùng Panic Stop. */
     public void stop() {
         mStopped = true;
     }
@@ -441,6 +529,7 @@ public class AutoTuner {
     }
 
     /** Echo of a parameter write/read, dispatched from the activity's ParamListener. */
+    /** Echo của một lần ghi/đọc tham số, được phân phối từ ParamListener của activity. */
     public void onParam(String completeName, float value) {
         synchronized (mEcho) {
             mEcho.put(completeName, value);
@@ -493,6 +582,9 @@ public class AutoTuner {
      * Write one parameter and confirm it, 3 x 500 ms echo retries (the reference's
      * pattern): the write reply lands in {@link #mEcho} via {@link #onParam} and in the
      * Param's value map, and both are polled before the write is repeated.
+     * Ghi một tham số và xác nhận, 3 lần gửi lại echo 500 ms (mẫu của bản tham chiếu):
+     * phản hồi ghi nằm trong {@link #mEcho} qua {@link #onParam} và trong bảng giá trị
+     * của Param, cả hai được poll trước khi lặp lại lần ghi.
      */
     private float setParam(String name, float value) {
         for (int retry = 0; retry < 3; retry++) {
@@ -515,6 +607,7 @@ public class AutoTuner {
                     }
                 } catch (RuntimeException e) {
                     // the value map can be empty mid-connect; the retry is the answer
+                    // bảng giá trị có thể trống giữa lúc kết nối; việc gửi lại là câu trả lời
                 }
                 sleep(10);
             }
@@ -531,6 +624,7 @@ public class AutoTuner {
     }
 
     /** Read the starting gains from the drone (read requests + echoes, 1.5 s). */
+    /** Đọc các gain khởi đầu từ drone (yêu cầu đọc + echo, 1.5 s). */
     private float[] readStartValues() {
         synchronized (mEcho) {
             mEcho.clear();
@@ -571,6 +665,7 @@ public class AutoTuner {
     }
 
     /** Level on the stand (roll and pitch within 15 deg) for 1.5 s. */
+    /** Nằm ngang trên giá (roll và pitch trong vòng 15 độ) suốt 1.5 s. */
     private void waitUpright(boolean prompt) {
         if (prompt) {
             status("Tipped: stand the drone upright, it self-levels once on its stand");
@@ -599,8 +694,10 @@ public class AutoTuner {
     }
 
     /** One trial with the parameters already applied: settle, measure, score. */
+    /** Một lần thử với tham số đã được áp dụng: chờ ổn định, đo, chấm điểm. */
     private Metrics measure() {
         sleep(1500);                                      // settle after the change
+        // chờ ổn định sau thay đổi
         checkStop();
         long t0 = now();
         long trialMs = (long) (mCfg.trialS * 1000);
@@ -609,6 +706,7 @@ public class AutoTuner {
             for (Telemetry t : since(t0)) {
                 if (tipped(t)) {
                     // the trial is over the moment the drone tips on its stand
+                    // lần thử kết thúc ngay khi drone nghiêng trên giá
                     trialMs = 0;
                     break;
                 }
@@ -648,6 +746,9 @@ public class AutoTuner {
             // The reference's fall cost: without it a short pre-tip window can outscore a
             // clean full trial and the model learns to tip. Same currency as everything
             // else, so a fall is simply "much worse".
+            // Phạt nghiêng của bản tham chiếu: không có nó, một cửa sổ ngắn trước khi nghiêng
+            // có thể ghi điểm cao hơn một lần thử sạch trọn vẹn và mô hình học cách làm nghiêng.
+            // Cùng đơn vị với mọi thứ khác, nên một lần nghiêng đơn giản là "tệ hơn nhiều".
             double survived = (double) badAt / Math.max(frames.size(), 1) * mCfg.trialS;
             m = new Metrics(m.angleMean, m.angleStd, m.rateRms, m.motorRms, m.controlEffort,
                     m.saturatedShare, 100.0 + 10.0 * (mCfg.trialS - survived));
@@ -656,6 +757,7 @@ public class AutoTuner {
     }
 
     /** Wait level with the last parameters, switch to p, measure, record. */
+    /** Đợi nằm ngang với tham số cũ, chuyển sang p, đo, ghi lại. */
     private TrialResult evaluate(String stage, float[] p) {
         checkStop();
         waitUpright(false);
@@ -688,6 +790,7 @@ public class AutoTuner {
     // ------------------------------------------------------------- model bookkeeping
 
     /** Search box around the current gains, seeded with matching past trials. */
+    /** Hộp tìm kiếm quanh các gain hiện tại, được gieo hạt từ các lần thử cũ khớp. */
     private void begin(double factor) {
         mSpace = new Space(mCfg.ids, mParams, factor);
         StringBuilder sb = new StringBuilder(mCfg.method.tag);
@@ -703,6 +806,10 @@ public class AutoTuner {
      * rows of the trial log whose gains outside the tuned set match the current ones within
      * 10 %. The reference's angle0-within-1-deg check has no counterpart here (the drone's
      * gains are all multiplicative).
+     * Các lần thử cũ được thực hiện với các gain khác giống nhau, dạng điểm trên khối lập
+     * phương đơn vị (seed của ml_tune.py): các hàng trong log lần thử mà các gain ngoài nhóm
+     * đang tinh chỉnh khớp với hiện tại trong khoảng 10 %. Kiểm tra angle0-trong-1-độ của
+     * bản tham chiếu không có tương ứng tại đây (các gain của drone đều là gain nhân).
      */
     private void seed() {
         if (!mCfg.learn) {
@@ -717,6 +824,7 @@ public class AutoTuner {
             tunedIdx[j] = indexOfGain(mCfg.ids.get(j));
             if (tunedIdx[j] < 0) {
                 return;                      // not a PID gain: nothing to match rows against
+                // không phải gain PID: không có gì để khớp với các hàng
             }
         }
         for (double[] row : readHistory(mLogFile)) {
@@ -748,10 +856,12 @@ public class AutoTuner {
     }
 
     /** evaluate() plus the model bookkeeping and the model report. */
+    /** evaluate() cộng thêm ghi sổ mô hình và báo cáo mô hình. */
     private TrialResult trial(float[] p, double[] x) {
         TrialResult r = evaluate(mStage, p);
         mLastCost = r.cost;
         // the firmware may clamp/round: learn what was really applied
+        // firmware có thể kẹp/làm tròn: học theo giá trị thực sự đã áp dụng
         double[] u = mSpace.toUnit(toDoubles(mTried));
         if (u == null) {
             u = x;
@@ -793,6 +903,7 @@ public class AutoTuner {
     }
 
     /** The tried set (this run, did not tip) with the lowest predicted cost. */
+    /** Tập đã thử (trong lần chạy này, không nghiêng) có chi phí dự đoán thấp nhất. */
     private void chooseBestMl(GaussianProcess model) {
         double bestMean = Double.POSITIVE_INFINITY;
         int jBest = -1;
@@ -867,6 +978,7 @@ public class AutoTuner {
     }
 
     /** autotune.py's twiddle over the tuned gains: +-step per gain, wins re-measured. */
+    /** Twiddle của autotune.py trên các gain đang tinh chỉnh: +-step cho mỗi gain, thắng được đo lại. */
     private void searchTwiddle() {
         begin(mCfg.range);
         int d = mCfg.ids.size();
@@ -904,6 +1016,7 @@ public class AutoTuner {
                         continue;
                     }
                     TrialResult r2 = trial(cand, null);          // confirm: noise must not win
+                    // xác nhận: nhiễu không được phép thắng
                     if (!r2.bad && (r.cost + r2.cost) / 2 < mBestCost) {
                         bestP = cand;
                         mBestCost = (r.cost + r2.cost) / 2;
@@ -924,6 +1037,7 @@ public class AutoTuner {
     }
 
     /** Nelder-Mead downhill simplex; the best vertex is re-measured on a shrink. */
+    /** Nelder-Mead simplex đi xuống; đỉnh tốt nhất được đo lại khi thu nhỏ. */
     private void searchNelderMead() {
         begin(mCfg.range);
         int d = mCfg.ids.size();
@@ -979,6 +1093,7 @@ public class AutoTuner {
                     if (fc < Math.min(fr, fw)) {
                         s.set(s.size() - 1, new Object[] {fc, xc});
                     } else {                                  // shrink towards the best, re-measured
+                        // thu nhỏ về phía tốt nhất, đo lại
                         double[] b = (double[]) s.get(0)[1];
                         List<Object[]> next = new ArrayList<>();
                         next.add(new Object[] {((Double) s.get(0)[0] + f(b)) / 2, b});
@@ -999,6 +1114,7 @@ public class AutoTuner {
     }
 
     /** Baseline: Latin-hypercube random search. */
+    /** Đường cơ sở: tìm kiếm ngẫu nhiên kiểu Latin-hypercube. */
     private void searchRandom() {
         begin(mCfg.range);
         int d = mCfg.ids.size();
@@ -1023,6 +1139,8 @@ public class AutoTuner {
     // ------------------------------------------------------------- the other searches
     // ml_tune.py's SearchTuner and subclasses: each search*() is an endless loop over
     // unit-cube points and f() throws Budget when the trials are used up.
+    // SearchTuner và các lớp con của ml_tune.py: mỗi search*() là một vòng lặp vô hạn trên
+    // các điểm khối lập phương đơn vị và f() ném Budget khi đã dùng hết số lần thử.
 
     private void searchOther() {
         begin(mCfg.range);
@@ -1063,6 +1181,7 @@ public class AutoTuner {
     }
 
     /** Population for the evolutionary methods: 4 + 2 per gain, but at least 3 generations. */
+    /** Quần thể cho các phương pháp tiến hóa: 4 + 2 mỗi gain, nhưng ít nhất 3 thế hệ. */
     private int popSize() {
         return Math.max(4, Math.min(4 + 2 * mD, (mCfg.trials - mK) / 3));
     }
@@ -1075,6 +1194,7 @@ public class AutoTuner {
     }
 
     /** Neural surrogate: an MlpEnsemble; the next trial minimises mean - 1.5 x member spread. */
+    /** Mô hình thay thế nơ-ron: một MlpEnsemble; lần thử kế tiếp cực tiểu hóa mean - 1.5 x độ phân tán giữa các thành viên. */
     private void searchNeural() {
         for (double[] x : firstPopulation(Math.max(1, mD + 3 - mXs.size()))) {
             f(x);
@@ -1113,6 +1233,10 @@ public class AutoTuner {
      * gains. The policy is a Gaussian over the unit cube; each step plays mean +- eps (one
      * trial each, reward = -score) and moves the mean towards the better one and the widths
      * towards what paid off.
+     * Học tăng cường theo chuỗi thử: PGPE (Sehnke và cộng sự, 2010), policy-gradient trên
+     * các gain. Policy là một Gaussian trên khối lập phương đơn vị; mỗi bước thử mean +- eps
+     * (mỗi bên một lần thử, reward = -score) và dịch chuyển mean về phía tốt hơn, còn các
+     * độ rộng về phía đã mang lại hiệu quả.
      */
     private void searchPolicyGradient() {
         double[] mu = mX0.clone();
@@ -1145,6 +1269,7 @@ public class AutoTuner {
     }
 
     /** CMA-ES, (mu/mu_w, lambda), sigma0 0.2 of the box; the clipped steps are learned from. */
+    /** CMA-ES, (mu/mu_w, lambda), sigma0 bằng 0.2 của hộp; các bước bị kẹp vẫn được dùng để học. */
     private void searchCmaes() {
         int d = mD;
         int lam = 4 + (int) (3 * Math.log(d));
@@ -1201,6 +1326,7 @@ public class AutoTuner {
                 }
                 for (int i = 0; i < d; i++) {
                     steps[k][i] = (xsGen[k][i] - m[i]) / sigma;   // clipped steps are learned from
+                    // các bước bị kẹp vẫn được dùng để học
                 }
             }
             double[] scores = new double[lam];
@@ -1273,6 +1399,7 @@ public class AutoTuner {
     }
 
     /** Particle swarm: inertia 0.6, c1 = c2 = 1.5, speed <= 0.2 per step. */
+    /** Bầy hạt: quán tính 0.6, c1 = c2 = 1.5, tốc độ <= 0.2 mỗi bước. */
     private void searchPso() {
         int n = popSize();
         List<double[]> pos = firstPopulation(n);
@@ -1314,6 +1441,7 @@ public class AutoTuner {
     }
 
     /** Real-coded GA: tournament of 2, BLX-0.3 crossover, Gaussian mutation, elitism. */
+    /** GA mã thực: giải đấu 2, lai ghép BLX-0.3, đột biến Gaussian, giữ tinh hoa. */
     private void searchGenetic() {
         int n = popSize();
         List<double[]> pop = firstPopulation(n);
@@ -1366,6 +1494,7 @@ public class AutoTuner {
     }
 
     /** Differential evolution, DE/rand/1/bin, F 0.7, CR 0.9, greedy replacement. */
+    /** Tiến hóa sai phân, DE/rand/1/bin, F 0.7, CR 0.9, thay thế tham lam. */
     private void searchDifferentialEvolution() {
         int n = popSize();
         List<double[]> pop = firstPopulation(n);
@@ -1401,6 +1530,7 @@ public class AutoTuner {
     }
 
     /** SPSA: two trials at x +- c delta give a gradient estimate; gain-scheduled steps downhill. */
+    /** SPSA: hai lần thử tại x +- c delta cho một ước lượng gradient; bước đi xuống theo lịch gain. */
     private void searchSpsa() {
         double[] x = mX0.clone();
         double a = 0;
@@ -1425,6 +1555,7 @@ public class AutoTuner {
                 gMax = Math.max(gMax, Math.abs(g[j]));
             }
             if (!aSet) {                     // first step moves ~0.1 of the box
+                // bước đầu di chuyển ~0.1 của hộp
                 a = 0.1 * Math.pow(aStab + 1, 0.602) / Math.max(gMax, 1e-6);
                 aSet = true;
             }
@@ -1437,6 +1568,7 @@ public class AutoTuner {
     }
 
     /** Eigenvalues and eigenvectors (as columns) of a small symmetric matrix, cyclic Jacobi. */
+    /** Giá trị riêng và vector riêng (theo cột) của một ma trận đối xứng nhỏ, Jacobi vòng. */
     private static class Eigen {
         final double[] values;
         final double[][] vectors;
@@ -1512,6 +1644,7 @@ public class AutoTuner {
     }
 
     /** Population std, as numpy's np.std. */
+    /** Độ lệch chuẩn quần thể, như np.std của numpy. */
     private static double stdOf(List<Double> a) {
         double mu = meanOf(a);
         double s = 0;
@@ -1548,6 +1681,7 @@ public class AutoTuner {
     }
 
     /** One trial at unit-cube point x; returns its score toY(cost). */
+    /** Một lần thử tại điểm x trên khối lập phương đơn vị; trả về điểm số toY(cost). */
     private double f(double[] x) {
         if (mK >= mCfg.trials) {
             throw new Budget();
@@ -1694,6 +1828,9 @@ public class AutoTuner {
     /**
      * The trial log (autotune-format CSV) is appended every run and read back by {@link #seed}
      * on the next one. A log that cannot be opened only costs the history seeding.
+     * File log lần thử (CSV định dạng autotune) được nối thêm mỗi lần chạy và được
+     * {@link #seed} đọc lại ở lần sau. Một file log không mở được chỉ làm mất phần
+     * gieo hạt lịch sử.
      */
     private void openLog() {
         if (mLogFile == null) {
@@ -1712,6 +1849,7 @@ public class AutoTuner {
     }
 
     /** Append one trial to the CSV {@link #openLog} opened (columns match {@link #LOG_HEADER}). */
+    /** Nối một lần thử vào CSV mà {@link #openLog} đã mở (các cột khớp với {@link #LOG_HEADER}). */
     private void logTrial(String stage, Metrics m) {
         if (mLog == null) {
             return;
@@ -1733,6 +1871,7 @@ public class AutoTuner {
     }
 
     /** The 9 PID gains as the drone currently has them, or null if any cannot be read. */
+    /** 9 gain PID như drone đang có, hoặc null nếu có gain không đọc được. */
     private double[] gainSnapshot() {
         double[] out = new double[PID_GAINS.length];
         for (int i = 0; i < out.length; i++) {
@@ -1744,6 +1883,7 @@ public class AutoTuner {
                 out[i] = v.doubleValue();
             } catch (RuntimeException e) {
                 return null;              // the value map can be empty mid-connect
+                // bảng giá trị có thể trống giữa lúc kết nối
             }
         }
         return out;
@@ -1753,6 +1893,9 @@ public class AutoTuner {
      * Rows of an existing trial log: the 9 gains then the cost. A row that does not parse is
      * skipped rather than failing the read — a hand-edited or truncated log must not stop a
      * run, only cost it some history.
+     * Các hàng của một file log lần thử hiện có: 9 gain rồi đến chi phí. Một hàng không phân
+     * tích được sẽ bị bỏ qua thay vì làm hỏng cả lần đọc — một file log bị sửa tay hay cắt
+     * cụt không được phép dừng một lần chạy, chỉ làm mất một phần lịch sử.
      */
     private static List<double[]> readHistory(File f) {
         List<double[]> out = new ArrayList<>();
@@ -1797,6 +1940,7 @@ public class AutoTuner {
     }
 
     /** Cells along one axis of {@link Report#grid}. */
+    /** Các ô dọc theo một trục của {@link Report#grid}. */
     private static final int GRID_N = 41;
 
     private Report buildReport(String reason) {
@@ -1824,11 +1968,13 @@ public class AutoTuner {
         boolean[] fellMask = new boolean[n];
         for (int i = 0; i < n; i++) {
             costs[i] = Math.expm1(mYs.get(i));          // cost units, not log
+            // đơn vị chi phí, không phải log
             own[i] = mOwn.get(i);
             fellMask[i] = mBadMask.get(i);
         }
 
         // The predicted-cost grid ModelView draws: only meaningful over 1 or 2 gains.
+        // Lưới chi phí dự đoán mà ModelView vẽ: chỉ có ý nghĩa với 1 hoặc 2 gain.
         int d = mSpace == null ? 0 : mSpace.names.length;
         int gridN = 0;
         double[] grid = null;
@@ -1870,6 +2016,10 @@ public class AutoTuner {
      * positive, so the whole box is log-scaled (current / factor .. current x factor,
      * clamped to the parameter's limits); the reference's linear offset parameter has no
      * counterpart here.
+     * Hộp quanh các giá trị khởi đầu, ánh xạ về [0,1]^d. Các gain của drone đều dương,
+     * nên toàn bộ hộp dùng thang log (hiện tại / factor .. hiện tại x factor, kẹp trong
+     * giới hạn của tham số); tham số offset tuyến tính của bản tham chiếu không có
+     * tương ứng tại đây.
      */
     public static class Space {
         public final List<String> ids;
@@ -1889,6 +2039,7 @@ public class AutoTuner {
                 hi[k] = Math.log(Math.min(c * factor, spec.max));
                 if (hi[k] <= lo[k]) {
                     hi[k] = lo[k] + Math.log(2);   // degenerate edge: give the box some width
+                    // biên suy biến: cho hộp một chút độ rộng
                 }
             }
         }
@@ -1898,6 +2049,7 @@ public class AutoTuner {
         }
 
         /** null when a value lies outside the box (or a gain is not positive). */
+        /** null khi một giá trị nằm ngoài hộp (hoặc một gain không dương). */
         public double[] toUnit(double[] values) {
             double[] x = new double[values.length];
             for (int k = 0; k < values.length; k++) {

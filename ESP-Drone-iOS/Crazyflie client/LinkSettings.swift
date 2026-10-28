@@ -6,15 +6,24 @@
 //  the picker survives relaunches. The firmware selects its side of the link
 //  from NVS (PROTOCOL.md §8) — the picker's profiles mirror those names so the
 //  pilot can match the board's `link` setting.
+//  App giao tiếp với tầng truyền nào, và ở đâu. Được lưu trong UserDefaults
+//  để trình chọn còn giữ được lựa chọn qua các lần khởi động lại. Firmware
+//  chọn phía liên kết của nó từ NVS (PROTOCOL.md §8) — các hồ sơ của trình
+//  chọn phản ánh đúng các tên đó để người lái khớp với thiết lập `link` của
+//  bo mạch.
 //
 
 import Foundation
 
 enum LinkType: Int, CaseIterable {
     case wifiSoftAP = 0        // drone hosts ESP-Drone at 192.168.43.42 (default)
+                               // drone phát WiFi ESP-Drone tại 192.168.43.42 (mặc định)
     case wifiStation = 1       // drone joins a network, esp-drone.local
+                               // drone tham gia một mạng WiFi, esp-drone.local
     case bluetoothSPP = 2      // Bluetooth Classic serial — not usable on iOS (MFi)
+                               // serial Bluetooth Classic — không dùng được trên iOS (MFi)
     case bleGatt = 3           // Bitcraze GATT service
+                               // service GATT của Bitcraze
 
     var title: String {
         switch self {
@@ -26,6 +35,7 @@ enum LinkType: Int, CaseIterable {
     }
 
     /// Matches PROTOCOL.md §8's transport profile numbering where one exists.
+    /// Khớp với cách đánh số hồ sơ tầng truyền trong PROTOCOL.md §8 ở những nơi có đánh số.
     var firmwareLinkMode: UInt8 {
         switch self {
         case .wifiSoftAP: return 0
@@ -69,6 +79,8 @@ struct LinkSettings {
 
     /// Host for the UDP transports. Kept per type so switching back and forth
     /// does not lose the station hostname.
+    /// Host cho các tầng truyền UDP. Được lưu theo từng loại để việc chuyển qua
+    /// lại không làm mất tên máy chủ của station.
     static func host(for type: LinkType) -> String {
         let saved = UserDefaults.standard.string(forKey: Keys.host)
         switch type {
@@ -99,6 +111,7 @@ struct LinkSettings {
     }
 
     /// Builds the driver for the current selection.
+    /// Dựng trình điều khiển cho lựa chọn hiện tại.
     static func makeDriver() -> CrtpDriver {
         switch linkType {
         case .wifiSoftAP, .wifiStation:

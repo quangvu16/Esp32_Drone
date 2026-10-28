@@ -38,6 +38,7 @@ import se.bitcraze.crazyflie.lib.crtp.CrtpPort;
 
 /**
  * An element in the TOC
+ * Một phần tử trong TOC
  *
  */
 public class TocElement implements Comparable<TocElement> {
@@ -58,8 +59,10 @@ public class TocElement implements Comparable<TocElement> {
 
     /**
      * TocElement creator
+     * Hàm tạo TocElement
      *
      * @param data the binary payload of the element
+     * @param data phần dữ liệu nhị phân của phần tử
      */
     public TocElement(CrtpPort port, byte[] data) {
         this();
@@ -73,6 +76,7 @@ public class TocElement implements Comparable<TocElement> {
             }
 
             // setting pytype not needed in Java cf lib
+            // không cần đặt pytype trong Java cf lib
 
             //TODO: self.access = ord(data[1]) & 0x10 ?!
             if ((data[1] & 0x40) != 0) {
@@ -85,6 +89,7 @@ public class TocElement implements Comparable<TocElement> {
 
     protected void fillVariableTypeMap() {
         //empty on purpose, implemented in LogTocElement and ParamTocElement
+        //cố ý để trống, được triển khai trong LogTocElement và ParamTocElement
     }
 
     public int getIdent() {
@@ -208,6 +213,7 @@ public class TocElement implements Comparable<TocElement> {
 
     public int compareTo(TocElement te) {
         // int identCmp = Integer.compare(this.getIdent(), te.getIdent()); // only supported in API level 19+
+        // chỉ được hỗ trợ ở API level 19+
         int identCmp = Integer.valueOf(this.getIdent()).compareTo(Integer.valueOf(te.getIdent()));
         return (identCmp != 0 ? identCmp : this.getCompleteName().compareTo(te.getCompleteName()));
     }

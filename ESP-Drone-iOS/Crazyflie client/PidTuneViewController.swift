@@ -5,11 +5,18 @@
 //  PID tuning screen (the main feature). Per-axis strip charts + per-term
 //  panels + statistics + gain editors with ±10% steps + Save/Load/Defaults +
 //  auto-tune behind a hold-to-confirm safety gate.
+//  Màn hình tinh chỉnh PID (tính năng chính). Biểu đồ dải cho từng trục + panel
+//  cho từng thành phần PID + thống kê + trình chỉnh gain với bước ±10% +
+//  Save/Load/Defaults + auto-tune sau cổng an toàn giữ-nút-để-xác-nhận.
 //
 //  Interaction design and the ±10% / hint-line editors come from
 //  PID-Calibration's MainActivity; the chart behaviour from ChartView.kt.
 //  Everything on the wire is CRTP (PROTOCOL.md §3/§5), not Protocol.kt's
 //  framing.
+//  Thiết kế tương tác và các trình chỉnh bước ±10% / dòng gợi ý lấy từ
+//  MainActivity của PID-Calibration; hành vi biểu đồ lấy từ ChartView.kt.
+//  Mọi thứ trên đường truyền đều là CRTP (PROTOCOL.md §3/§5), không phải
+//  framing của Protocol.kt.
 //
 
 import UIKit
@@ -49,10 +56,12 @@ final class PidTuneViewController: UIViewController {
     private var listener: ((LogSample) -> Void)?
 
     /// Set by the Fly screen: opens another section after this screen closes.
+    /// Do màn hình Fly thiết lập: mở một mục khác sau khi màn hình này đóng.
     var onSwitchSection: ((AppSection) -> Void)?
     private var sectionHeader: SectionHeader?
 
     /// Param TOC ids we drive (PROTOCOL.md §3): 9 PID gains + 3 flight + nav.kp.
+    /// Các id Param TOC mà ta ghi (PROTOCOL.md §3): 9 PID gain + 3 flight + nav.kp.
     private struct TuneParam {
         let id: UInt8
         let group: String
@@ -156,6 +165,8 @@ final class PidTuneViewController: UIViewController {
         axisControl.selectedSegmentIndex = 0
         axisControl.addTarget(self, action: #selector(axisChanged), for: .valueChanged)
         // Chart pause is routine and reversible: icon-only, words in the VoiceOver label.
+        // Tạm dừng biểu đồ là thao tác thường và hoàn tác được: chỉ dùng icon,
+        // phần chữ nằm trong nhãn VoiceOver.
         pauseButton.applyLabel(nil, symbol: "pause.fill", accessibilityText: "Pause charts")
         pauseButton.addTarget(self, action: #selector(togglePause), for: .touchUpInside)
         let topRow = UIStackView(arrangedSubviews: [axisControl, pauseButton])
@@ -176,6 +187,9 @@ final class PidTuneViewController: UIViewController {
 
         // The auto-tune model (ModelView.kt): trial costs + the model's
         // predicted cost over the tuned gains. Sized 1.15x wide, as on Android.
+        // Mô hình auto-tune (ModelView.kt): chi phí các lần thử + chi phí mô
+        // hình dự đoán trên các gain đang tinh chỉnh. Kích thước rộng 1,15 lần,
+        // như trên Android.
         let modelLabel = UILabel()
         modelLabel.text = "Auto-tune model"
         modelLabel.font = .systemFont(ofSize: 13, weight: .semibold)
@@ -198,6 +212,8 @@ final class PidTuneViewController: UIViewController {
 
         // Save / Load / Defaults
         // These write to / read from the drone's flash, not a phone file, so they keep text.
+        // Các nút này ghi vào / đọc từ flash của drone, không phải tệp trên
+        // điện thoại, nên giữ nguyên dạng chữ.
         saveButton.applyLabel("Save gains", symbol: "tray.and.arrow.down", font: .systemFont(ofSize: 15))
         loadButton.applyLabel("Load gains", symbol: "tray.and.arrow.up", font: .systemFont(ofSize: 15))
         defaultsButton.applyLabel("Restore defaults", symbol: nil, font: .systemFont(ofSize: 15))
@@ -246,6 +262,7 @@ final class PidTuneViewController: UIViewController {
         stack.addArrangedSubview(startTuneButton)
 
         // Same name, colour and icon as CUT MOTORS on the flight and GPS screens.
+        // Cùng tên, màu và icon với CUT MOTORS trên màn hình bay và GPS.
         stopTuneButton.applyLabel("CUT MOTORS — stop tuner", symbol: "exclamationmark.triangle.fill",
                                   accessibilityText: "Cut motors and stop the tuner",
                                   font: .systemFont(ofSize: 16, weight: .bold), color: .white)
@@ -270,6 +287,7 @@ final class PidTuneViewController: UIViewController {
         telemetry.listeners.append(listener)
 
         // Ask the client for the params once the TOC is up.
+        // Yêu cầu client đọc các tham số ngay khi TOC đã sẵn sàng.
         client.onParamTocReady = { [weak self] _ in
             self?.client.readAllParams()
         }
@@ -373,6 +391,10 @@ final class PidTuneViewController: UIViewController {
         // are not in the tune block; they ride the status block, and
         // `telemetry` has already folded this sample in by the time a listener
         // runs — so the tip check sees the newest roll/pitch.
+        // Truyền cho tuner đúng khung mà biểu đồ vừa vẽ. Các góc thăng bằng
+        // không nằm trong khối tune; chúng đi trong khối status, và `telemetry`
+        // đã gộp mẫu này vào trước khi listener chạy — nên phép kiểm tra nghiêng
+        // thấy roll/pitch mới nhất.
         if let tuner = tuner, let angle = sample[a.angleLogName] {
             tuner.ingest(TuneSample(
                 angle: angle,
@@ -388,6 +410,9 @@ final class PidTuneViewController: UIViewController {
         // Stats over the visible window (the chart ring).
         // Angle series is series 0 of angleChart; we recompute from telemetry
         // history so the numbers match the log, not the drawing.
+        // Thống kê trên cửa sổ đang hiển thị (vòng dữ liệu của biểu đồ).
+        // Chuỗi góc là chuỗi 0 của angleChart; ta tính lại từ lịch sử dữ liệu
+        // từ xa để các con số khớp với log, không phải với hình vẽ.
         let window = telemetry.history.suffix(300)
         let a = axis
         let angles = window.compactMap { $0[a.angleLogName] }
@@ -415,6 +440,7 @@ final class PidTuneViewController: UIViewController {
 
     @objc private func axisChanged() {
         // Recreate the tune log block for the new axis so the term panels track it.
+        // Tạo lại khối log tune cho trục mới để các panel thành phần bám theo.
         let a = axis
         rebuildTuneBlock(for: a)
         configureCharts()
@@ -463,6 +489,7 @@ final class PidTuneViewController: UIViewController {
     // MARK: Log block for the active axis
 
     /// Per-axis tune block. Budget is 25 value bytes (PROTOCOL.md §4):
+    /// Khối tune theo từng trục. Ngân sách là 25 byte giá trị (PROTOCOL.md §4):
     /// pid.X_p/i/d (12) + stabilizer.X (4) + controller.X (4) + motor.m1 (2) = 22.
     private func rebuildTuneBlock(for axis: TuneAxis) {
         let base = axis.title.lowercased()
@@ -496,6 +523,7 @@ final class PidTuneViewController: UIViewController {
         tunerHoldStart = Date()
         setStartTuneLabel("KEEP HOLDING…")
         // A 1.5 s hold is the two-step against accidental taps.
+        // Giữ nút 1,5 s là cơ chế hai bước chống bấm nhầm.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self = self, let t0 = self.tunerHoldStart else { return }
             if Date().timeIntervalSince(t0) >= 1.4 {
@@ -519,6 +547,7 @@ final class PidTuneViewController: UIViewController {
         setStartTuneLabel("Hold to confirm — start auto-tune")
 
         // Never start while disarmed without asking.
+        // Không bao giờ khởi động khi drone chưa kích hoạt mà không hỏi trước.
         let armed = (telemetry.value("flight.armed") ?? 0) > 0.5
         if !armed {
             let alert = UIAlertController(
@@ -554,6 +583,9 @@ final class PidTuneViewController: UIViewController {
         // Starting gains come from the editors (the drone's current values) —
         // the three rows for THIS axis. `prefix(3)` would always hand over
         // roll's gains and then write them into pid.pitch_* or pid.yaw_*.
+        // Gain khởi tạo lấy từ các trình chỉnh (giá trị hiện tại của drone) —
+        // đúng ba hàng của TRỤC này. `prefix(3)` sẽ luôn lấy gain của roll
+        // rồi ghi vào pid.pitch_* hoặc pid.yaw_*.
         let start = a.gainParamIds.compactMap { id -> Double? in
             guard let i = tuneParams.firstIndex(where: { $0.id == id }),
                   i < editorRows.count else { return nil }
@@ -571,6 +603,7 @@ final class PidTuneViewController: UIViewController {
         cfg.trials = 12
 
         // Make sure the tune block is streaming so `measure()` has data.
+        // Đảm bảo khối tune đang truyền dữ liệu để `measure()` có dữ liệu.
         rebuildTuneBlock(for: a)
 
         let tuner = AutoTuner(config: cfg, client: client, startGains: start)
@@ -585,6 +618,7 @@ final class PidTuneViewController: UIViewController {
 
     @objc private func panicStop() {
         // Halt the tuner AND cut the motors. This is the panic path.
+        // DỪNG tuner VÀ cắt động cơ. Đây là đường xử lý khẩn cấp.
         tuner?.stop()
         client.emergency()
         let generator = UINotificationFeedbackGenerator()
@@ -608,6 +642,9 @@ extension PidTuneViewController: AutoTuner.Listener {
         let best = report.best.map { String(format: "%.4g", $0) }.joined(separator: ", ")
         // Twiddle has no best until both starting trials are in, and a run whose
         // samples never landed in the search box has none at all.
+        // Twiddle chưa có best cho đến khi cả hai lần thử khởi tạo hoàn tất, và
+        // một lượt chạy mà các mẫu không bao giờ lọt vào miền tìm kiếm thì không
+        // có best nào cả.
         let bestCost = report.bestCost.isFinite
             ? String(format: "%.3f", report.bestCost) : "—"
         tuneStatusLabel.text = String(
@@ -632,6 +669,8 @@ extension PidTuneViewController: AutoTuner.Listener {
 /// Numeric field + ±10% buttons + hint line. Ported from MainActivity's
 /// param editor rows: the buttons are the fast path while flying, the field
 /// is for typing an exact value.
+/// Ô nhập số + nút ±10% + dòng gợi ý. Port từ các hàng trình chỉnh tham số
+/// của MainActivity: nút là lối nhanh khi đang bay, ô nhập để gõ giá trị chính xác.
 final class ParamEditorRow: UIView {
 
     private(set) var value: Double = 0
@@ -712,6 +751,7 @@ final class ParamEditorRow: UIView {
 
     private func applyStep(_ fraction: Double) {
         // ±10% of the current value — the brief's fast in-flight adjust.
+        // ±10% của giá trị hiện tại — cách chỉnh nhanh khi đang bay theo yêu cầu thiết kế.
         let next = value * (1 + fraction)
         value = next
         set(next)

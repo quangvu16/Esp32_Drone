@@ -10,6 +10,15 @@
 //  2-std uncertainty band for one. With twiddle the map is only a picture of
 //  the trials; it does not steer that search.
 //  Dots: blue = this run, grey = earlier runs, red = fell; star = current best.
+//  Mô hình tự tinh chỉnh sau lần thử gần nhất (AutoTuner.TrialReport), chuyển
+//  từ ModelView.kt của PID-Calibration. Ở trên là chi phí của từng lần thử (thang
+//  log; x = nghiêng, xanh lá = lần thử tốt nhất đến nay, nét đứt = mức tốt nhất
+//  của mô hình), ở dưới là chi phí mô hình dự đoán trên các gain đã tinh chỉnh
+//  (trục log): heatmap cho hai gain trở lên (các gain khác giữ ở mức tốt nhất,
+//  càng tối càng tốt), hoặc một đường cong kèm dải bất định 2-std cho một gain.
+//  Với twiddle, bản đồ chỉ là hình ảnh minh họa các lần thử; nó không dẫn dắt
+//  phép tìm kiếm đó.
+//  Chấm: xanh dương = lượt này, xám = các lượt trước, đỏ = nghiêng; sao = mức tốt nhất hiện tại.
 //
 
 import UIKit
@@ -26,11 +35,16 @@ final class ModelView: UIView {
 
     /// Predicted cost over the tuned gains (AutoTuner.kt's report() grid):
     /// 80 points for one gain (with the 2-std band), 32x32 for two or more.
+    /// Chi phí dự đoán trên các gain đã tinh chỉnh (lưới report() của AutoTuner.kt):
+    /// 80 điểm cho một gain (kèm dải 2-std), 32x32 cho hai gain trở lên.
     private struct Grid {
         let n: Int
         let values: [Double]       // expm1 of the predicted mean
+        // expm1 của trung bình dự đoán
         let lo: [Double]?          // expm1(mean - 2 std), one-gain only
+        // expm1(mean - 2 std), chỉ cho một gain
         let hi: [Double]?          // expm1(mean + 2 std), one-gain only
+        // expm1(mean + 2 std), chỉ cho một gain
     }
 
     private var gridCache: Grid?
@@ -96,6 +110,7 @@ final class ModelView: UIView {
         ctx.strokePath()
 
         // Best trial so far (falls do not count).
+        // Lần thử tốt nhất đến nay (lần bị nghiêng không được tính).
         ctx.setStrokeColor(UIColor.systemGreen.cgColor)
         ctx.beginPath()
         var runMin = Double.infinity
@@ -135,6 +150,7 @@ final class ModelView: UIView {
     }
 
     /// Log-cost axis: horizontal grid lines at 1, 10, 100 and labels.
+    /// Trục chi phí log: các đường lưới ngang tại 1, 10, 100 kèm nhãn.
     private func axes(_ box: CGRect, _ lo: Double, _ hi: Double, in ctx: CGContext) {
         for e in -1...3 {
             let v = pow(10.0, Double(e))
@@ -193,6 +209,7 @@ final class ModelView: UIView {
             axes(box, lo, hi, in: ctx)
 
             // 2-std band.
+            // Dải 2-std.
             ctx.setFillColor(UIColor.systemBlue.withAlphaComponent(0.25).cgColor)
             ctx.beginPath()
             for i in 0..<g.n {
@@ -231,6 +248,7 @@ final class ModelView: UIView {
             }
         } else {
             // Heatmap over the first two gains; any others held at the best.
+            // Heatmap trên hai gain đầu; các gain khác giữ ở mức tốt nhất.
             if heatmapImage == nil {
                 heatmapImage = heatmap(g)
             }
@@ -246,6 +264,7 @@ final class ModelView: UIView {
                 star(CGPoint(x: px(bx[0]), y: py(bx[1])), in: ctx)
             }
             // Y axis: the second gain.
+            // Trục Y: gain thứ hai.
             for u in [0.0, 0.5, 1.0] {
                 let label = String(format: "%.3g", r.space.value(1, u))
                 text(label, box.minX - width(of: label) - 4, py(u) + 4, in: ctx)
@@ -258,6 +277,7 @@ final class ModelView: UIView {
         }
 
         // X axis: the first gain (log scale).
+        // Trục X: gain đầu tiên (thang log).
         for u in [0.0, 0.5, 1.0] {
             let label = String(format: "%.3g", r.space.value(0, u))
             let w = width(of: label)
@@ -267,6 +287,7 @@ final class ModelView: UIView {
     }
 
     /// Predicted cost over the tuned gains, in cost units.
+    /// Chi phí dự đoán trên các gain đã tinh chỉnh, theo đơn vị chi phí.
     private func grid(for r: AutoTuner.TrialReport) -> Grid? {
         guard let model = r.model else { return nil }
         let d = r.space.names.count
@@ -302,6 +323,7 @@ final class ModelView: UIView {
         for i in 0..<(n * n) {
             let gx = i % n
             let gy = n - 1 - i / n                     // row 0 is the top
+            // dòng 0 là phía trên
             let (r8, g8, b8) = ModelView.viridis((logs[gy * n + gx] - lo) / (hi - lo))
             pixels[i * 4] = r8
             pixels[i * 4 + 1] = g8
@@ -317,6 +339,7 @@ final class ModelView: UIView {
     }
 
     /// Matplotlib's viridis from five stops; 0 = dark purple (low cost).
+    /// Viridis của Matplotlib từ năm mốc màu; 0 = tím đậm (chi phí thấp).
     private static let viridisStops: [UInt32] =
         [0x440154, 0x3B528B, 0x21918C, 0x5EC962, 0xFDE725]
 
@@ -344,6 +367,7 @@ final class ModelView: UIView {
     }
 
     /// Kotlin drawText draws with `y` as the baseline; UIKit from the top.
+    /// drawText của Kotlin vẽ với `y` là đường cơ sở; UIKit tính từ trên xuống.
     private func text(_ s: String, _ x: CGFloat, _ y: CGFloat, in ctx: CGContext) {
         UIGraphicsPushContext(ctx)
         (s as NSString).draw(at: CGPoint(x: x, y: y - 8), withAttributes: ModelView.textAttrs)

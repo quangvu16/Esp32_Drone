@@ -7,10 +7,18 @@
 //  hidden layers and a linear output, each member from its own random start,
 //  trained full-batch with Adam and weight decay in plain Swift. The spread
 //  between members stands in for the GP's uncertainty (predict's std).
+//  Tập mô hình deep ensemble (Lakshminarayanan et al. 2017) gồm các mạng nơ-ron
+//  nhỏ — port trực tiếp từ `MlpEnsemble` của ml_tune.py: d -> 32 -> 32 -> 1 với
+//  các tầng ẩn tanh và đầu ra tuyến tính, mỗi thành viên khởi tạo ngẫu nhiên
+//  riêng, huấn luyện full-batch bằng Adam và weight decay viết bằng Swift thuần.
+//  Độ lệch giữa các thành viên thay cho độ bất định của GP (std của predict).
 //
 //  Targets are standardised to zero mean / unit sd before training and the
 //  predictions are de-standardised after; weight decay is applied to the
 //  gradient (g += DECAY * W) before the Adam step, as in the reference.
+//  Giá trị mục tiêu được chuẩn hóa về trung bình 0 / độ lệch chuẩn đơn vị trước
+//  khi huấn luyện và các dự đoán được giải chuẩn hóa sau đó; weight decay được
+//  áp lên gradient (g += DECAY * W) trước bước Adam, như trong bản tham chiếu.
 //
 
 import Foundation
@@ -18,15 +26,22 @@ import Foundation
 /// The fitted cost surrogate the model view draws. Both the Gaussian process
 /// (AutoTuner.swift) and this ensemble speak it — the trial payload carries
 /// whichever the run fitted, as ml_tune.py's `post("trial", …)` carries `gp`.
+/// Mô hình thay thế chi phí đã khớp mà model view vẽ. Cả Gaussian process
+/// (AutoTuner.swift) lẫn tập mô hình này đều dùng chung giao diện đó — phần
+/// dữ liệu của lần thử mang mô hình mà lượt chạy đã khớp, như `post("trial", …)`
+/// của ml_tune.py mang `gp`.
 protocol CostModel {
     /// Mean and std of y = log1p(min(cost, 300)) at a unit-cube point.
+    /// Trung bình và độ lệch chuẩn của y = log1p(min(cost, 300)) tại một điểm trong khối đơn vị.
     func predict(_ x: [Double]) -> (mean: Double, std: Double)
 }
 
 extension RandomNumberGenerator {
     /// N(0, 1) via Box-Muller — the reference's `rng.normal` / `nextGaussian`.
+    /// N(0, 1) theo Box-Muller — `rng.normal` / `nextGaussian` của bản tham chiếu.
     mutating func nextGaussian() -> Double {
         let u1 = 1 - Double.random(in: 0..<1, using: &self)   // (0, 1], so log(u1) is finite
+        // (0, 1], nên log(u1) hữu hạn
         let u2 = Double.random(in: 0..<1, using: &self)
         return (-2 * log(u1)).squareRoot() * cos(2 * .pi * u2)
     }
@@ -45,6 +60,8 @@ final class MlpEnsemble: CostModel {
 
     /// Weights of one member: d -> HIDDEN -> HIDDEN -> 1 (biases as 1-wide
     /// rows so every parameter goes through the same Adam step).
+        /// Trọng số của một thành viên: d -> HIDDEN -> HIDDEN -> 1 (bias là các
+        /// hàng rộng 1 để mọi tham số đều đi qua cùng một bước Adam).
     private struct Net {
         var w0: [[Double]]      // d x HIDDEN
         var b0: [Double]        // HIDDEN
@@ -78,6 +95,7 @@ final class MlpEnsemble: CostModel {
     }
 
     /// Ensemble mean and spread of the cost (in y units) at `x`.
+    /// Trung bình và độ phân tán của tập mô hình về chi phí (đơn vị y) tại `x`.
     func predict(_ x: [Double]) -> (mean: Double, std: Double) {
         var out: [Double] = []
         for n in nets {
@@ -91,6 +109,7 @@ final class MlpEnsemble: CostModel {
     // MARK: - Private
 
     /// One member's forward pass; fills the hidden layers for backprop.
+    /// Một lượt truyền xuôi của một thành viên; điền các tầng ẩn để lan truyền ngược.
     private static func forward(_ n: Net, _ x: [Double]) -> (h1: [Double], h2: [Double], out: Double) {
         let h = hidden
         var h1 = [Double](repeating: 0, count: h)
@@ -116,11 +135,14 @@ final class MlpEnsemble: CostModel {
 
     /// Full-batch training with Adam — ml_tune.py's `train`, one weight-decayed
     /// gradient over the whole set per step.
+        /// Huấn luyện full-batch với Adam — `train` của ml_tune.py, mỗi bước một
+        /// gradient có weight decay trên toàn bộ tập mẫu.
     private static func train<R: RandomNumberGenerator>(xs: [[Double]], z: [Double], rng: inout R) -> Net {
         let d = xs[0].count
         let h = hidden
         let n = Double(xs.count)
         // W ~ N(0, 1/sqrt(fan_in)), biases zero.
+        // W ~ N(0, 1/sqrt(fan_in)), bias bằng 0.
         var net = Net(
             w0: (0..<d).map { _ in (0..<h).map { _ in rng.nextGaussian() / sqrt(Double(d)) } },
             b0: [Double](repeating: 0, count: h),
@@ -169,6 +191,7 @@ final class MlpEnsemble: CostModel {
     }
 
     /// One Adam step over a parameter row: weight decay rides on the gradient.
+    /// Một bước Adam trên một hàng tham số: weight decay được cộng thẳng vào gradient.
     private static func adam(_ p: inout [Double], _ m1: inout [Double], _ m2: inout [Double],
                              _ g: [Double], _ c1: Double, _ c2: Double) {
         for j in p.indices {
@@ -180,6 +203,7 @@ final class MlpEnsemble: CostModel {
     }
 
     /// The same for a weight matrix (each row one parameter row).
+    /// Tương tự cho một ma trận trọng số (mỗi hàng là một hàng tham số).
     private static func adam(_ p: inout [[Double]], _ m1: inout [[Double]], _ m2: inout [[Double]],
                              _ g: [[Double]], _ c1: Double, _ c2: Double) {
         for i in p.indices {

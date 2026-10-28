@@ -40,6 +40,9 @@ import com.espressif.espdrone.android.R;
  * This class encapsulates the common preferences for all types of controllers.
  *
  * TODO: rename Class
+ * Lớp này đóng gói các thiết lập chung cho mọi loại bộ điều khiển.
+ *
+ * TODO: đổi tên lớp
  */
 public class Controls {
 
@@ -47,12 +50,14 @@ public class Controls {
     private SharedPreferences mPreferences;
 
     // Raw input values
+    // Giá trị đầu vào thô
     private float mRight_analog_x;
     private float mRight_analog_y;
     private float mLeft_analog_x;
     private float mLeft_analog_y;
 
     // Trim values
+    // Giá trị trim
     private static final float TRIM_MAX = 0.5f;
     private static final float TRIM_INCREMENTS = 0.02f;
     private float mRollTrim;
@@ -60,6 +65,7 @@ public class Controls {
     private String mTrimDefaultValue;
 
     private int mMode; // Controller axis mapping (Mode 1-4)
+    // Ánh xạ trục của bộ điều khiển (Mode 1-4)
     private float mDeadzone;
 
     private int mControllerType;
@@ -71,6 +77,7 @@ public class Controls {
     private String mAlt2Action;
 
     //Gyro sensor values
+    // Giá trị cảm biến con quay hồi chuyển
     private boolean mUseGyro;
     private int mGyroAmplification;
     private String mGyroAmplificationDefaultValue;
@@ -80,14 +87,17 @@ public class Controls {
     private String mDeadzoneDefaultValue;
 
     private boolean mXmode; // determines Crazyflie flight configuration (false = +, true = x)
+    // xác định cấu hình bay của Crazyflie (false = +, true = x)
 
     //Advanced flight control
+    // Điều khiển bay nâng cao
     private int mMaxRollPitchAngle;
     private int mMaxYawAngle;
     private int mMaxThrust;
     private int mMinThrust;
 
     //Advanced flight control default values
+    // Giá trị mặc định của điều khiển bay nâng cao
     private String mMaxRollPitchAngleDefaultValue;
     private String mMaxYawAngleDefaultValue;
     private String mMaxThrustDefaultValue;
@@ -112,6 +122,7 @@ public class Controls {
         mAlt2ActionDefaultValue = res.getString(R.string.preferences_alt2_action_defaultValue);
 
         //Advanced flight control
+        // Điều khiển bay nâng cao
         mMaxRollPitchAngleDefaultValue = res.getString(R.string.preferences_maxRollPitchAngle_defaultValue);
         mMaxYawAngleDefaultValue = res.getString(R.string.preferences_maxYawAngle_defaultValue);
         mMaxThrustDefaultValue = res.getString(R.string.preferences_maxThrust_defaultValue);
@@ -136,6 +147,7 @@ public class Controls {
         this.mAlt2Action = mPreferences.getString(PreferencesActivity.KEY_PREF_ALT2_ACTION, mAlt2ActionDefaultValue);
 
         //Advanced flight control
+        // Điều khiển bay nâng cao
         if (mPreferences.getBoolean(PreferencesActivity.KEY_PREF_AFC_BOOL, false)) {
             this.mMaxRollPitchAngle = Integer.parseInt(mPreferences.getString(PreferencesActivity.KEY_PREF_MAX_ROLLPITCH_ANGLE, mMaxRollPitchAngleDefaultValue));
             this.mMaxYawAngle = Integer.parseInt(mPreferences.getString(PreferencesActivity.KEY_PREF_MAX_YAW_ANGLE, mMaxYawAngleDefaultValue));
@@ -263,6 +275,7 @@ public class Controls {
     }
 
     // TODO: move methods to AbstractController?
+    // TODO: chuyển các phương thức sang AbstractController?
 
     public void setRightAnalogX(float right_analog_x) {
         this.mRight_analog_x = right_analog_x;
@@ -301,6 +314,7 @@ public class Controls {
     }
 
     // TODO: move methods to Controls?
+    // TODO: chuyển các phương thức sang Controls?
     public float getRollPitchFactor() {
         return getMaxRollPitchAngle();
     }
@@ -313,6 +327,7 @@ public class Controls {
         int addThrust = 0;
         if ((getMaxThrust() - getMinThrust()) < 0) {
             addThrust = 0; // do not allow negative values
+            // không cho phép giá trị âm
         } else {
             addThrust = (getMaxThrust() - getMinThrust());
         }

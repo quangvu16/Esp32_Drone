@@ -69,6 +69,7 @@ public class Crazyflie {
 
     /**
      * State of the connection procedure
+     * Trạng thái của quy trình kết nối
      */
     public enum State {
         DISCONNECTED,
@@ -78,14 +79,17 @@ public class Crazyflie {
     }
 
     /* used in examples */
+    /* được dùng trong các ví dụ */
     public State getState() {
         return mState;
     }
 
     /**
      * Crazyflie constructor
+     * Hàm tạo của Crazyflie
      *
      * @param driver driver to use (e.g. RadioDriver or BleLink)
+     * @param driver trình điều khiển cần dùng (ví dụ: RadioDriver hoặc BleLink)
      */
     public Crazyflie(CrtpDriver driver) {
         this(driver, null);
@@ -93,9 +97,12 @@ public class Crazyflie {
 
     /**
      * Crazyflie constructor
+     * Hàm tạo của Crazyflie
      *
      * @param driver driver to use (e.g. RadioDriver or BleLink)
+     * @param driver trình điều khiển cần dùng (ví dụ: RadioDriver hoặc BleLink)
      * @param tocCacheDir TOC cache files dir
+     * @param tocCacheDir thư mục chứa các tệp cache của TOC
      */
     public Crazyflie(CrtpDriver driver, File tocCacheDir) {
         this.mDriver = driver;
@@ -107,6 +114,7 @@ public class Crazyflie {
         mState = State.INITIALIZED;
 
         // try to connect
+        // thử kết nối
         try {
             if (mDriver instanceof RadioDriver) {
                 if (mConnectionData == null) {
@@ -141,6 +149,7 @@ public class Crazyflie {
 
             if (mDriver.isConnected()) {
                 //Send commander packet with all values set to 0 before closing the connection
+                // Gửi gói tin commander với mọi giá trị đặt bằng 0 trước khi đóng kết nối
                 sendPacket(new CommanderPacket(0, 0, 0, (char) 0));
             }
             mDriver.disconnect();
@@ -156,6 +165,7 @@ public class Crazyflie {
     }
 
     //TODO: is this good enough?
+    //TODO: như vậy đã đủ tốt chưa?
     public boolean isConnected() {
         return mState == State.SETUP_FINISHED;
     }
@@ -166,10 +176,13 @@ public class Crazyflie {
 
     /**
      * Send a packet through the driver interface
+     * Gửi một gói tin qua giao diện của trình điều khiển
      *
      * @param packet packet to send to the Crazyflie
+     * @param packet gói tin cần gửi tới Crazyflie
      */
     // def send_packet(self, pk, expected_reply=(), resend=False):
+    // (Python: nguyên mẫu hàm send_packet tương ứng)
     public void sendPacket(CrtpPacket packet){
         if (mDriver.isConnected()) {
             if (packet == null) {
@@ -180,6 +193,7 @@ public class Crazyflie {
 
             if (packet.getExpectedReply() != null && packet.getExpectedReply().length > 0) {
                 //add packet to resend queue
+                // thêm gói tin vào hàng đợi gửi lại
                 if(!mResendQueue.contains(packet)) {
                     mResendQueue.add(packet);
                 } else {
@@ -192,11 +206,15 @@ public class Crazyflie {
     /**
      * Callback called for every packet received to check if we are
      * waiting for a packet like this. If so, then remove it from the queue.
+     * Callback được gọi cho mỗi gói tin nhận được để kiểm tra xem ta có đang
+     * đợi một gói tin như vậy không. Nếu có thì loại nó khỏi hàng đợi.
      *
      * @param packet received packet
+     * @param packet gói tin đã nhận
      */
     private void checkReceivedPackets(CrtpPacket packet) {
         // compare received packet with expectedReplies in resend queue
+        // so sánh gói tin nhận được với expectedReply trong hàng đợi gửi lại
         for(CrtpPacket resendQueuePacket : mResendQueue) {
             if(isPacketMatchingExpectedReply(resendQueuePacket, packet)) {
                 mResendQueue.remove(resendQueuePacket);
@@ -208,6 +226,7 @@ public class Crazyflie {
 
     private boolean isPacketMatchingExpectedReply(CrtpPacket resendQueuePacket, CrtpPacket packet) {
         //Only check equality for the amount of bytes in expected reply
+        // Chỉ so sánh trong phạm vi số byte của expected reply
         byte[] expectedReply = resendQueuePacket.getExpectedReply();
         for(int i = 0; i < expectedReply.length;i++) {
             if(expectedReply[i] != packet.getPayload()[i]) {
@@ -244,26 +263,35 @@ public class Crazyflie {
     /**
      * Called when first packet arrives from Crazyflie.
      * This is used to determine if we are connected to something that is answering.
+     * Được gọi khi gói tin đầu tiên đến từ Crazyflie.
+     * Dùng để xác định ta có đang kết nối với một thiết bị có phản hồi hay không.
      *
      * @param packet initial packet
+     * @param packet gói tin khởi tạo
      */
     private void checkForInitialPacketCallback(CrtpPacket packet) {
         // mLogger.info("checkForInitialPacketCallback...");
         //TODO: should be made more reliable
+        //TODO: cần được làm đáng tin cậy hơn
         if (this.mState == State.INITIALIZED) {
             mLogger.info("Initial packet has been received! => State.CONNECTED");
             this.mState = State.CONNECTED;
             //self.link_established.call(self.link_uri)
+            // (Python: gọi callback link_established với link_uri)
             //FIXME: Crazyflie should not call mDriver.notifyConnected()
+            //FIXME: Crazyflie không nên gọi mDriver.notifyConnected()
             this.mDriver.notifyConnected();
             startConnectionSetup();
         }
         //self.packet_received.remove_callback(self._check_for_initial_packet_cb)
+        // (Python: gỡ callback _check_for_initial_packet_cb)
         // => IncomingPacketHandler
+        // (chỗ này nay được xử lý trong IncomingPacketHandler)
     }
 
     /**
      * Hack to circumvent BLE reconnect issue
+     * Thủ thuật để tránh lỗi kết nối lại của BLE
      */
     public void startConnectionSetup_BLE() {
         if (this.mState == State.INITIALIZED) {
@@ -279,6 +307,7 @@ public class Crazyflie {
 
     /**
      * Start the connection setup by refreshing the TOCs
+     * Bắt đầu thiết lập kết nối bằng cách làm mới các TOC
      */
     private void startConnectionSetup() {
         String connection = "";
@@ -291,14 +320,18 @@ public class Crazyflie {
 
         mParam = new Param(this);
         //must be defined first to be usable in Log TocFetchFinishedListener
+        // phải được định nghĩa trước để dùng được trong TocFetchFinishedListener của Log
         final TocFetchFinishedListener paramTocFetchFinishedListener = new TocFetchFinishedListener(CrtpPort.PARAMETERS) {
             public void tocFetchFinished() {
                 //_param_toc_updated_cb(self):
+                // (Python: callback _param_toc_updated_cb tương ứng)
                 mLogger.info("Param TOC finished updating.");
                 //mParam.requestUpdateOfAllParams();
                 //TODO: should be set only after log, param, mems are all updated
+                //TODO: chỉ nên đặt sau khi log, param, mem đều đã cập nhật xong
                 mState = State.SETUP_FINISHED;
                 //TODO: fix hacky-di-hack
+                //TODO: cần vá lại chỗ hack này
                 mDriver.notifySetupFinished();
             }
         };
@@ -308,23 +341,32 @@ public class Crazyflie {
             public void tocFetchFinished() {
                 mLogger.info("Logg TOC finished updating.");
                 //after log toc has been fetched, fetch param toc
+                // sau khi đã lấy xong TOC của log thì lấy TOC của tham số
                 mParam.refreshToc(paramTocFetchFinishedListener, mTocCache);
             }
         };
         //mLog.refreshToc(self._log_toc_updated_cb, self._toc_cache);
+        // (Python: lệnh gọi refreshToc tương ứng)
         // BLE carries only the commander subset of CRTP and cannot answer TOC
         // queries, so it skips straight to a finished setup. Links speaking full
         // CRTP (the Crazyradio and the ESP-Drone UDP link) download the log and
         // parameter TOCs here, which is what fills in the battery readout and
         // the parameter-backed settings.
+        // BLE chỉ mang tập con commander của CRTP và không thể trả lời các
+        // truy vấn TOC, nên nó bỏ thẳng tới bước thiết lập hoàn tất. Các liên
+        // kết nói đầy đủ CRTP (Crazyradio và liên kết UDP của ESP-Drone) tải
+        // các TOC của log và tham số tại đây, chính là thứ lấp đầy phần hiển
+        // thị pin và các thiết lập dựa trên tham số.
         if (mDriver.supportsToc()) {
             mLogg.refreshToc(loggTocFetchFinishedListener, mTocCache);
         } else {
             mState = State.SETUP_FINISHED; //important, otherwise BLE keeps trying to reconnect
+            // quan trọng, nếu không BLE sẽ liên tục cố gắng kết nối lại
             mDriver.notifySetupFinished();
         }
 
         //TODO: self.mem.refresh(self._mems_updated_cb)
+        //TODO: (Python: self.mem.refresh(self._mems_updated_cb) — làm mới phần mem)
     }
 
     public Param getParam() {
@@ -349,8 +391,10 @@ public class Crazyflie {
 
     /**
      * Add a data listener for data that comes on a specific port
+     * Thêm một data listener cho dữ liệu đến trên một cổng cụ thể
      *
      * @param dataListener datalistener that should be added
+     * @param dataListener data listener cần thêm
      */
     public void addDataListener(DataListener dataListener) {
         if (dataListener != null) {
@@ -361,8 +405,10 @@ public class Crazyflie {
 
     /**
      * Remove a data listener for data that comes on a specific port
+     * Gỡ một data listener cho dữ liệu đến trên một cổng cụ thể
      *
      * @param dataListener datalistener that should be removed
+     * @param dataListener data listener cần gỡ
      */
     public void removeDataListener(DataListener dataListener) {
         if (dataListener != null) {
@@ -375,8 +421,10 @@ public class Crazyflie {
 
     /**
      * Notify data listeners that a packet was received
+     * Thông báo cho các data listener rằng một gói tin đã được nhận
      *
      * @param packet received packet
+     * @param packet gói tin đã nhận
      */
     private void notifyDataReceived(CrtpPacket packet) {
         boolean found = false;
@@ -393,6 +441,7 @@ public class Crazyflie {
 
     /**
      * Handles incoming packets and sends the data to the correct listeners
+     * Xử lý các gói tin đến và chuyển dữ liệu tới đúng listener
      */
     private class IncomingPacketHandler implements Runnable {
 
@@ -405,6 +454,8 @@ public class Crazyflie {
                 if(packet != null) {
                     //All-packet callbacks
                     //self.cf.packet_received.call(pk)
+                    // các callback cho mọi gói tin
+                    // (Python: gọi packet_received với gói tin nhận được)
 
                     checkForInitialPacketCallback(packet);
                     checkReceivedPackets(packet);

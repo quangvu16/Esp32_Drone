@@ -31,19 +31,26 @@ import java.nio.ByteBuffer;
 
 /**
  * Navigation extension on CRTP port 7, channel 1 (PROTOCOL.md section 6).
+ * Phần mở rộng định hướng trên CRTP port 7, channel 1 (PROTOCOL.md mục 6).
  *
  * <p>The phone supplies the target as a north/east offset from the launch point; the drone has no
  * GPS and no compass and only estimates where it is. Offsets are rotated into the launch frame by
  * the firmware, which is defined at {@code ALIGN}:
+ * <p>Điện thoại cung cấp mục tiêu dạng độ lệch bắc/đông so với điểm cất cánh; drone không có
+ * GPS và la bàn, chỉ ước lượng vị trí của mình. Firmware quay độ lệch vào khung cất cánh,
+ * khung này được định nghĩa tại {@code ALIGN}:
  *
  * <pre>
  *   x = n*cos(alpha) + e*sin(alpha)    // +x = where the nose pointed at ALIGN
+ *                                       // +x = hướng mũi chỉ tại ALIGN
  *   y = n*sin(alpha) - e*cos(alpha)    // +y = 90 deg LEFT of that
+ *                                       // +y = 90 độ BÊN TRÁI hướng đó
  * </pre>
  */
 public class NavPacket extends CrtpPacket {
 
     /** Port 7, channel 1 — the firmware's {@code NAV_HDR}. */
+    /** Port 7, channel 1 — {@code NAV_HDR} của firmware. */
     public static final int CHANNEL = 1;
 
     public static final int CMD_TARGET = 0x20;
@@ -61,6 +68,7 @@ public class NavPacket extends CrtpPacket {
     }
 
     /** North/east target offset from the launch point, in metres. */
+    /** Độ lệch mục tiêu bắc/đông so với điểm cất cánh, tính bằng mét. */
     public static NavPacket target(float northMeters, float eastMeters) {
         ByteBuffer buffer = ByteBuffer.allocate(8).order(BYTE_ORDER);
         buffer.putFloat(northMeters);
@@ -73,6 +81,7 @@ public class NavPacket extends CrtpPacket {
     }
 
     /** Compass bearing of the nose at launch, in degrees. Starts a fresh launch frame. */
+    /** Phương hướng la bàn của mũi máy khi cất cánh, tính bằng độ. Bắt đầu một khung cất cánh mới. */
     public static NavPacket align(float alphaDegrees) {
         ByteBuffer buffer = ByteBuffer.allocate(4).order(BYTE_ORDER);
         buffer.putFloat(alphaDegrees);

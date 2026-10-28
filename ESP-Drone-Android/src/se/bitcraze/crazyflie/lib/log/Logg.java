@@ -51,16 +51,21 @@ import se.bitcraze.crazyflie.lib.toc.TocFetcher;
 import se.bitcraze.crazyflie.lib.toc.VariableType;
 
 //TODO: find better name
+//TODO: tìm tên hay hơn
 //TODO: add remaining callbacks/listeners
+//TODO: thêm các callback/listener còn lại
 //TODO: dataReceived callback in Logg or LogConfig?
+//TODO: callback dataReceived ở Logg hay LogConfig?
 
 //TODO: save/load config to/from file (JSON?)
+//TODO: lưu/tải cấu hình từ/ra file (JSON?)
 
 public class Logg {
 
     final Logger mLogger = LoggerFactory.getLogger("Logging");
 
     // The max size of a CRTP packet payload
+    // Kích thước tối đa của phần dữ liệu gói tin CRTP
     private final static int MAX_LOG_DATA_PACKET_SIZE = 30;
 
     private Crazyflie mCrazyflie;
@@ -81,6 +86,9 @@ public class Logg {
      * These codes can be decoded using os.stderror, but
      * some of the text messages will look very strange
      * in the UI, so they are redefined here
+     * Các mã này có thể được giải mã bằng os.stderror, nhưng
+     * một số thông báo văn bản sẽ trông rất lạ trong UI,
+     * nên chúng được định nghĩa lại ở đây
      */
     static {
         mErrCodes.put(12, "No more memory available");
@@ -103,10 +111,12 @@ public class Logg {
 
         /*
         # Called with newly created blocks
+        # Được gọi với các block vừa được tạo
         self.block_added_cb = Caller()
          */
 
         // TODO: there are two dataListeners active on CrtpPort.LOGGING (one in Logg and one in TocFetcher)
+        // TODO: có hai dataListener đang hoạt động trên CrtpPort.LOGGING (một trong Logg và một trong TocFetcher)
         // self.cf.add_port_callback(CRTPPort.LOGGING, self._new_packet_cb)
         mCrazyflie.addDataListener(new DataListener(CrtpPort.LOGGING) {
             @Override
@@ -125,30 +135,41 @@ public class Logg {
     }
 
     //TODO: only for debugging
+    //TODO: chỉ dùng để gỡ lỗi
     public Toc getToc() {
         return this.mToc;
     }
 
     //TODO fix
+    //TODO sửa
     public void setToc(Toc toc) {
         this.mToc = toc;
     }
 
     /**
      * Add a log configuration to the logging framework <br/>
+     * Thêm một cấu hình log vào hệ thống log <br/>
      * <br/>
      * When doing this the contents of the log configuration will be validated
      * and listeners for new log configurations will be notified.<br/>
+     * Khi làm vậy, nội dung của cấu hình log sẽ được kiểm tra tính hợp lệ
+     * và các listener cho cấu hình log mới sẽ được thông báo.<br/>
      * When validating the configuration the variables are checked against the TOC
      * to see that they actually exist. If they don't exist then the configuration
      * cannot be used.<br/>
+     * Khi kiểm tra cấu hình, các biến được đối chiếu với TOC
+     * để xem chúng thực sự tồn tại. Nếu chúng không tồn tại thì cấu hình
+     * không thể được sử dụng.<br/>
      * Since a valid TOC is required, a Crazyflie has to be
      * connected when calling this method, otherwise it will fail.
+     * Vì cần một TOC hợp lệ, Crazyflie phải được kết nối
+     * khi gọi phương thức này, nếu không sẽ thất bại.
      *
      * @param logConfig
      */
     public void addConfig(LogConfig logConfig) {
         //TODO: check if really connected
+        //TODO: kiểm tra xem đã thực sự kết nối chưa
         if (this.mCrazyflie.getDriver() == null) {
             mLogger.error("Cannot add configs without being connected to a Crazyflie!");
             return;
@@ -157,6 +178,9 @@ public class Logg {
          * If the log configuration contains variables that we added without
          * type (i.e we want the stored as type for fetching as well) then
          * resolve this now and add the variable type.
+         * Nếu cấu hình log chứa các biến mà ta đã thêm vào không kèm
+         * kiểu (tức là ta muốn lưu kiểu đó để dùng cho việc lấy về luôn) thì
+         * hãy giải quyết điều này ngay và thêm kiểu biến.
          */
 
         if (logConfig == null) {
@@ -174,6 +198,7 @@ public class Logg {
                     // raise KeyError("Variable {} not in TOC".format(name))
                 } else {
                     // Now that we know what type this variable has, set the correct type
+                    // Bây giờ ta đã biết biến này có kiểu gì, hãy đặt kiểu chính xác
                     logVariable.setVariableType(tocElement.getCtype());
                 }
             }
@@ -181,9 +206,12 @@ public class Logg {
         /*
          * Now check that all the added variables are in the TOC and that
          * the total size constraint of a data packet with logging data is not ???
+         * Giờ kiểm tra xem mọi biến đã thêm đều nằm trong TOC và rằng
+         * ràng buộc tổng kích thước của một gói tin dữ liệu log là không ???
          */
 
         // TODO: iterate only once over all log variables?
+        // TODO: chỉ duyệt qua tất cả biến log một lần?
 
         int size = 0;
         for (LogVariable logVariable : logConfig.getLogVariables()) {
@@ -193,9 +221,12 @@ public class Logg {
             /*
              * Check that we are able to find the variable in the TOC so
              * we can return error already now and not when the config is sent
+             * Kiểm tra xem ta có thể tìm thấy biến trong TOC để
+             * có thể báo lỗi ngay từ bây giờ chứ không phải khi cấu hình được gửi đi
              */
 
             // TODO: seems to be redundant
+            // TODO: có vẻ dư thừa
             if (logVariable.isTocVariable()) {
                 if (mToc.getElementByCompleteName(logVariable.getName()) == null) {
                     mLogger.warn(logVariable.getName() + " not in TOC, this log config cannot be used!");
@@ -209,8 +240,10 @@ public class Logg {
         if (size <= MAX_LOG_DATA_PACKET_SIZE && (logConfig.getPeriod() > 0 && logConfig.getPeriod() < 0xFF)) {
             logConfig.setValid(true);
             // logconf.cf = self.cf         -> not necessary in Java
+            // không cần thiết trong Java
 
             // set log config ID
+            // đặt ID cho cấu hình log
             logConfig.setId((mLogConfigIdCounter + 1) % 255);
 
             mLogConfigs.add(logConfig);
@@ -224,6 +257,7 @@ public class Logg {
 
     /**
      * Start refreshing the table of loggable variables
+     * Bắt đầu làm mới bảng các biến có thể ghi log
      */
     // def refresh_toc(self, refresh_done_callback, toc_cache):
     public void refreshToc(TocFetchFinishedListener listener, TocCache tocCache) {
@@ -245,6 +279,7 @@ public class Logg {
 
     /**
      * Callback for newly arrived packets with TOC information
+     * Callback cho các gói tin vừa đến chứa thông tin TOC
      *
      * @param packet
      */
@@ -252,11 +287,13 @@ public class Logg {
         int channel = packet.getHeader().getChannel();
 
         //TODO: cmd vs id in payload[0] !?!
+        //TODO: cmd hay id trong payload[0] !?!
         //cmd = packet.datal[0]
         byte cmd = packet.getPayload()[0];
 
         // payload = struct.pack("B" * (len(packet.datal) - 1), *packet.datal[1:])
         //TODO: payload starts on third byte!?
+        //TODO: phần dữ liệu bắt đầu từ byte thứ ba!?
 
         byte[] payload = packet.getPayload();
 
@@ -266,6 +303,7 @@ public class Logg {
             LogConfig logConfig = findLogConfig(id);
 
             //TODO: use switch instead of if?
+            //TODO: dùng switch thay cho if?
             if (cmd == CMD_CREATE_LOGCONFIG) {
                 if (logConfig != null) {
                     if (errorStatus == 0x00) {
@@ -273,16 +311,20 @@ public class Logg {
                             mLogger.debug("Successfully added log config ID=" + id);
 
                             // TODO: call start(LogConfig) instead?
+                            // TODO: gọi start(LogConfig) thay vào đó?
                             // TODO: double check with start method (add & start vs just add)
+                            // TODO: kiểm tra lại với phương thức start (add & start hay chỉ add)
                             sendLoggPacket(new byte[] {CMD_START_LOGGING, (byte) id, (byte) logConfig.getPeriod()}, new byte[]{CMD_START_LOGGING, (byte) id});
                             logConfig.setAdded(true);
                             notifyLogAdded(logConfig);
                         } else {
                             //TODO can this ever happen?
+                            //TODO điều này có bao giờ xảy ra không?
                             mLogger.warn("Log config ID=" + id + " is already added. Flag error?");
                         }
                     } else {
                         //TODO: logging is redundant if LogListener is set up correctly
+                        //TODO: việc ghi log là dư thừa nếu LogListener được thiết lập đúng
                         // msg = self._err_codes[error_status]
                         String msg = getErrorMsg(errorStatus);
                         mLogger.warn("Error " + errorStatus + " when adding ID=" + id + " (" + msg + ")");
@@ -318,6 +360,10 @@ public class Logg {
                         # for this. For some reason we get an error back after
                         # the log config has been started and added. This will show
                         # an error in the UI, but everything is still working.
+                        # Đây là cách vá tạm thời, chúng tôi đang mở một issue mới
+                        # cho việc này. Vì một lý do nào đó ta nhận lại lỗi sau khi
+                        # cấu hình log đã được khởi động và thêm vào. Việc này sẽ hiện
+                        # một lỗi trong UI, nhưng mọi thứ vẫn hoạt động.
                         #block.error_cb.call(block, msg)
                         */
                         notifyLogError(logConfig);
@@ -337,6 +383,8 @@ public class Logg {
                 /*
                  * Accept deletion of a log config that hasn't been added. This could
                  * happen due to timing (i.e add/start/delete in fast sequence)
+                 * Chấp nhận việc xóa một cấu hình log chưa được thêm vào. Việc này có thể
+                 * xảy ra do timing (tức là add/start/delete liền nhau rất nhanh)
                  */
                 if (errorStatus == 0x00) {
                     mLogger.info("Successfully deleted log config ID=" + id);
@@ -351,6 +399,7 @@ public class Logg {
                 }
             } else if (cmd == CMD_RESET_LOGGING) {
                 // Guard against multiple responses due to re-sending
+                // Phòng trường hợp nhiều phản hồi do gửi lại
                 if (mToc == null) {
                     mLogger.debug("Logging reset, continue with TOC download");
                     mLogConfigs = new ArrayList<LogConfig>();
@@ -364,6 +413,7 @@ public class Logg {
             }
         } else if (channel == CHAN_LOGDATA) {
             // TODO: fix payload offset
+            // TODO: sửa độ lệch của phần dữ liệu
             int id = payload[0];
             LogConfig logConfig = findLogConfig(id);
 
@@ -379,6 +429,7 @@ public class Logg {
 
     /* package private */ static int parseLogData(byte[] payload, LogConfig logConfig, Map<String, Number> logDataMap) {
         //get timestamp
+        //lấy timestamp
         int timestamp = parseTimestamp(payload[1], payload[2], payload[3]);
         // logdata = packet.data[4:]
         int offset = 4;
@@ -388,6 +439,7 @@ public class Logg {
         logDataMap.putAll(logConfig.unpackLogData(logData));
         LoggerFactory.getLogger("Logging").debug("Unpacked log data (ID: " + logConfig.getId() + ") with time stamp " + timestamp);
         //TODO: what to do with the unpacked data?
+        //TODO: làm gì với dữ liệu đã giải nén?
         return timestamp;
     }
 
@@ -395,14 +447,17 @@ public class Logg {
     // timestamp = (timestamps[0] | timestamps[1] << 8 | timestamps[2] << 16)
     /* package private */ static int parseTimestamp(byte data1, byte data2, byte data3) {
         //allocate 4 bytes for an int
+        //cấp phát 4 byte cho một int
         ByteBuffer buffer = ByteBuffer.wrap(new byte[]{data1, data2, data3, 0}).order(CrtpPacket.BYTE_ORDER);
         return buffer.getInt();
     }
 
 
     /* Methods from LogConfig class */
+    /* Các phương thức từ lớp LogConfig */
 
     // Commands used when accessing the Log configurations
+    // Các lệnh được dùng khi truy cập các cấu hình Log
     public final static int CMD_CREATE_LOGCONFIG = 0;
     public final static int CMD_APPEND_LOGCONFIG = 1;
     public final static int CMD_DELETE_LOGCONFIG = 2;
@@ -412,6 +467,7 @@ public class Logg {
 
 
     // Channels used for the logging port
+    // Các kênh được dùng cho cổng logging
     private final static int CHAN_TOC = 0;
     private final static int CHAN_SETTINGS = 1;
     private final static int CHAN_LOGDATA = 2;
@@ -421,6 +477,7 @@ public class Logg {
 
     /**
      * Save the log configuration in the Crazyflie
+     * Lưu cấu hình log trong Crazyflie
      */
     public void create(LogConfig logConfig) {
         if (logConfig == null) {
@@ -437,7 +494,9 @@ public class Logg {
             throw new IllegalStateException("LogConfig " + logConfig.getName() + " is empty!");
         }
         // currently the number of LogVariables per LogConfig is limited by the size of one packet: 31 bytes - 2 bytes (header)
+        // hiện tại số lượng LogVariable trên mỗi LogConfig bị giới hạn bởi kích thước của một gói tin: 31 byte - 2 byte (header)
         // TODO: it should be possible to add more LogVariables in additional packets
+        // TODO: lẽ ra nên có thể thêm nhiều LogVariable hơn trong các gói tin bổ sung
         if (logVariables.size() >= (bb.capacity()-2)/2) {
             throw new IllegalStateException("Maximum number of LogVariables per packet has been reached (" + logVariables.size() + ").");
         }
@@ -449,9 +508,11 @@ public class Logg {
         int noOfCheckedLogVariables = 0;
         for (LogVariable variable : logVariables) {
             if(!variable.isTocVariable()) { // Memory location
+                                            // Vị trí vùng nhớ
                 createMemoryLocationElement(bb, variable);
                 noOfCheckedLogVariables++;
             } else { // Item in TOC
+                     // Mục trong TOC
                 boolean successful = createTocElement(bb, variable);
                 if (successful) {
                     noOfCheckedLogVariables++;
@@ -485,6 +546,7 @@ public class Logg {
 
     private void createMemoryLocationElement(ByteBuffer bb, LogVariable variable) {
         //create LogTocElement to get the variableTypeId
+        //tạo LogTocElement để lấy variableTypeId
         VariableType variableType = variable.getVariableType();
         TocElement memLogTocElement = new TocElement();
         memLogTocElement.setCtype(variableType);
@@ -502,10 +564,12 @@ public class Logg {
         String name = variable.getName();
 
         // get TOC element ID
+        // lấy ID phần tử TOC
         int tocElementId = mToc.getElementId(name);
         if (tocElementId == -1) {
             mLogger.error("Toc element " + name + " not found in TOC.");
             // TODO: create UI error message?
+            // TODO: tạo thông báo lỗi cho UI?
             return false;
         }
 
@@ -529,6 +593,7 @@ public class Logg {
 
     /**
      * Start the logging for this entry
+     * Bắt đầu ghi log cho mục này
      */
     public void start(LogConfig logConfig) {
         if (logConfig == null) {
@@ -550,6 +615,7 @@ public class Logg {
 
     /**
      * Stop the logging for this entry
+     * Dừng ghi log cho mục này
      */
     public void stop(LogConfig logConfig) {
         if (logConfig == null) {
@@ -569,6 +635,7 @@ public class Logg {
 
     /**
      * Delete this entry in the Crazyflie
+     * Xóa mục này trong Crazyflie
      */
     public void delete(LogConfig logConfig) {
         if (logConfig == null) {
@@ -585,6 +652,7 @@ public class Logg {
             }
         }
         //hacky workarounds
+        //cách xử lý tạm thời (hacky)
         logConfig.setAdded(false);
         mLogConfigs.remove(logConfig);
     }
@@ -600,10 +668,12 @@ public class Logg {
     }
 
     /* Log listener methods*/
+    /* Các phương thức của log listener */
 
 
     /**
      * Add a log listener
+     * Thêm một log listener
      */
     public void addLogListener(LogListener logListener) {
         mLogListeners.add(logListener);
@@ -611,6 +681,7 @@ public class Logg {
 
     /**
      * Remove the log listener
+     * Gỡ log listener
      */
     public void removeLogListener(LogListener logListener) {
         mLogListeners.remove(logListener);

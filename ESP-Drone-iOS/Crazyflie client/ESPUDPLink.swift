@@ -14,6 +14,10 @@ import AFNetworking
 /// The endpoints are user-configurable — WiFi SoftAP defaults to the firmware's
 /// 192.168.43.42:2390 out / 2399 in, WiFi Station uses a hostname such as
 /// esp-drone.local. `LinkSettings` carries the choice.
+/// Tầng truyền UDP: `[CRTP ...][uint8 checksum]` theo cả hai chiều
+/// (PROTOCOL.md §1). Các điểm cuối do người dùng cấu hình — WiFi SoftAP mặc
+/// định theo firmware là 192.168.43.42:2390 ra / 2399 vào, WiFi Station dùng
+/// tên máy chủ như esp-drone.local. `LinkSettings` lưu giữ lựa chọn này.
 class ESPUDPLink: NSObject, CrtpDriver, GCDAsyncUdpSocketDelegate {
 
     var clientSocket: GCDAsyncUdpSocket = GCDAsyncUdpSocket()
@@ -58,6 +62,10 @@ class ESPUDPLink: NSObject, CrtpDriver, GCDAsyncUdpSocketDelegate {
         // then hand the raw CRTP packet to the client state machine. Console
         // text still decodes as UTF-8 further up, so nothing is printed here
         // that would crash on binary.
+        // Đóng khung datagram: [CRTP ...][checksum]. Kiểm tra và tách bỏ byte tổng
+        // kiểm tra, rồi chuyển gói tin CRTP thô cho máy trạng thái của client. Chữ
+        // ở console vẫn được giải mã UTF-8 ở tầng trên, nên không có gì ở đây được
+        // in ra mà gây crash với dữ liệu nhị phân.
         guard let crtp = CrtpChecksum.strip(from: data) else {
             print("didReceive: \(data.count) bytes, bad checksum — dropped")
             return
@@ -84,8 +92,12 @@ class ESPUDPLink: NSObject, CrtpDriver, GCDAsyncUdpSocketDelegate {
     func connect(_ address: String?, callback: @escaping (Bool) -> ()) {
         print("ESPUDPLink connect")
         //网络状态消息监听
+        // Observe network-reachability change notifications.
+        // Lắng nghe thông báo trạng thái mạng
         NotificationCenter.default.addObserver(self, selector: #selector(sendWifiStatus), name: NSNotification.Name.AFNetworkingReachabilityDidChange, object: nil)
         //开启网络状态消息监听
+        // Start monitoring network reachability.
+        // Bắt đầu lắng nghe trạng thái mạng
         AFNetworkReachabilityManager.shared().startMonitoring()
         connectCallback = callback
     }
@@ -108,8 +120,12 @@ class ESPUDPLink: NSObject, CrtpDriver, GCDAsyncUdpSocketDelegate {
         print("Remove message notification")
         state = "idle"
         //关闭网络状态消息监听
+        // Stop monitoring network reachability.
+        // Dừng lắng nghe trạng thái mạng
         AFNetworkReachabilityManager.shared().stopMonitoring()
         //移除网络状态消息通知
+        // Unregister the network-reachability observer.
+        // Gỡ đăng ký thông báo trạng thái mạng
         NotificationCenter.default.removeObserver(self)
     }
 

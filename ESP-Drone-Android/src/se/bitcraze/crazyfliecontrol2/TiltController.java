@@ -38,29 +38,41 @@ import java.util.Locale;
 
 /**
  * Tilt-to-fly from the phone's rotation vector (PROTOCOL.md section 9).
+ * Nghiêng điện thoại để bay, dùng vector quay của điện thoại (PROTOCOL.md mục 9).
  *
  * <p>Landscape, phone flat = level drone. The rotation vector gives an orientation that
  * does not drift the way a pure gyro integration would, and needs no calibration beyond
  * the sensor's own. Roll and pitch are the phone's attitude; yaw is the rate of turn
  * about the vertical, scaled to deg/s — the firmware treats the yaw field as a rate.
+ * <p>Để ngang, điện thoại nằm phẳng = drone thăng bằng. Vector quay cho một định hướng
+ * không trôi như cách tích phân con quay thuần túy, và không cần hiệu chuẩn gì thêm ngoài
+ * hiệu chuẩn của chính cảm biến. Roll và pitch là tư thế của điện thoại; yaw là tốc độ
+ * quay quanh phương thẳng đứng, quy đổi sang deg/s — firmware coi trường yaw là một
+ * tốc độ.
  *
  * <p>The mapping is deliberately inert until {@link #setEnabled} is turned on from the
  * labelled toggle, so picking up the phone cannot engage it by accident.
+ * <p>Phép ánh xạ cố tình bất hoạt cho đến khi {@link #setEnabled} được bật từ công tắc
+ * có nhãn, nên việc nhấc điện thoại lên không thể kích hoạt nhầm.
  */
 public class TiltController implements SensorEventListener {
 
     private static final String LOG_TAG = "TiltController";
 
     /** Phone attitude inside this many degrees is treated as level. */
+    /** Tư thế điện thoại trong khoảng này (đơn vị độ) được coi là thăng bằng. */
     private static final float DEADZONE_DEG = 3.0f;
 
     /** Phone tilt at or beyond this maps to the full commanded angle. */
+    /** Điện thoại nghiêng từ mức này trở lên sẽ ánh xạ sang góc điều khiển đầy đủ. */
     private static final float MAX_TILT_DEG = 25.0f;
 
     /** The firmware rejects |roll|,|pitch| above this, so never command more. */
+    /** Firmware từ chối |roll|,|pitch| lớn hơn mức này, nên không bao giờ điều khiển vượt quá. */
     private static final float FIRMWARE_ANGLE_LIMIT_DEG = 25.0f;
 
     /** Phone yaw rate at or beyond this maps to the full commanded rate. */
+    /** Tốc độ yaw của điện thoại từ mức này trở lên sẽ ánh xạ sang tốc độ điều khiển đầy đủ. */
     private static final float MAX_YAW_RATE_DPS = 120.0f;
 
     private final SensorManager mSensorManager;
@@ -96,6 +108,8 @@ public class TiltController implements SensorEventListener {
     /**
      * Tilt-to-fly must be deliberately armed from the UI toggle. Turning it off also
      * zeroes the outputs so the drone does not keep tracking a phone that is now idle.
+     * Nghiêng điện thoại để bay phải được kích hoạt có chủ đích từ công tắc trên UI. Tắt nó
+     * cũng đưa các đầu ra về 0 để drone không tiếp tục bám theo một chiếc điện thoại đang nghỉ.
      */
     public void setEnabled(boolean enabled) {
         mEnabled = enabled;
@@ -120,6 +134,9 @@ public class TiltController implements SensorEventListener {
         // Game rotation vector is the better choice (no magnetometer, so no magnetic
         // interference from the drone's motors), but falls back to the plain rotation
         // vector when the device lacks it.
+        // Game rotation vector là lựa chọn tốt hơn (không dùng từ kế, nên không có nhiễu
+        // từ của động cơ drone), nhưng sẽ dự phòng sang vector quay thường khi thiết bị
+        // không có cảm biến này.
         Sensor sensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
         if (sensor == null) {
             sensor = mRotationSensor;
@@ -136,6 +153,7 @@ public class TiltController implements SensorEventListener {
     }
 
     /** Commanded roll in degrees for a CommanderPacket. */
+    /** Roll được điều khiển, đơn vị độ, dùng cho CommanderPacket. */
     public float getRollDeg() {
         return mRollDeg;
     }
@@ -144,12 +162,16 @@ public class TiltController implements SensorEventListener {
      * Commanded pitch in degrees. {@link se.bitcraze.crazyflie.lib.crtp.CommanderPacket}
      * negates the UI pitch on the wire, so return the UI sense (nose-down positive) and
      * let the packet class do the sign, exactly as the stick path does.
+     * Pitch được điều khiển, đơn vị độ. {@link se.bitcraze.crazyflie.lib.crtp.CommanderPacket}
+     * đảo dấu pitch của UI trên đường truyền, nên trả về theo quy ước UI (mũi chúi xuống là
+     * dương) và để lớp gói tin tự xử lý dấu, giống hệt đường xử lý từ cần gạt.
      */
     public float getPitchDeg() {
         return mPitchDeg;
     }
 
     /** Commanded yaw rate in deg/s. */
+    /** Tốc độ yaw được điều khiển, đơn vị deg/s. */
     public float getYawRateDps() {
         return mYawRateDps;
     }
@@ -173,6 +195,8 @@ public class TiltController implements SensorEventListener {
             SensorManager.getOrientation(mRotationMatrix, mOrientation);
             // Orientation is radians: [azimuth, pitch, roll] about the device axes.
             // In landscape the device's roll axis is the drone's roll axis.
+            // Orientation là radian: [azimuth, pitch, roll] theo các trục của thiết bị.
+            // Ở chiều ngang, trục roll của thiết bị chính là trục roll của drone.
             float rollRad = mOrientation[2];
             float pitchRad = mOrientation[1];
             float yawRad = mOrientation[0];
@@ -182,10 +206,13 @@ public class TiltController implements SensorEventListener {
 
             // Yaw is a rate here, not an angle: differentiate the azimuth so a held
             // angle does not command a continuous turn.
+            // Ở đây yaw là tốc độ, không phải góc: vi phân azimuth để một góc giữ cố định
+            // không điều khiển drone rẽ liên tục.
             float yawDeg = (float) Math.toDegrees(yawRad);
             float delta = wrapDeg(yawDeg - mLastYawDeg);
             mLastYawDeg = yawDeg;
             // SENSOR_DELAY_GAME is ~50 Hz; treat the sample interval as 20 ms.
+            // SENSOR_DELAY_GAME khoảng 50 Hz; coi khoảng lấy mẫu là 20 ms.
             mYawRateDps = clamp(delta * 50f, -MAX_YAW_RATE_DPS, MAX_YAW_RATE_DPS);
             if (Math.abs(mYawRateDps) < 2f) {
                 mYawRateDps = 0f;
@@ -197,6 +224,8 @@ public class TiltController implements SensorEventListener {
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
         // The rotation vector is unusable while it is still calibrating, but there is
         // nothing useful to do here beyond letting the sensor settle on its own.
+        // Vector quay chưa dùng được trong khi còn đang hiệu chuẩn, nhưng không có việc
+        // gì hữu ích cần làm ở đây ngoài để cảm biến tự ổn định.
     }
 
     private float mLastYawDeg;

@@ -5,6 +5,9 @@
 //  Trial framework + four optimizers, ported from PID-Calibration's AutoTuner.kt.
 //  The balance-robot cost (wheel speed, travel, fall) is replaced with the
 //  drone's own telemetry (PROTOCOL.md §4 log TOC):
+//  Khung lần thử + bốn bộ tối ưu, port từ AutoTuner.kt của PID-Calibration.
+//  Chi phí của robot cân bằng (vận tốc bánh xe, quãng đường, ngã) được thay
+//  bằng dữ liệu từ xa của chính drone (log TOC PROTOCOL.md §4):
 //
 //      cost = angle_std
 //           + 0.1 × gyro_rms
@@ -17,10 +20,19 @@
 //  Genetic, Differential evolution, SPSA) so the UI can compare against them;
 //  each searches the same unit cube, scores a trial as toY(cost) and reports
 //  the result as ML does — the tried set with the lowest *predicted* cost.
+//  ML / Twiddle / Nelder-Mead / Random là bốn phương pháp đầu tiên. Phần còn
+//  lại của họ SearchTuner trong ml_tune.py cũng được port (Neural, RL, CMA-ES,
+//  PSO, Genetic, Differential evolution, SPSA) để UI so sánh được với chúng;
+//  mỗi phương pháp tìm trong cùng một khối đơn vị, chấm một lần thử bằng
+//  toY(cost) và báo kết quả như ML — tập đã thử có chi phí *dự đoán* thấp nhất.
 //
 //  SAFETY: this class never starts a trial on its own. The caller must run the
 //  hold-to-confirm gate first, must keep the drone secured on a stand or
 //  tethered, and must wire `panicStop` to an emergency cut. One axis at a time.
+//  AN TOÀN: lớp này không bao giờ tự bắt đầu một lần thử. Người gọi phải đi
+//  qua cổng an toàn giữ-nút-để-xác-nhận trước, phải giữ drone cố định trên giá
+//  đỡ hoặc buộc dây, và phải nối `panicStop` vào lệnh cắt khẩn cấp. Mỗi lần
+//  một trục.
 //
 
 import Foundation
@@ -30,6 +42,9 @@ import Foundation
 /// Log-scaled box around the starting gains, mapped to the unit cube.
 /// Factor 2.0 → the search range is current/2 .. current×2, matching
 /// AutoTuner.kt's default `Method.defaultRange`.
+/// Hộp chia tỷ lệ log quanh các gain khởi tạo, ánh xạ sang khối đơn vị.
+/// Hệ số 2.0 → miền tìm kiếm là current/2 .. current×2, khớp với
+/// `Method.defaultRange` mặc định của AutoTuner.kt.
 struct TuneSpace {
     let names: [String]
     let lo: [Double]
@@ -37,6 +52,7 @@ struct TuneSpace {
     let logScaled: [Bool]
 
     /// - Parameter centre: starting gain values, same order as `names`.
+    /// - Parameter centre: giá trị gain khởi tạo, cùng thứ tự với `names`.
     init(names: [String], centre: [Double], factor: Double) {
         self.names = names
         var lo: [Double] = []
@@ -45,6 +61,9 @@ struct TuneSpace {
         for c in centre {
             // Gains are multiplicative, so the box is log-scaled. A non-positive
             // start is treated as a tiny positive so the search can still move.
+            // Gain mang tính nhân nên hộp chia theo tỷ lệ log. Giá trị khởi
+            // tạo không dương được coi là một số dương rất nhỏ để phép tìm vẫn
+            // di chuyển được.
             let base = c > 0 ? c : 0.05
             lo.append(log(max(base / factor, 1e-3)))
             hi.append(log(min(base * factor, 1e6)))
@@ -56,11 +75,13 @@ struct TuneSpace {
     }
 
     /// Unit-cube point → real gain values.
+    /// Điểm trong khối đơn vị → giá trị gain thật.
     func value(_ k: Int, _ u: Double) -> Double {
         exp(lo[k] + u * (hi[k] - lo[k]))
     }
 
     /// Real values → unit-cube point, or `nil` when outside the box.
+    /// Giá trị thật → điểm trong khối đơn vị, hoặc `nil` khi nằm ngoài hộp.
     func toUnit(_ values: [Double]) -> [Double]? {
         var x: [Double] = []
         for (k, v) in values.enumerated() {
@@ -76,6 +97,7 @@ struct TuneSpace {
 // MARK: - Cost
 
 /// Per-trial measurements used to score a candidate.
+/// Các phép đo của một lần thử dùng để chấm điểm một ứng viên.
 struct TuneMetrics {
     var angleMean: Double
     var angleStd: Double
@@ -91,6 +113,12 @@ struct TuneMetrics {
     /// a quad has no wheels. The reference's fall cost is applied in
     /// `measure()` instead, because it needs to know how much of the trial
     /// was lost.
+    /// Điểm của cửa sổ sống sót, giống hệt `costOf` của app Android và
+    /// `drone.cost_of` trong tools/pid-tune để một lượt chạy có cùng ý nghĩa
+    /// bất kể do công cụ nào tạo ra. Thành tử quãng đường đo bằng encoder bánh
+    /// xe bị lược bỏ — quad không có bánh xe. Chi phí nghiêng của bản tham chiếu
+    /// được áp trong `measure()` thay vào đó, vì nó cần biết bao nhiêu phần của
+    /// lần thử đã bị mất.
     var cost: Double {
         angleStd
             + 0.1 * gyroRms
@@ -101,15 +129,21 @@ struct TuneMetrics {
 }
 
 /// One decoded telemetry row the tuner cares about.
+/// Một dòng dữ liệu từ xa đã giải mã mà tuner quan tâm.
 struct TuneSample {
     /// Active axis angle (stabilizer.roll / .pitch / .yaw rate), degrees.
+    /// Góc của trục đang tinh chỉnh (tốc độ stabilizer.roll / .pitch / .yaw), tính bằng độ.
     let angle: Double
     /// Motor output in µs (motor.m1..m4), as the firmware writes them.
+    /// Đầu ra động cơ tính bằng µs (motor.m1..m4), đúng như firmware ghi.
     let motorMicros: [Double]
     /// Controller output for the active axis (controller.roll / .pitch / .yaw).
+    /// Đầu ra của bộ điều khiển cho trục đang tinh chỉnh (controller.roll / .pitch / .yaw).
     let controller: Double
     /// Level angles from the status block, for the tip check. Past
     /// `AutoTuner.tipDeg` on either axis the drone has lost control.
+    /// Góc thăng bằng từ khối status, dùng cho phép kiểm tra nghiêng. Vượt quá
+    /// `AutoTuner.tipDeg` trên một trong hai trục là drone đã mất kiểm soát.
     let roll: Double
     let pitch: Double
 }
@@ -119,6 +153,9 @@ struct TuneSample {
 /// Zero-mean GP on standardised targets, RBF kernel over unit-cube inputs,
 /// marginal-likelihood grid over LENGTHS × NOISES — a direct port of
 /// AutoTuner.kt's `GaussianProcess`.
+/// GP trung bình 0 trên các giá trị mục tiêu đã chuẩn hóa, kernel RBF trên đầu
+/// vào trong khối đơn vị, lưới likelihood biên trên LENGTHS × NOISES — port
+/// trực tiếp từ `GaussianProcess` của AutoTuner.kt.
 final class GaussianProcess {
     private let xs: [[Double]]
     private let mu: Double
@@ -141,6 +178,8 @@ final class GaussianProcess {
         self.sd = sd
         // Local `sd` — a closure over `self.sd` here would capture self before
         // ls/chol/alpha are initialised.
+        // `sd` cục bộ — một closure bắt `self.sd` ở đây sẽ nắm giữ self trước
+        // khi ls/chol/alpha được khởi tạo.
         let z = y.map { ($0 - mean) / sd }
 
         var bestLml = -Double.infinity
@@ -177,6 +216,7 @@ final class GaussianProcess {
     }
 
     /// Posterior mean and std of the latent y at `x`.
+    /// Trung bình và độ lệch chuẩn hậu nghiệm của y tiềm ẩn tại `x`.
     func predict(_ x: [Double]) -> (mean: Double, std: Double) {
         let ks = xs.map { GaussianProcess.rbf(x, $0, ls) }
         var mean = 0.0
@@ -189,6 +229,7 @@ final class GaussianProcess {
     }
 
     /// Expected improvement over the best observed `yBest` (in standardised cost).
+    /// Mức cải thiện kỳ vọng so với `yBest` tốt nhất đã quan sát (theo chi phí đã chuẩn hóa).
     func expectedImprovement(_ x: [Double], yBest: Double, xi: Double = 0.01) -> Double {
         let (mean, std) = predict(x)
         let imp = yBest - mean - xi
@@ -227,6 +268,7 @@ final class GaussianProcess {
     }
 
     /// L x = b (lower-triangular).
+    /// L x = b (tam giác dưới).
     private static func forwardSolve(_ l: [[Double]], _ b: [Double]) -> [Double] {
         var x = [Double](repeating: 0, count: b.count)
         for i in b.indices {
@@ -253,6 +295,7 @@ final class GaussianProcess {
     }
 
     /// Abramowitz-Stegun 7.1.26 erf, |error| < 1.5e-7.
+    /// xấp xỉ erf Abramowitz-Stegun 7.1.26, |sai số| < 1.5e-7.
     private static func normCdf(_ z: Double) -> Double {
         let x = abs(z) / sqrt(2.0)
         let t = 1 / (1 + 0.3275911 * x)
@@ -270,6 +313,7 @@ extension GaussianProcess: CostModel {}
 // MARK: - Tuner
 
 /// Which axis is under tune. One at a time — the safety gate enforces it.
+/// Trục nào đang được tinh chỉnh. Mỗi lần một trục — cổng an toàn đảm bảo điều đó.
 enum TuneAxis: Int, CaseIterable {
     case roll = 0
     case pitch
@@ -284,6 +328,7 @@ enum TuneAxis: Int, CaseIterable {
     }
 
     /// Parameter TOC ids for kp/ki/kd on this axis (PROTOCOL.md §3).
+    /// Các id Param TOC cho kp/ki/kd trên trục này (PROTOCOL.md §3).
     var gainParamIds: [UInt8] {
         switch self {
         case .roll: return [3, 4, 5]    // pid.roll_kp, ki, kd
@@ -301,6 +346,7 @@ enum TuneAxis: Int, CaseIterable {
     }
 
     /// Log TOC names for the angle / controller / motor samples.
+    /// Tên trong Log TOC cho các mẫu góc / điều khiển / động cơ.
     var angleLogName: String {
         switch self {
         case .roll: return "stabilizer.roll"
@@ -320,6 +366,8 @@ enum TuneAxis: Int, CaseIterable {
 
 /// The optimizers. `tag` starts the log's stage column, as on the PC — the
 /// strings match ml_tune.py's `method` where it has one.
+/// Các bộ tối ưu. `tag` mở đầu cho cột stage của log, như trên PC — các chuỗi
+/// khớp với `method` của ml_tune.py ở nơi ml_tune.py có trường này.
 enum TuneMethod: Int, CaseIterable {
     case ml = 0
     case twiddle
@@ -377,6 +425,7 @@ enum TuneMethod: Int, CaseIterable {
     }
 
     /// ml_tune.py's `method` strings; the trial log's stage column starts with it.
+    /// Các chuỗi `method` của ml_tune.py; cột stage trong log lần thử mở đầu bằng nó.
     var tag: String {
         switch self {
         case .ml: return "ml"
@@ -394,6 +443,7 @@ enum TuneMethod: Int, CaseIterable {
     }
 
     /// Search box as a multiplier on the starting gains.
+    /// Hộp tìm kiếm dạng hệ số nhân trên các gain khởi tạo.
     var defaultRange: Double {
         self == .twiddle ? 3.0 : 2.0
     }
@@ -404,6 +454,12 @@ enum TuneMethod: Int, CaseIterable {
     /// aliases it, so the whole SearchTuner family — Random and Nelder-Mead
     /// included — reports the predicted best too. Twiddle alone keeps its own
     /// best, because its confirm-a-pair rule is the point of the method.
+    /// Kết quả là tập đã thử có chi phí GP *dự đoán* thấp nhất (`choose_best`
+    /// của ml_tune.py), không phải lần thử đơn lẻ may mắn nhất. Mọi phương pháp
+    /// trừ Twiddle: BayesTuner định nghĩa quy tắc và `SearchTuner.choose_best`
+    /// là bí danh của nó, nên cả họ SearchTuner — kể cả Random và Nelder-Mead —
+    /// cũng báo best theo dự đoán. Riêng Twiddle giữ best của chính nó, vì quy
+    /// tắc xác nhận theo cặp mới là điểm cốt lõi của phương pháp.
     var usesPredictedBest: Bool {
         self != .twiddle
     }
@@ -411,6 +467,9 @@ enum TuneMethod: Int, CaseIterable {
 
 /// Runs the trial loop on its own serial queue. The UI feeds samples in via
 /// `ingest(_:)` and reads back via the listener callbacks (always main-queue).
+/// Chạy vòng lặp lần thử trên hàng đợi tuần tự riêng của nó. UI đưa mẫu vào
+/// qua `ingest(_:)` và đọc lại qua các callback của listener (luôn trên
+/// main-queue).
 final class AutoTuner {
 
     struct Config {
@@ -418,8 +477,10 @@ final class AutoTuner {
         var method: TuneMethod
         var trials: Int
         /// Seconds of telemetry per trial, after the settle window.
+        /// Số giây dữ liệu từ xa cho mỗi lần thử, sau cửa sổ ổn định.
         var trialSeconds: Double
         /// Seconds of no-input settle after writing a candidate.
+        /// Số giây nghỉ không có đầu vào để ổn định sau khi ghi một ứng viên.
         var settleSeconds: Double
         var range: Double
     }
@@ -434,6 +495,10 @@ final class AutoTuner {
     /// payload: the fitted model (`gp`), the search space, every trial's
     /// unit-cube point and score (`X`, `Y`), which of them are this run's
     /// (`own`, `fell_mask`) and the predicted-best point (`best_x`).
+    /// Trạng thái mô hình sau một lần thử — phần dữ liệu `post("trial", …)` của
+    /// ml_tune.py: mô hình đã khớp (`gp`), miền tìm kiếm, điểm trong khối đơn
+    /// vị và điểm số của mỗi lần thử (`X`, `Y`), cái nào thuộc lượt chạy này
+    /// (`own`, `fell_mask`) và điểm dự đoán tốt nhất (`best_x`).
     struct TrialReport {
         let n: Int
         let total: Int
@@ -442,16 +507,21 @@ final class AutoTuner {
         let best: [Double]
         let bestCost: Double
         // The payload's model fields, for ModelView.
+        // Các trường mô hình của phần dữ liệu, dành cho ModelView.
         let method: TuneMethod
         let space: TuneSpace
         let xs: [[Double]]          // X
         let ys: [Double]            // Y, in toY space
+        // Y, trong miền toY
         let costs: [Double]         // fromY(ys) — what ModelView plots
+        // fromY(ys) — thứ ModelView vẽ
         let own: [Bool]
         let fellMask: [Bool]
         let bestX: [Double]?        // best_x
         let bestPred: Double?       // best_pred, cost units
+        // best_pred, đơn vị chi phí
         let model: CostModel?       // gp: always the fitted GaussianProcess here
+        // gp: tại đây luôn là GaussianProcess đã khớp
     }
 
     // MARK: Tuner state
@@ -464,6 +534,7 @@ final class AutoTuner {
     private let stateLock = NSLock()
 
     /// Telemetry ring fed by the log client. Main-thread writers, queue readers.
+    /// Vòng dữ liệu từ xa do log client nạp vào. Luồng chính ghi, hàng đợi đọc.
     private var pendingSamples: [TuneSample] = []
     private var paramEcho: [UInt8: Double] = [:]
 
@@ -471,6 +542,7 @@ final class AutoTuner {
     private var running = false
 
     /// Current gains being held (kp, ki, kd).
+    /// Các gain hiện đang giữ (kp, ki, kd).
     private var params: [Double]
     private var startParams: [Double]?
     private var bestParams: [Double]
@@ -481,6 +553,7 @@ final class AutoTuner {
     private var ys: [Double] = []            // toY(cost)
     private var own: [Bool] = []
     private var fell: [Bool] = []            // did this run's trial tip the drone?
+    // lần thử của lượt chạy này có làm drone nghiêng không?
     private var k = 0
     private var stage = ""
     private var model: GaussianProcess?
@@ -488,6 +561,7 @@ final class AutoTuner {
     private var bestPred: Double?
 
     /// SearchTuner family state (ml_tune.py: d and x0).
+    /// Trạng thái của họ SearchTuner (ml_tune.py: d và x0).
     private var d = 0
     private var x0: [Double] = []
 
@@ -513,6 +587,7 @@ final class AutoTuner {
     }
 
     /// Feed decoded telemetry. Safe from any thread.
+    /// Nạp dữ liệu từ xa đã giải mã. An toàn từ mọi luồng.
     func ingest(_ sample: TuneSample) {
         stateLock.lock()
         pendingSamples.append(sample)
@@ -523,6 +598,7 @@ final class AutoTuner {
     }
 
     /// Feed a param echo (id → value) from `CrtpClient.onParamValue`.
+    /// Nạp một echo tham số (id → value) từ `CrtpClient.onParamValue`.
     func ingestParam(id: UInt8, value: Double) {
         stateLock.lock()
         paramEcho[id] = value
@@ -530,6 +606,7 @@ final class AutoTuner {
     }
 
     /// Begin searching. The caller must already have cleared the safety gate.
+    /// Bắt đầu tìm kiếm. Người gọi phải đã vượt qua cổng an toàn trước đó.
     func start() {
         queue.async { [weak self] in
             self?.run()
@@ -538,6 +615,8 @@ final class AutoTuner {
 
     /// Halts the tuner after the current step. The caller should also send
     /// `FC_CMD_EMERGENCY` — this class does not, so the panic path is one tap.
+    /// Dừng tuner sau bước hiện tại. Người gọi cũng nên gửi `FC_CMD_EMERGENCY`
+    /// — lớp này không gửi, để đường khẩn cấp chỉ là một cú chạm.
     func stop() {
         stateLock.lock()
         stopped = true
@@ -561,6 +640,9 @@ final class AutoTuner {
 
     /// Thrown by `f` when the trial budget is used up — ml_tune.py's `Budget`,
     /// which the endless SearchTuner loops end on (a normal run's end).
+    /// Được `f` ném ra khi đã dùng hết ngân sách lần thử — `Budget` của
+    /// ml_tune.py, thứ mà các vòng lặp vô hạn của SearchTuner kết thúc bằng
+    /// (một kết thúc bình thường của lượt chạy).
     private struct Budget: Error {}
 
     private func status(_ s: String) {
@@ -572,6 +654,9 @@ final class AutoTuner {
     /// Writes one gain and waits for the drone's echo. Retries 3× — the
     /// client's own 500 ms retransmission already covers the wire, this covers
     /// a lost reply.
+    /// Ghi một gain và chờ echo của drone. Gửi lại tối đa 3 lần — cơ chế gửi
+    /// lại 500 ms của client đã lo phần đường truyền, phần này lo trường hợp
+    /// câu trả lời bị mất.
     private func setGain(paramId: UInt8, _ value: Double) throws {
         for _ in 0..<3 {
             stateLock.lock()
@@ -593,6 +678,7 @@ final class AutoTuner {
     }
 
     /// Applies the candidate, writing only what actually changed.
+    /// Áp dụng ứng viên, chỉ ghi những gì thực sự thay đổi.
     private func apply(_ p: [Double]) throws {
         let ids = cfg.axis.gainParamIds
         for i in 0..<min(p.count, ids.count) {
@@ -610,21 +696,30 @@ final class AutoTuner {
     }
 
     /// One trial with the parameters already applied. Settle → collect → score.
+    /// Một lần thử với các tham số đã được áp dụng. Ổn định → thu thập → chấm điểm.
     // Cost-model constants, shared with the Android app and tools/pid-tune so a
     // tuning run scores the same wherever it is run.
+    // Các hằng số của hàm chi phí, dùng chung với app Android và tools/pid-tune
+    // để một lượt tinh chỉnh được chấm giống nhau dù chạy ở đâu.
     static let tipDeg = 25.0            // the firmware's MAX_TILT_DEG
+    // MAX_TILT_DEG của firmware
     static let motorCentre = 1500.0     // µs midpoint of the 1000..2000 convention
+    // điểm giữa theo µs của quy ước 1000..2000
     static let motorSatHi = 1990.0
     static let motorSatLo = 1010.0
 
     /// The drone has lost control. On a stand this flags wild oscillation; in
     /// the air it flags an actual fall.
+    /// Drone đã mất kiểm soát. Trên giá đỡ, điều này báo dao động dữ dội; trên
+    /// không, đó là một cú rơi thật sự.
     private func tipped(_ f: TuneSample) -> Bool {
         abs(f.roll) > Self.tipDeg || abs(f.pitch) > Self.tipDeg
     }
 
     /// One trial with the parameters already applied. Settle → collect → score.
     /// The trial ends early the moment the drone tips.
+    /// Một lần thử với các tham số đã được áp dụng. Ổn định → thu thập → chấm điểm.
+    /// Lần thử kết thúc sớm ngay khi drone nghiêng.
     private func measure() throws -> (cost: Double, metrics: TuneMetrics, fell: Bool) {
         Thread.sleep(forTimeInterval: cfg.settleSeconds)
         stateLock.lock()
@@ -638,6 +733,7 @@ final class AutoTuner {
             Thread.sleep(forTimeInterval: 0.1)
             if drainSamples(since: t0).contains(where: tipped) {
                 window = 0                // the drone is over; stop collecting
+                // drone đã mất kiểm soát; ngừng thu thập
             }
         }
 
@@ -648,6 +744,7 @@ final class AutoTuner {
         }
 
         // Score only the window before the tip, as the other tools do.
+        // Chỉ chấm điểm cửa sổ trước lúc nghiêng, như các công cụ khác làm.
         let badAt = frames.firstIndex(where: tipped)
         let ok = badAt.map { Array(frames[..<$0]) } ?? frames
         let good = ok.count >= 5 ? ok : Array(frames.prefix(5))
@@ -660,6 +757,9 @@ final class AutoTuner {
         // Gyro-rate RMS: finite difference of the angle samples. For the yaw
         // axis the log carries a rate already (stabilizer.yaw is deg/s), but
         // the same formula still gives a usable magnitude.
+        // RMS của tốc độ góc: sai phân hữu hạn trên các mẫu góc. Với trục yaw,
+        // log đã mang sẵn một tốc độ (stabilizer.yaw là deg/s), nhưng cùng công
+        // thức vẫn cho một độ lớn dùng được.
         var gyroSq = 0.0
         if good.count > 1 {
             let dt = max(1e-3, cfg.trialSeconds / Double(good.count))
@@ -673,6 +773,9 @@ final class AutoTuner {
         // Motor RMS about the 1500 µs midpoint. Squaring the raw µs would add
         // a flat 1500 to every cost, clamp them all at COST_CAP and leave the
         // model with nothing to learn.
+        // RMS của động cơ quanh điểm giữa 1500 µs. Bình phương giá trị µs thô
+        // sẽ cộng thêm một lượng cố định 1500 vào mọi chi phí, kẹp tất cả tại
+        // COST_CAP và để mô hình không còn gì để học.
         let motorSq = good.reduce(0.0) { acc, f in
             let m = f.motorMicros.reduce(0, +) / Double(max(1, f.motorMicros.count))
                 - Self.motorCentre
@@ -681,9 +784,11 @@ final class AutoTuner {
         let motorRms = sqrt(motorSq / n)
 
         // Mean |output|, as the other tools score it — not an RMS.
+        // Trung bình |đầu ra|, như các công cụ khác chấm — không phải RMS.
         let controlEffort = good.reduce(0.0) { $0 + abs($1.controller) } / n
 
         // Saturation at the rails the apps watch.
+        // Mức bão hòa tại các ngưỡng mà app theo dõi.
         let sat = good.reduce(0) { acc, f in
             let hot = f.motorMicros.contains { $0 >= Self.motorSatHi || $0 <= Self.motorSatLo }
             return acc + (hot ? 1 : 0)
@@ -704,6 +809,9 @@ final class AutoTuner {
         if let badAt = badAt {
             // The reference's fall cost: without it a short pre-tip window can
             // outscore a clean full trial and the model learns to tip.
+            // Chi phí nghiêng của bản tham chiếu: nếu không có nó, một cửa sổ
+            // ngắn trước lúc nghiêng có thể đạt điểm cao hơn một lần thử sạch
+            // trọn vẹn, và mô hình sẽ học cách làm drone nghiêng.
             let survived = Double(badAt) / Double(max(frames.count, 1)) * cfg.trialSeconds
             cost = 100 + 10 * (cfg.trialSeconds - survived)
         }
@@ -715,6 +823,11 @@ final class AutoTuner {
     /// searches compare costs in one space; only the model is fitted on
     /// `toY(cost)`. `x` is the unit-cube point the search asked for, used only
     /// when the firmware's round-trip lands outside the box.
+    /// Đánh giá một ứng viên: ghi vào drone, đo, ghi sổ. Trả về chi phí **thô**
+    /// và cờ nghiêng (giống `trial(p, x)` trong ml_tune.py) để các phép tìm so
+    /// chi phí trong cùng một miền; chỉ mô hình là học trên `toY(cost)`. `x` là
+    /// điểm trong khối đơn vị mà phép tìm yêu cầu, chỉ dùng khi lượt đi-về của
+    /// firmware rơi ra ngoài hộp.
     private func trial(_ p: [Double], x: [Double]? = nil) throws -> (cost: Double, fell: Bool) {
         try checkStop()
         try apply(p)
@@ -722,9 +835,13 @@ final class AutoTuner {
         k += 1
 
         // What the trial really flew, before a fall puts the best values back.
+        // Những gì lần thử thực sự đã bay, trước khi việc nghiêng khiến các giá
+        // trị tốt nhất được ghi trở lại.
         let tried = params
         // The firmware may have clamped/rounded the values: learn what was
         // really applied (ml_tune.py's `tried`).
+        // Firmware có thể đã kẹp/làm tròn giá trị: học lại cái thực sự đã được
+        // áp dụng (`tried` của ml_tune.py).
         if let u = space.toUnit(tried) ?? x {
             xs.append(u)
             ys.append(toY(cost))
@@ -741,10 +858,17 @@ final class AutoTuner {
         // Model bookkeeping shared by all methods (ml_tune.py's trial).
         // Note `trial` never writes `bestParams`/`bestCost` — `chooseBest` does,
         // so the winner is never a lucky single trial.
+        // Việc ghi sổ mô hình dùng chung cho mọi phương pháp (trial của ml_tune.py).
+        // Lưu ý `trial` không bao giờ ghi `bestParams`/`bestCost` — `chooseBest`
+        // mới làm điều đó, nên người thắng không bao giờ là một lần thử may mắn
+        // đơn lẻ.
         model = xs.isEmpty ? nil : GaussianProcess(xs: xs, y: ys)
         if cfg.method == .twiddle {
             // Twiddle owns `best` and moves it only on a confirmed pair; here we
             // just mirror it into the window (ml_tune.py's TwiddleTuner.choose_best).
+            // Twiddle sở hữu `best` và chỉ di chuyển nó khi có một cặp được xác
+            // nhận; ở đây ta chỉ phản chiếu nó vào cửa sổ
+            // (TwiddleTuner.choose_best của ml_tune.py).
             bestX = space.toUnit(bestParams)
             bestPred = bestCost.isFinite ? bestCost : nil
         } else {
@@ -768,6 +892,11 @@ final class AutoTuner {
     /// ml_tune.py's BayesTuner.choose_best, which `SearchTuner` aliases for the
     /// whole family. It becomes the applied best, so a lucky trial never wins
     /// on its own. Only Twiddle skips this and keeps its own pair-mean best.
+    /// Tập đã thử (của lượt chạy này, không nghiêng) có chi phí dự đoán thấp
+    /// nhất — BayesTuner.choose_best của ml_tune.py, mà `SearchTuner` dùng làm
+    /// bí danh cho cả họ. Nó trở thành best được áp dụng, nên một lần thử may
+    /// mắn không bao giờ tự thắng. Riêng Twiddle bỏ qua bước này và tự giữ best
+    /// dạng trung bình cặp của chính nó.
     private func chooseBestPredicted() {
         guard let model = model else { return }
         var means: [Double] = []
@@ -784,11 +913,13 @@ final class AutoTuner {
     }
 
     /// log1p min-cost transform — matches AutoTuner.kt's `toY`.
+    /// Phép biến đổi log1p trên chi phí — khớp với `toY` của AutoTuner.kt.
     private func toY(_ cost: Double) -> Double {
         log1p(min(cost, 300))
     }
 
     /// The inverse — the cost a toY score stands for (ml_tune.py's `from_y`).
+    /// Phép nghịch đảo — chi phí mà một điểm toY đại diện (`from_y` của ml_tune.py).
     private func fromY(_ y: Double) -> Double {
         expm1(y)
     }
@@ -821,6 +952,7 @@ final class AutoTuner {
         var reason = "completed"
         defer {
             // Leave the best gains on the drone.
+            // Giữ lại các gain tốt nhất trên drone.
             do {
                 try apply(bestParams)
                 reason += " (best gains applied)"
@@ -869,6 +1001,7 @@ final class AutoTuner {
             reason = "stopped"
         } catch is Budget {
             // Trial budget used up inside a search loop: a normal end.
+            // Ngân sách lần thử đã hết bên trong vòng lặp tìm kiếm: một kết thúc bình thường.
         } catch {
             reason = "error: \(error.localizedDescription)"
         }
@@ -915,6 +1048,7 @@ final class AutoTuner {
     }
 
     /// Unit-cube point → real gains.
+    /// Điểm trong khối đơn vị → các giá trị gain thật.
     private func candidates(from x: [Double]) -> [Double] {
         (0..<x.count).map { space.value($0, x[$0]) }
     }
@@ -931,6 +1065,9 @@ final class AutoTuner {
         // `trial` hands back a raw cost, so every comparison below is in one
         // space — the same space the status line prints. (ml_tune.py's
         // TwiddleTuner.search keeps `best_cost` raw the same way.)
+        // `trial` trả về chi phí thô, nên mọi phép so sánh dưới đây nằm trong
+        // cùng một miền — đúng miền mà dòng trạng thái in ra. (TwiddleTuner.search
+        // của ml_tune.py cũng giữ `best_cost` ở dạng thô như vậy.)
         let c0 = try trial(bestP).cost
         let c1 = try trial(bestP).cost
         bestCost = (c0 + c1) / 2
@@ -951,6 +1088,7 @@ final class AutoTuner {
                     let r = try trial(cand)
                     if r.fell || r.cost >= bestCost || k >= cfg.trials { continue }
                     // Confirm: noise must not win.
+                    // Xác nhận: nhiễu không được phép thắng.
                     let r2 = try trial(cand)
                     if !r2.fell && (r.cost + r2.cost) / 2 < bestCost {
                         bestP = cand
@@ -1007,6 +1145,7 @@ final class AutoTuner {
                     simplex[simplex.count - 1] = (fc, xc)
                 } else {
                     // Shrink towards the best, re-measured.
+                    // Co về phía giá trị tốt nhất, có đo lại.
                     let b = simplex[0].1
                     let head = ((simplex[0].0 + (try f(b))) / 2, b)
                     var next: [(Double, [Double])] = [head]
@@ -1022,6 +1161,8 @@ final class AutoTuner {
 
     /// One trial at unit-cube point x; returns its score toY(cost). Raises
     /// `Budget` when the trials are used up.
+    /// Một lần thử tại điểm x trong khối đơn vị; trả về điểm số toY(cost). Ném
+    /// `Budget` khi đã dùng hết số lần thử.
     private func f(_ x: [Double]) throws -> Double {
         if k >= cfg.trials { throw Budget() }
         let u = clip(x)
@@ -1043,6 +1184,8 @@ final class AutoTuner {
 
     /// One persisted trial row: the axis gains, the cost, whether the drone
     /// tipped during the trial.
+    /// Một dòng lần thử đã lưu: các gain của trục, chi phí, và drone có nghiêng
+    /// trong lần thử đó hay không.
     private struct HistoryRow {
         let values: [Double]     // kp, ki, kd
         let cost: Double
@@ -1053,6 +1196,7 @@ final class AutoTuner {
         "trial,stage,axis,kp,ki,kd,cost,fell,angle_mean,angle_std,gyro_rms,motor_rms,control_effort,sat"
 
     /// ml_tune.py's ml_tune_log.csv: trial rows kept across runs.
+    /// ml_tune_log.csv của ml_tune.py: các dòng lần thử được giữ qua các lượt chạy.
     private static var trialLogURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ml_tune_log.csv")
@@ -1061,6 +1205,9 @@ final class AutoTuner {
     /// Search box around the current gains, seeded with matching past trials
     /// (ml_tune.py's begin). The stage names the method and the tuned gains,
     /// as on the PC.
+    /// Hộp tìm kiếm quanh các gain hiện tại, được gieo bằng các lần thử trong
+    /// quá khứ khớp điều kiện (`begin` của ml_tune.py). Stage đặt tên theo
+    /// phương pháp và các gain đang tinh chỉnh, như trên PC.
     private func begin() {
         stage = cfg.method.tag + ":" + space.names.joined(separator: "+")
         d = cfg.axis.gainNames.count
@@ -1081,6 +1228,12 @@ final class AutoTuner {
     /// ml_tune.py when every gain is ticked — and a quad has no angle0 offset,
     /// so the 1 deg balance-angle check has no counterpart. The search box is
     /// the filter that remains.
+    /// Các lần thử trong quá khứ với các gain còn lại giống nhau, dạng điểm
+    /// trong khối đơn vị (`seed` của ml_tune.py). Cả ba gain của trục đều được
+    /// tinh chỉnh ở đây, nên phép kiểm tra "các gain khác trong vòng 10%" không
+    /// còn gì để so — như trong ml_tune.py khi mọi gain đều được tick — và quad
+    /// không có độ lệch angle0, nên phép kiểm tra góc cân bằng 1 độ cũng không
+    /// có tương ứng. Hộp tìm kiếm là bộ lọc duy nhất còn lại.
     private func seed() -> (xs: [[Double]], ys: [Double]) {
         var xs: [[Double]] = []
         var ys: [Double] = []
@@ -1094,6 +1247,7 @@ final class AutoTuner {
     }
 
     /// ml_tune.py's read_history: trial rows from the log, if it exists.
+    /// read_history của ml_tune.py: các dòng lần thử từ log, nếu có.
     private static func readHistory(axis: TuneAxis) -> [HistoryRow] {
         guard let text = try? String(contentsOf: trialLogURL, encoding: .utf8) else { return [] }
         var header: [String] = []
@@ -1129,6 +1283,7 @@ final class AutoTuner {
     }
 
     /// One log row per trial (ml_tune.py's evaluate), flushed.
+    /// Một dòng log cho mỗi lần thử (`evaluate` của ml_tune.py), được ghi ra ngay.
     private func logTrial(stage: String, params: [Double], cost: Double, metrics: TuneMetrics,
                           fell: Bool) {
         guard let h = logHandle else { return }
@@ -1156,13 +1311,18 @@ final class AutoTuner {
     // Each search*() is an endless loop over unit-cube points; f() raises
     // Budget when the trials are used up, and trial() applies choose_best
     // (the tried set with the lowest GP-predicted cost) after every trial.
+    // Mỗi search*() là một vòng lặp vô hạn trên các điểm trong khối đơn vị; f()
+    // ném Budget khi đã dùng hết số lần thử, và trial() áp dụng choose_best (tập
+    // đã thử có chi phí GP dự đoán thấp nhất) sau mỗi lần thử.
 
     /// Population for the evolutionary methods: 4 + 2 per gain, but at least 3 generations.
+    /// Quần thể cho các phương pháp tiến hóa: 4 + 2 mỗi gain, nhưng ít nhất 3 thế hệ.
     private func popSize() -> Int {
         max(4, min(4 + 2 * d, (cfg.trials - k) / 3))
     }
 
     /// ml_tune.py's first_population: the start point plus a Latin hypercube.
+    /// first_population của ml_tune.py: điểm khởi tạo cộng thêm một siêu lập phương Latin.
     private func firstPopulation(_ n: Int) -> [[Double]] {
         [x0] + latinHypercube(count: n - 1, d: d)
     }
@@ -1184,6 +1344,9 @@ final class AutoTuner {
 
     /// ml_tune.py's NeuralTuner: seed, then fit an MlpEnsemble on every trial
     /// so far and run the candidate minimising its lower confidence bound.
+    /// NeuralTuner của ml_tune.py: gieo mẫu, rồi khớp một MlpEnsemble trên mọi
+    /// lần thử tới thời điểm đó và chạy ứng viên có biên dưới khoảng tin cậy
+    /// nhỏ nhất.
     private func searchNeural() throws {
         for x in firstPopulation(max(1, d + 3 - xs.count)) {
             _ = try f(x)
@@ -1218,6 +1381,11 @@ final class AutoTuner {
     /// the unit cube; each step plays the symmetric pair mu ± eps (one trial
     /// each, reward = -score) and moves the mean towards the better one and the
     /// widths towards what paid off.
+    /// PolicyGradientTuner của ml_tune.py: PGPE (Sehnke et al. 2010), một
+    /// policy-gradient ngay trên các gain. Chính sách là một phân phối Gaussian
+    /// trên khối đơn vị; mỗi bước chơi cặp đối xứng mu ± eps (mỗi bên một lần
+    /// thử, reward = -score) và kéo trung bình về phía bên tốt hơn, còn các độ
+    /// rộng hướng theo phía đã có lợi.
     private func searchPolicyGradient() throws {
         var mu = x0
         var sig = [Double](repeating: 0.15, count: d)
@@ -1244,6 +1412,9 @@ final class AutoTuner {
     /// ml_tune.py's CmaesTuner: Hansen's (mu/mu_w, lambda) CMA-ES, sigma0 0.2
     /// of the box; the clipped steps are the ones learned from, and sigma is
     /// clamped to at most 0.5.
+    /// CmaesTuner của ml_tune.py: CMA-ES (mu/mu_w, lambda) của Hansen, sigma0
+    /// bằng 0,2 của hộp; các bước sau khi kẹp mới là những bước được học, và
+    /// sigma bị kẹp không quá 0,5.
     private func searchCmaes() throws {
         let dd = Double(d)
         let lam = 4 + Int(3 * log(dd))
@@ -1280,6 +1451,7 @@ final class AutoTuner {
                 xsGen.append(clip((0..<d).map { m[$0] + sigma * y[$0] }))
             }
             // The clipped steps are the ones learned from.
+            // Các bước sau khi bị kẹp mới là những bước được học.
             let steps = xsGen.map { x in (0..<d).map { (x[$0] - m[$0]) / sigma } }
             var scores: [Double] = []
             for x in xsGen {
@@ -1336,6 +1508,9 @@ final class AutoTuner {
     /// ml_tune.py's PsoTuner: particle swarm (Kennedy & Eberhart 1995), each
     /// particle pulled towards its own best and the swarm's best — inertia 0.6,
     /// c1 = c2 = 1.5, speed <= 0.2 per step.
+    /// PsoTuner của ml_tune.py: bầy hạt (Kennedy & Eberhart 1995), mỗi hạt bị
+    /// kéo về phía best của chính nó và best của cả bầy — quán tính 0,6,
+    /// c1 = c2 = 1.5, tốc độ <= 0,2 mỗi bước.
     private func searchPso() throws {
         let n = popSize()
         var pos = firstPopulation(n)
@@ -1367,6 +1542,9 @@ final class AutoTuner {
     /// ml_tune.py's GeneticTuner: real-coded genetic algorithm — tournament
     /// selection, BLX-0.3 blend crossover, Gaussian mutation, the best
     /// individual carried over (elitism).
+    /// GeneticTuner của ml_tune.py: thuật toán di truyền mã thực — chọn lọc đấu
+    /// giải, lai trộn BLX-0.3, đột biến Gaussian, cá thể tốt nhất được giữ lại
+    /// (elitism).
     private func searchGenetic() throws {
         let n = popSize()
         var pop = firstPopulation(n)
@@ -1409,6 +1587,9 @@ final class AutoTuner {
     /// ml_tune.py's DifferentialEvolutionTuner: differential evolution
     /// (Storn & Price 1997), DE/rand/1/bin, F 0.7, CR 0.9 — a trial vector
     /// replaces its parent only if it scores better.
+    /// DifferentialEvolutionTuner của ml_tune.py: phép tiến hóa sai phân
+    /// (Storn & Price 1997), DE/rand/1/bin, F 0.7, CR 0.9 — một vector thử chỉ
+    /// thay thế cha của nó nếu điểm số tốt hơn.
     private func searchDifferentialEvolution() throws {
         let n = popSize()
         var pop = firstPopulation(n)
@@ -1441,6 +1622,10 @@ final class AutoTuner {
     /// ml_tune.py's SpsaTuner: SPSA (Spall 1992) — every iteration perturbs all
     /// gains at once by ±c, two trials give a gradient estimate, and a
     /// gain-scheduled step goes downhill. Built for noisy costs.
+    /// SpsaTuner của ml_tune.py: SPSA (Spall 1992) — mỗi vòng lặp làm nhiễu
+    /// mọi gain cùng lúc theo ±c, hai lần thử cho một ước lượng gradient, và
+    /// một bước có độ lớn được điều chỉnh theo vòng lặp sẽ đi xuống dốc. Thiết
+    /// kế cho chi phí nhiễu.
     private func searchSpsa() throws {
         var x = x0
         var a: Double?
@@ -1455,6 +1640,7 @@ final class AutoTuner {
             let g = delta.map { diff / (2 * ck) * $0 }
             if a == nil {
                 // First step moves ~0.1 of the box.
+                // Bước đầu tiên di chuyển ~0,1 của hộp.
                 a = 0.1 * pow(stab + 1, 0.602) / max(g.map { abs($0) }.max()!, 1e-6)
             }
             let step = g.map { a! / pow(Double(iter + 1) + stab, 0.602) * $0 }
@@ -1465,6 +1651,8 @@ final class AutoTuner {
 
     /// Eigenvalues and eigenvectors (as columns) of a small symmetric matrix,
     /// cyclic Jacobi — CMA-ES's C is symmetric positive definite.
+    /// Giá trị riêng và vector riêng (theo cột) của một ma trận đối xứng nhỏ,
+    /// Jacobi tuần hoàn — ma trận C của CMA-ES là đối xứng xác định dương.
     private func symmetricEigen(_ m: [[Double]]) -> (values: [Double], vectors: [[Double]]) {
         let n = m.count
         var a = m

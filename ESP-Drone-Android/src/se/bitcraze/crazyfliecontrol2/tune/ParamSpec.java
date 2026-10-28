@@ -5,11 +5,17 @@ import java.util.Locale;
 /**
  * The 13 tunable parameters (PROTOCOL.md section 3, ids 3-15): what the editors show and
  * what the auto-tuner's search box is clamped to.
+ * 13 tham số tinh chỉnh được (PROTOCOL.md mục 3, ids 3-15): những gì trình chỉnh sửa
+ * hiển thị và các biên mà hộp tìm kiếm của bộ tự tinh chỉnh bị kẹp trong khoảng.
  *
  * <p>The min/max values are client-side guards, not firmware limits. The firmware clamps
  * hover_thrust itself (8000..55000) and the PID output to +-400; everything else is free,
  * so the editor limits exist to keep fat-fingered values (and the log-scaled search box)
  * inside something a drone can survive.
+ * <p>Giá trị min/max là chốt chặn phía máy khách, không phải giới hạn của firmware. Firmware
+ * tự kẹp hover_thrust trong khoảng (8000..55000) và kẹp đầu ra PID về +-400; tất cả những
+ * thứ khác là tự do, nên giới hạn của trình chỉnh sửa tồn tại để giữ giá trị gõ nhầm (và hộp
+ * tìm kiếm thang log) trong vùng mà drone có thể sống sót được.
  */
 public final class ParamSpec {
 
@@ -20,8 +26,10 @@ public final class ParamSpec {
     public final float min;
     public final float max;
     /** Fallback increment for the -10%/+10% buttons when 10% of the value is zero. */
+    /** Bước tăng dự phòng cho nút -10%/+10% khi 10% của giá trị bằng không. */
     public final float step;
     /** True for the UINT16 params (hover_thrust, takeoff_ms, land_ms). */
+    /** Đúng với các tham số UINT16 (hover_thrust, takeoff_ms, land_ms). */
     public final boolean integer;
 
     private ParamSpec(String completeName, String label, String hint, int decimals,
@@ -39,6 +47,9 @@ public final class ParamSpec {
     // Hints follow the tuning guide's "too low / too high" table. The firmware's
     // pidCompute() is rate-mode: err = gyro_rate - setpoint, p = kp*err, i += ki*err
     // (clamped to +-400), d = kd*(err - last_err), output clamped to +-400.
+    // Các gợi ý theo bảng "too low / too high" trong hướng dẫn tinh chỉnh. Hàm
+    // pidCompute() của firmware ở chế độ rate: err = gyro_rate - setpoint, p = kp*err, i += ki*err
+    // (kẹp về +-400), d = kd*(err - last_err), đầu ra kẹp về +-400.
     public static final ParamSpec[] ALL = {
             new ParamSpec("pid.roll_kp", "Roll rate Kp",
                     "Rate stiffness. Too low: slow, sluggish response. Too high: overshoot, oscillation, buzz.",
@@ -99,6 +110,7 @@ public final class ParamSpec {
     }
 
     /** The wire representation: Integer for the UINT16 params, Float for the FLOAT ones. */
+    /** Dạng biểu diễn trên đường truyền: Integer cho tham số UINT16, Float cho tham số FLOAT. */
     public Number toWire(double value) {
         if (integer) {
             return Integer.valueOf((int) Math.round(clamp(value)));

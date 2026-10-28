@@ -30,6 +30,15 @@ import se.bitcraze.crazyflie.lib.crtp.FlightControlPacket;
  * <p>CUT MOTORS is not here: it lives in the screen header so it sits in the same
  * place on every screen. Hover thrust, tilt control and Arm / Disarm live in the More
  * panel. MainActivity owns both.
+ * Cột giữa của màn hình Fly (redesign stage 2, PROTOCOL.md mục 5).
+ *
+ * <p>Khi đã kết nối, nó hiển thị chế độ bay, MỘT hành động chính theo tình huống
+ * (Takeoff khi đang ở đất, Land khi đã armed), bốn số theo thời gian thực và nút More.
+ * Khi chưa kết nối, nó hiển thị bước cần làm tiếp và nút Connect.
+ *
+ * <p>CUT MOTORS không nằm ở đây: nó nằm ở header màn hình để luôn ở cùng một chỗ
+ * trên mọi màn hình. Hover lực đẩy, tilt control và Arm / Disarm nằm trong panel More.
+ * MainActivity sở hữu cả hai.
  */
 public class FlightModePanel extends LinearLayout {
 
@@ -107,6 +116,7 @@ public class FlightModePanel extends LinearLayout {
                 @Override
                 public void onClick(View v) {
                     // Show the choice at once; the drone's next status report confirms it.
+                    // Hiển thị lựa chọn ngay; báo cáo trạng thái kế tiếp của drone sẽ xác nhận.
                     selectMode(mode);
                     if (mListener != null) {
                         mListener.onSetMode(mode);
@@ -150,6 +160,7 @@ public class FlightModePanel extends LinearLayout {
     }
 
     /** Swap between the fly controls and the "not connected" card. */
+    /** Chuyển đổi giữa phần điều khiển bay và thẻ "chưa kết nối". */
     public void setConnected(boolean connected, String linkName) {
         mControls.setVisibility(connected ? VISIBLE : GONE);
         mDisconnected.setVisibility(connected ? GONE : VISIBLE);
@@ -180,6 +191,7 @@ public class FlightModePanel extends LinearLayout {
     }
 
     /** One status report from the drone's log block. */
+    /** Một báo cáo trạng thái từ log block của drone. */
     public void setFlightStatus(int mode, boolean armed, int autoState, float roll, float pitch) {
         mStatusSeen = true;
         selectMode(mode);
@@ -193,6 +205,7 @@ public class FlightModePanel extends LinearLayout {
     }
 
     /** Follow and RTH are driven from the Mission screen, so none of the three is selected then. */
+    /** Follow và RTH được điều khiển từ màn hình Mission, nên khi đó không nút nào trong ba nút được chọn. */
     private void selectMode(int mode) {
         int surface = ContextCompat.getColor(getContext(), R.color.fly_surface);
         int ink = ContextCompat.getColor(getContext(), R.color.fly_ink);

@@ -18,13 +18,20 @@ import java.util.Locale;
  * small angle and a large motor pulse are both readable; the legend gives each series'
  * range. With {@link #setSharedScale} all series use one range instead, so they compare
  * directly (the per-term panels). The zero line is the middle of the plot.
+ * Biểu đồ dải cuộn. Mỗi chuỗi được co giãn theo thang riêng, đối xứng quanh mốc không, nên
+ * một góc nhỏ và một xung lớn của động cơ đều dễ đọc; chú giải hiển thị khoảng của từng chuỗi.
+ * Với {@link #setSharedScale} tất cả chuỗi dùng chung một khoảng để so sánh trực tiếp (các
+ * panel theo từng thành phần). Đường không nằm ở giữa đồ thị.
  *
  * <p>Ported from the balance tuner's Kotlin ChartView. Colours are hard-coded ARGB values
  * (a colour-blind tolerant set) so the view does not depend on theme resources.
+ * <p>Được port từ ChartView bằng Kotlin của bộ tinh chỉnh balance. Màu là các giá trị ARGB
+ * ghi cứng (một bộ màu thân thiện với người mù màu) nên view không phụ thuộc tài nguyên theme.
  */
 public class ChartView extends View {
 
     /** 300 samples at 20 Hz = 15 s of history. */
+    /** 300 mẫu ở 20 Hz = 15 s lịch sử. */
     public static final int CAPACITY = 300;
 
     public static class Series {
@@ -45,13 +52,16 @@ public class ChartView extends View {
     private List<Series> mSeries = Collections.emptyList();
     private float[][] mData = new float[0][];
     private int mHead;   // index the next sample goes to
+    // chỉ số nơi mẫu tiếp theo sẽ được ghi vào
     private int mCount;
 
     private boolean mPaused;
     private String mTitle;
     private boolean mSharedScale;
     private String mUnit = "";                   // shown once in the legend when sharedScale
+    // chỉ hiển thị một lần trong chú giải khi dùng sharedScale
     private float[] mMarkers = new float[0];     // dashed horizontal lines, e.g. saturation
+    // các đường ngang nét đứt, ví dụ mức bão hòa
 
     private final float mDensity = getResources().getDisplayMetrics().density;
     private final Paint mBgPaint = new Paint();
@@ -88,6 +98,7 @@ public class ChartView extends View {
     }
 
     /** Replaces the series definitions and resets the buffers. */
+    /** Thay các định nghĩa chuỗi và đặt lại các bộ đệm. */
     public void setSeries(List<Series> series) {
         mSeries = series;
         mData = new float[series.size()][CAPACITY];
@@ -148,8 +159,11 @@ public class ChartView extends View {
     /**
      * Copies the visible window of one series into {@code out}, oldest sample first.
      * Used by the statistics panel; the chart stays the single owner of the buffer.
+     * Sao chép cửa sổ hiển thị của một chuỗi vào {@code out}, mẫu cũ nhất đứng trước.
+     * Dùng cho bảng thống kê; biểu đồ vẫn là chủ sở hữu duy nhất của bộ đệm.
      *
      * @return the number of samples copied
+     * @return số mẫu đã sao chép
      */
     public int copySamples(int seriesIndex, float[] out) {
         if (seriesIndex < 0 || seriesIndex >= mData.length) {
@@ -183,6 +197,7 @@ public class ChartView extends View {
             canvas.drawLine(0f, y, w, y, mGridPaint);
         }
         // 1 s ticks at 20 Hz
+        // vạch chia mỗi 1 s ở 20 Hz
         mGridPaint.setAlpha(60);
         for (int s = 0; s < CAPACITY; s += 20) {
             float x = w - s * w / (CAPACITY - 1);
@@ -230,6 +245,7 @@ public class ChartView extends View {
                 mPath.reset();
                 for (int k = 0; k < mCount; k++) {
                     // newest sample at the right edge
+                    // mẫu mới nhất ở mép phải
                     float x = w - (mCount - 1 - k) * w / (CAPACITY - 1);
                     float y = mid - at(i, k) / range * half;
                     if (k == 0) {
@@ -261,6 +277,7 @@ public class ChartView extends View {
     }
 
     /** k-th oldest stored sample of series i. */
+    /** Mẫu đã lưu cũ thứ k của chuỗi i. */
     private float at(int i, int k) {
         return mData[i][(mHead - mCount + k + CAPACITY) % CAPACITY];
     }

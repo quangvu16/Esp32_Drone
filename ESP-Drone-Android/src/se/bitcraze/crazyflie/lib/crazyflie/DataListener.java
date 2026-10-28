@@ -38,6 +38,13 @@ import se.bitcraze.crazyflie.lib.crtp.CrtpPort;
  * -add port mask (or use CrtpPort.ALL?)
  * -add channel mask
  *
+ * Giao diện để nhận thông báo về dữ liệu nhận được từ Crazyflie.
+ *
+ * TODO:
+ * -thêm channel?
+ * -thêm port mask (hoặc dùng CrtpPort.ALL?)
+ * -thêm channel mask
+ *
  */
 public abstract class DataListener {
 

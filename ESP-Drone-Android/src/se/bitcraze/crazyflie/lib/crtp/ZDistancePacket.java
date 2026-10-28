@@ -6,6 +6,9 @@ import java.nio.ByteBuffer;
  * Control mode where the height is sent as an absolute
  * setpoint (intended to be the distance to the surface
  * under the Crazflie).
+ * Chế độ điều khiển trong đó độ cao được gửi dưới dạng một
+ * setpoint tuyệt đối (dự định là khoảng cách tới bề mặt
+ * bên dưới Crazflie).
  * 
  * Created by arnaud on 31/03/17.
  */
@@ -18,6 +21,7 @@ public class ZDistancePacket extends CrtpPacket {
 
     /**
      * Create a new commander packet.
+     * Tạo một gói tin commander mới.
      *
      * @param roll (Deg.)
      * @param pitch (Deg.)
@@ -38,6 +42,7 @@ public class ZDistancePacket extends CrtpPacket {
         buffer.put((byte) 0x02);
         buffer.putFloat(mRoll);
         buffer.putFloat(-mPitch); //invert axis
+                                  //đảo trục
         buffer.putFloat(mYawrate);
         buffer.putFloat(mZDistance);
     }
@@ -45,6 +50,7 @@ public class ZDistancePacket extends CrtpPacket {
     @Override
     protected int getDataByteCount() {
         return 1 + 4 * 4; // 1 byte (type), 4 floats with size 4, 1 byte (type)
+                          // 1 byte (kiểu), 4 số thực cỡ 4 byte, 1 byte (kiểu)
     }
 
     @Override

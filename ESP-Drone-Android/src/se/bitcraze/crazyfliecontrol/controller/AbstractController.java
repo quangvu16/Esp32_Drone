@@ -32,6 +32,7 @@ import se.bitcraze.crazyfliecontrol2.MainActivity;
 
 /**
  * The AbstractController implements the basic methods of IController class
+ * AbstractController hiện thực các phương thức cơ bản của lớp IController
  *
  */
 public abstract class AbstractController implements IController {
@@ -73,6 +74,7 @@ public abstract class AbstractController implements IController {
 
     /*
      * Thrust value in percent (used in the UI)
+     * Giá trị lực đẩy tính theo phần trăm (dùng trong UI)
      */
     public float getThrust() {
         float thrust = ((mControls.getMode() == 1 || mControls.getMode() == 3) ? mControls.getRightAnalog_Y() : mControls.getLeftAnalog_Y());
@@ -84,6 +86,7 @@ public abstract class AbstractController implements IController {
 
     /*
      * Absolute thrust value (gets send to the Crazyflie)
+     * Giá trị lực đẩy tuyệt đối (được gửi tới Crazyflie)
      */
     public float getThrustAbsolute() {
         float thrust = getThrust();
@@ -111,6 +114,7 @@ public abstract class AbstractController implements IController {
 
     /**
      * Return initial target height by default
+     * Trả về độ cao mục tiêu ban đầu theo mặc định
      *
      * @return
      */
@@ -124,6 +128,7 @@ public abstract class AbstractController implements IController {
 
     /**
      * Disabled by default
+     * Vô hiệu hóa theo mặc định
      *
      * @return
      */

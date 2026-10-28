@@ -63,15 +63,19 @@ import se.bitcraze.crazyflie.lib.crtp.CrtpDriver;
 
 /**
  * Bootloading utilities for the Crazyflie.
+ * Các tiện ích bootload cho Crazyflie.
  *
  */
 //TODO: fix targetId and addr confusion
+//TODO: sửa sự nhầm lẫn giữa targetId và addr
 //TODO: fix warmboot
+//TODO: sửa warmboot
 public class Bootloader {
 
     final Logger mLogger = LoggerFactory.getLogger("Bootloader");
 
     private static ObjectMapper mMapper = new ObjectMapper(); // can reuse, share globally
+    // có thể tái sử dụng, dùng chung toàn cục
     private static final String MANIFEST_FILENAME = "manifest.json";
     private Cloader mCload;
     private boolean mCancelled = false;
@@ -81,8 +85,12 @@ public class Bootloader {
      * Init the communication class by starting to communicate with the
      * link given. clink is the link address used after resetting to the
      * bootloader.
+     * Khởi tạo tầng truyền thông bằng cách bắt đầu giao tiếp với
+     * liên kết được truyền vào. clink là địa chỉ liên kết dùng sau khi reset
+     * về bootloader.
      *
      * The device is actually considered to be in firmware mode.
+     * Thiết bị thực tế được xem là đang ở chế độ firmware.
      */
     public Bootloader(CrtpDriver driver) {
         this.mCload = new Cloader(driver);
@@ -101,8 +109,10 @@ public class Bootloader {
 
             //TODO
             //self._cload.open_bootloader_uri(self.clink)
+            // (Python: mở bootloader uri với clink)
             //this.mCload.openBootloaderConnection(connectionData);
             started = this.mCload.resetToBootloader(TargetTypes.NRF51); //is NRF51 correct here?
+            // NRF51 có đúng ở đây không?
             if (started) {
                 started = this.mCload.checkLinkAndGetInfo(TargetTypes.STM32);
             }
@@ -111,7 +121,9 @@ public class Bootloader {
             ConnectionData bootloaderConnection = this.mCload.scanForBootloader();
 
             // Workaround for libusb on Windows (open/close too fast)
+            // Cách lách cho libusb trên Windows (mở/đóng quá nhanh)
             //time.sleep(1)
+            // (Python: nghỉ 1 giây)
 
             if (bootloaderConnection != null) {
                 mLogger.info("startBootloader: bootloader connection found");
@@ -119,6 +131,7 @@ public class Bootloader {
                     this.mCload.setConnectionData(bootloaderConnection);
                     this.mCload.openBootloaderConnection();
                     started = this.mCload.checkLinkAndGetInfo(TargetTypes.STM32); //TODO: what is the real parameter for this?
+                    //TODO: tham số thực sự cho chỗ này là gì?
                 } catch (IOException e) {
                     mLogger.warn(e.getMessage());
                     started = false;
@@ -133,6 +146,7 @@ public class Bootloader {
                 if (protocolVersion == BootVersion.CF1_PROTO_VER_0 ||
                     protocolVersion == BootVersion.CF1_PROTO_VER_1) {
                     // Nothing to do
+                    // Không có gì phải làm
                 } else if (protocolVersion == BootVersion.CF2_PROTO_VER) {
                     this.mCload.requestInfoUpdate(TargetTypes.NRF51);
                 } else {
@@ -157,6 +171,7 @@ public class Bootloader {
 
     /**
      * Read a flash page from the specified target
+     * Đọc một trang flash từ target đã chỉ định
      */
     public byte[] readCF1Config() {
         Target target = this.mCload.getTargets().get(TargetTypes.STM32); //CF1
@@ -173,6 +188,7 @@ public class Bootloader {
     }
 
     //TODO: improve
+    //TODO: cần cải thiện
     public static byte[] readFile(File file) throws IOException {
         byte[] fileData = new byte[(int) file.length()];
         Logger logger = LoggerFactory.getLogger("Bootloader");
@@ -195,6 +211,7 @@ public class Bootloader {
 
     public boolean flash(File file) throws IOException {
         // assume stm32 if no target name is specified and file extension is ".bin"
+        // giả sử là stm32 nếu không chỉ định tên target và tệp có phần mở rộng ".bin"
         if (file.getName().endsWith(".bin")) {
             mLogger.info("Assuming STM32 for file " + file.getName() + ".");
             return flash(file, "stm32");
@@ -203,6 +220,7 @@ public class Bootloader {
     }
 
     // Method is used by ECT Bootloader!
+    // Phương thức này được dùng bởi ECT Bootloader!
     public boolean flash(File file, String... targetNames) throws IOException {
         List<FlashTarget> filesToFlash = getFlashTargets(file, targetNames);
         if (filesToFlash.isEmpty()) {
@@ -220,6 +238,7 @@ public class Bootloader {
     }
 
     // package private for tests
+    // package private để dùng trong các bài kiểm thử
     /* package private */ List<FlashTarget> getFlashTargets(File file, String... targetNames) throws IOException {
         List<FlashTarget> filesToFlash = new ArrayList<FlashTarget>();
 
@@ -229,12 +248,15 @@ public class Bootloader {
         }
 
         // check if supplied targetNames are known TargetTypes, if so, continue, else return
+        // kiểm tra xem targetNames được truyền vào có phải TargetTypes đã biết không, nếu có thì tiếp tục, không thì trả về
 
         if (isZipFile(file)) {
             // unzip
+            // giải nén
             unzip(file);
 
             // read manifest.json
+            // đọc manifest.json
             File basePath = new File(file.getAbsoluteFile().getParent() + "/" + getFileNameWithoutExtension(file));
             File manifestFile = new File(basePath.getAbsolutePath(), MANIFEST_FILENAME);
             if (basePath.exists() && manifestFile.exists()) {
@@ -245,33 +267,43 @@ public class Bootloader {
                     mLogger.error("Error while trying to read manifest file:\n" + ioe.getMessage());
                 }
                 //TODO: improve error handling
+                //TODO: cải thiện xử lý lỗi
                 if (mf == null) {
                     return filesToFlash;
                 }
                 Set<String> files = mf.getFiles().keySet();
 
                 // iterate over file names in manifest.json
+                // duyệt qua các tên tệp trong manifest.json
                 for (String fileName : files) {
                     FirmwareDetails firmwareDetails = mf.getFiles().get(fileName);
                     Target t = this.mCload.getTargets().get(TargetTypes.fromString(firmwareDetails.getTarget()));
                     if (t != null) {
                         // use path to extracted file
+                        // dùng đường dẫn tới tệp đã giải nén
                         //File flashFile = new File(file.getParent() + "/" + file.getName() + "/" + fileName);
                         File flashFile = new File(basePath.getAbsolutePath(), fileName);
                         FlashTarget ft = new FlashTarget(t, readFile(flashFile), firmwareDetails.getType(), t.getStartPage()); //TODO: does startPage HAVE to be an extra argument!? (it's already included in Target)
+                        //TODO: startPage có BẮT BUỘC phải là đối số riêng không!? (nó đã có trong Target rồi)
                         // add flash target
+                        // thêm flash target
                         // if no target names are specified, flash everything
+                        // nếu không chỉ định tên target thì ghi toàn bộ
                         if (targetNames == null || targetNames.length == 0 || targetNames[0].isEmpty()) {
                             // deal with different platforms (CF1, CF2)
+                            // xử lý các nền tảng khác nhau (CF1, CF2)
                             // TODO: simplify
+                            // TODO: đơn giản hóa
                             if (t.getFlashPages() == 128 && "cf1".equalsIgnoreCase(firmwareDetails.getPlatform())) { //128 = CF 1.0
                                 filesToFlash.add(ft);
                                 // deal with STM32 and NRF51 for CF2 (different no of flash pages)
+                                // xử lý STM32 và NRF51 cho CF2 (số trang flash khác nhau)
                             } else if ((t.getFlashPages() == 1024 || t.getFlashPages() == 232) && "cf2".equalsIgnoreCase(firmwareDetails.getPlatform())) { //1024 = CF 2.0
                                 filesToFlash.add(ft);
                             }
                         } else {
                             // else flash only files whose targets are contained in targetNames
+                            // nếu không thì chỉ ghi các tệp có target nằm trong targetNames
                             if (Arrays.asList(targetNames).contains(firmwareDetails.getTarget())) {
                                 filesToFlash.add(ft);
                             }
@@ -284,7 +316,9 @@ public class Bootloader {
                 mLogger.error("Zip file " + file.getName() + " does not include a " + MANIFEST_FILENAME);
             }
         } else { // File is not a Zip file
+        // Tệp không phải là tệp Zip
             // add single flash target
+            // thêm một flash target đơn lẻ
             if (targetNames == null || targetNames.length != 1) {
                 mLogger.error("Not an archive, must supply ONE target to flash.");
             } else {
@@ -321,12 +355,15 @@ public class Bootloader {
                 String filename = ze.getName();
                 byte[] bytes = baos.toByteArray();
                 // write files
+                // ghi các tệp
                 File filePath = new File(parent + "/" + getFileNameWithoutExtension(zipFile) + "/" + filename);
                 // create subdir
+                // tạo thư mục con
                 filePath.getParentFile().mkdirs();
                 fos = new FileOutputStream(filePath);
                 fos.write(bytes);
                 //check
+                // kiểm tra
                 if(filePath.exists() && filePath.length() > 0) {
                     mLogger.debug(filename + " successfully extracted to " + filePath.getAbsolutePath());
                 } else {
@@ -362,11 +399,15 @@ public class Bootloader {
 
     /**
      * Basic check if a file is a Zip file
+     * Kiểm tra cơ bản xem một tệp có phải tệp Zip hay không
      *
      * @param file potential zip file
+     * @param file tệp có thể là tệp zip
      * @return true if file is a Zip file, false otherwise
+     * @return true nếu tệp là tệp Zip, false nếu không
      */
     //TODO: how can this be improved?
+    //TODO: làm sao để cải thiện chỗ này?
     private boolean isZipFile(File file) {
         if (file != null && file.exists() && file.getName().endsWith(".zip")) {
             ZipFile zf = null;
@@ -392,8 +433,10 @@ public class Bootloader {
 
     /**
      * Reset to firmware depending on protocol version
+     * Reset về firmware tùy theo phiên bản giao thức
      *
      * @return true if successful, false otherwise
+     * @return true nếu thành công, false nếu không
      */
     public boolean resetToFirmware() {
         int targetType = -1;
@@ -417,6 +460,7 @@ public class Bootloader {
     }
 
     // def _internal_flash(self, target, current_file_number=1, total_files=1):
+    // (Python: nguyên mẫu hàm _internal_flash)
     private boolean internalFlash(FlashTarget flashTarget, int currentFileNo, int totalFiles) {
         Target t_data = flashTarget.getTarget();
         byte[] image = flashTarget.getData();
@@ -428,9 +472,11 @@ public class Bootloader {
         notifyUpdateStatus(flashingTo);
 
         //if len(image) > ((t_data.flash_pages - start_page) * t_data.page_size):
+        // (Python: kiểm tra xem còn đủ dung lượng để ghi ảnh firmware không)
         if (image.length > ((t_data.getFlashPages() - startPage) * pageSize)) {
             mLogger.error("Error: Not enough space to flash the image file.");
             //raise Exception()
+            // (Python: ném Exception)
             return false;
         }
 
@@ -438,16 +484,21 @@ public class Bootloader {
         mLogger.info(image.length - 1 + " bytes (" + noOfPages + " pages) ");
 
         // For each page
+        // Với mỗi trang
         int bufferCounter = 0; // Buffer counter
+        // bộ đếm bộ đệm
         int i = 0;
         for (i = 0; i < ((image.length - 1) / pageSize) + 1; i++) {
             // Load the buffer
+            // Nạp bộ đệm
             int end = 0;
             if (((i + 1) * pageSize) > image.length) {
                 //buff = image[i * t_data.page_size:]
+                // (Python: cắt image từ vị trí i * page_size tới hết)
                 end = image.length;
             } else {
                 //buff = image[i * t_data.page_size:(i + 1) * t_data.page_size])
+                // (Python: cắt image thành một trang)
                 end = (i + 1) * pageSize;
             }
             byte[] buffer = Arrays.copyOfRange(image, i * pageSize, end);
@@ -463,6 +514,7 @@ public class Bootloader {
             bufferCounter++;
 
             // Flash when the complete buffers are full
+            // Ghi ra flash khi các bộ đệm đã đầy
             if (bufferCounter >= t_data.getBufferPages()) {
                 String buffersFull = "Flashing page " + (i+1) + "...";
                 mLogger.info(buffersFull);
@@ -471,6 +523,7 @@ public class Bootloader {
                 if (!this.mCload.writeFlash(t_data.getId(), 0, startPage + i - (bufferCounter - 1), bufferCounter)) {
                     handleFlashError();
                     //raise Exception()
+                    // (Python: ném Exception)
                     return false;
                 }
                 bufferCounter = 0;
@@ -486,6 +539,7 @@ public class Bootloader {
             if (!this.mCload.writeFlash(t_data.getId(), 0, (startPage + ((image.length - 1) / pageSize)) - (bufferCounter - 1), bufferCounter)) {
                 handleFlashError();
                 //raise Exception()
+                // (Python: ném Exception)
                 return false;
             }
         }

@@ -64,8 +64,10 @@ public class Cf1Config {
     }
 
     // package private for testing
+    // package private để kiểm thử
     /* package private */ int checksum256(byte[] array) {
         // return reduce(lambda x, y: x + y, map(ord, st)) % 256
+        // (Python: cộng giá trị các byte rồi lấy phần dư 256)
         int result = array[0];
         for (int i = 1; i < array.length; i++) {
             result += (int) array[i];
@@ -74,8 +76,10 @@ public class Cf1Config {
     }
 
     // TODO: use constructor instead of parse method?
+    // TODO: dùng constructor thay cho phương thức parse?
     public void parse(byte[] byteArray) {
         // [channel, speed, pitchTrim, rollTrim] = struct.unpack("<BBff", data[5:15])
+        // (Python: giải mã data[5:15] thành channel, speed, pitchTrim, rollTrim)
         int offset = 5;
         ByteBuffer cf1ConfigBuffer = ByteBuffer.wrap(byteArray, offset, 10).order(ByteOrder.LITTLE_ENDIAN);
         this.mChannel = (int) cf1ConfigBuffer.get();

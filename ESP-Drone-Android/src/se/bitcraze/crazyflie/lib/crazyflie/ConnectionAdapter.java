@@ -30,6 +30,8 @@ package se.bitcraze.crazyflie.lib.crazyflie;
 /**
  * An abstract adapter class for receiving connection events. The methods in
  * this class are empty. This class exists as convenience for creating listener objects.
+ * Lớp adapter trừu tượng để nhận các sự kiện kết nối. Các phương thức trong
+ * lớp này đều rỗng. Lớp này tồn tại để tiện lợi cho việc tạo các đối tượng listener.
  */
 public abstract class ConnectionAdapter implements ConnectionListener {
 

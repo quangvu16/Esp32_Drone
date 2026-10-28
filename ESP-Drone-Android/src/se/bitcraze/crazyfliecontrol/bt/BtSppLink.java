@@ -61,6 +61,15 @@ import se.bitcraze.crazyflie.lib.crtp.CrtpPacket;
  * receiver scans for a length whose checksum validates.
  *
  * <p>Note the radio is shared with WiFi on the ESP32: only one of the two can be up at a time.
+ * Tầng truyền Bluetooth Classic SPP (PROTOCOL.md mục 8, hồ sơ liên kết 2).
+ *
+ * <p>Byte trên đường truyền giống hệt UDP — {@code [CRTP ...][uint8 checksum]} — nhưng SPP
+ * là luồng byte chứ không phải dịch vụ datagram, nên dữ liệu vào cần được đóng khung. Firmware
+ * ghi mỗi gói tin trong một lần {@code BluetoothSerial.write}, và checksum (byte thấp của
+ * tổng mọi byte CRTP kể cả header) đủ mạnh để đồng bộ lại, nên phía nhận quét tìm một độ dài
+ * mà checksum của nó hợp lệ.
+ *
+ * <p>Lưu ý radio dùng chung với WiFi trên ESP32: chỉ một trong hai được bật tại một thời điểm.
  */
 @SuppressLint("NewApi")
 public class BtSppLink extends CrtpDriver {
@@ -68,12 +77,15 @@ public class BtSppLink extends CrtpDriver {
     private final Logger mLogger = LoggerFactory.getLogger("BtSppLink");
 
     /** Standard Serial Port Profile UUID — the firmware's BluetoothSerial uses the same. */
+    /** UUID chuẩn của Serial Port Profile — BluetoothSerial của firmware dùng đúng UUID này. */
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     /** Matches the firmware's WiFi AP SSID and the BLE advertised name. */
+    /** Khớp với SSID WiFi AP của firmware và tên quảng bá BLE. */
     private static final String DRONE_DEVICE_NAME = "ESP-Drone";
 
     /** CRTP_MAX_SIZE (30) + header already included + 1 checksum byte. */
+    /** CRTP_MAX_SIZE (30) + header đã được tính sẵn + 1 byte checksum. */
     private static final int MAX_FRAME = 32;
 
     private final Context mContext;
@@ -110,6 +122,8 @@ public class BtSppLink extends CrtpDriver {
         try {
             // Cancel discovery first: it slows the RFCOMM handshake to a crawl and can
             // make the first few packets after connect time out.
+            // Hủy discovery trước: nó làm bắt tay RFCOMM chậm rì và có thể
+            // khiến vài gói tin đầu tiên sau khi kết nối bị hết thời gian chờ.
             mAdapter.cancelDiscovery();
             mSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
             mSocket.connect();
@@ -130,6 +144,10 @@ public class BtSppLink extends CrtpDriver {
      * name among the bonded devices, falling back to any bonded device if the name
      * was customised in firmware — a wrong pick fails the handshake rather than
      * silently talking to the wrong thing.
+     * SPP không có quét, nên drone phải được ghép cặp từ trước. Tìm ESP32 theo
+     * tên trong các thiết bị đã ghép cặp, nếu tên đã bị tùy chỉnh trong firmware
+     * thì dùng bất kỳ thiết bị đã ghép cặp nào — chọn sai sẽ làm bắt tay thất bại
+     * thay vì âm thầm nói chuyện với nhầm thiết bị.
      */
     private BluetoothDevice findDroneDevice() {
         Set<BluetoothDevice> bonded = mAdapter.getBondedDevices();
@@ -200,6 +218,7 @@ public class BtSppLink extends CrtpDriver {
     }
 
     /** Low byte of the sum of every CRTP byte including the header (PROTOCOL.md section 1). */
+    /** Byte thấp nhất của tổng mọi byte CRTP kể cả header (PROTOCOL.md mục 1). */
     static byte checksum(byte[] crtp) {
         int sum = 0;
         for (byte b : crtp) {
@@ -237,6 +256,7 @@ public class BtSppLink extends CrtpDriver {
                 connectionLost("SPP write failed: " + e.getMessage());
             } catch (InterruptedException e) {
                 // shutting down
+                // đang dừng luồng
             }
         }
     }
@@ -248,6 +268,12 @@ public class BtSppLink extends CrtpDriver {
      * scans for the first length in [2, MAX_FRAME] whose trailing checksum validates.
      * If nothing matches and the buffer has grown past a maximum frame, one byte is
      * dropped and the scan retries — a cheap resync that recovers from a lost byte.
+     * Lấy các gói tin đã đóng khung ra khỏi luồng byte SPP.
+     *
+     * <p>Vì SPP tự do gộp và tách các lần ghi, phía đọc giữ một bộ đệm và quét
+     * tìm độ dài đầu tiên trong [2, MAX_FRAME] mà checksum ở cuối hợp lệ.
+     * Nếu không có độ dài nào khớp và bộ đệm đã lớn hơn một khung tối đa, một byte
+     * bị loại bỏ rồi quét lại — cách đồng bộ lại rẻ tiền, phục hồi khi mất một byte.
      */
     private class ReceiveThread extends Thread {
         private final BluetoothSocket mSock;
@@ -303,6 +329,7 @@ public class BtSppLink extends CrtpDriver {
         }
 
         /** Length of the first valid frame at the head of the buffer, or 0 if none yet. */
+        /** Độ dài của khung hợp lệ đầu tiên ở đầu bộ đệm, hoặc 0 nếu chưa có. */
         private int findFrame(List<Byte> acc) {
             int max = Math.min(acc.size(), MAX_FRAME);
             for (int len = 2; len <= max; len++) {

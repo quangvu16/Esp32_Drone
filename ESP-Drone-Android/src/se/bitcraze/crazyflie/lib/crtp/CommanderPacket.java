@@ -31,6 +31,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Packet used for sending control set-points for the roll/pitch/yaw/thrust regulators.
+ * Gói tin dùng để gửi các setpoint điều khiển cho các bộ điều chỉnh roll/pitch/yaw/lực đẩy.
  */
 public class CommanderPacket extends CrtpPacket {
     private final float mRoll;
@@ -38,15 +39,18 @@ public class CommanderPacket extends CrtpPacket {
     private final float mYaw;
     private final char mThrust;
     private final boolean mClientXmode; // client side x-mode (default is +-mode)
+                                        // x-mode phía client (mặc định là +-mode)
 
     /**
      * Create a new commander packet.
+     * Tạo một gói tin commander mới.
      *
      * @param roll (Deg.)
      * @param pitch (Deg.)
      * @param yaw (Deg./s)
      * @param thrust (0-65535)
      * @param clientXmode if true, then roll and pitch values are recalculated before sending them to the Crazyflie
+     * @param clientXmode nếu đúng, các giá trị roll và pitch được tính lại trước khi gửi tới Crazyflie
      */
     public CommanderPacket(float roll, float pitch, float yaw, char thrust, boolean clientXmode) {
         super(0, CrtpPort.COMMANDER);
@@ -54,6 +58,7 @@ public class CommanderPacket extends CrtpPacket {
 
         if (this.mClientXmode) {
             //offset by 45 degrees
+            //dịch 45 độ
             this.mRoll = 0.707f * (roll - pitch);
             this.mPitch = 0.707f * (roll + pitch);
         } else {
@@ -66,6 +71,7 @@ public class CommanderPacket extends CrtpPacket {
 
     /**
      * Create a new commander packet with clientXmode set to false.
+     * Tạo một gói tin commander mới với clientXmode đặt bằng false.
      *
      * @param roll (Deg.)
      * @param pitch (Deg.)
@@ -80,6 +86,7 @@ public class CommanderPacket extends CrtpPacket {
     protected void serializeData(ByteBuffer buffer) {
         buffer.putFloat(mRoll);
         buffer.putFloat(-mPitch); //invert axis
+                                  //đảo trục
         buffer.putFloat(mYaw);
         buffer.putChar(mThrust);
     }
@@ -87,6 +94,7 @@ public class CommanderPacket extends CrtpPacket {
     @Override
     protected int getDataByteCount() {
         return 3 * 4 + 1 * 2; // 3 floats with size 4, 1 char (= uint16_t) with size 2
+                              // 3 số thực cỡ 4 byte, 1 char (= uint16_t) cỡ 2 byte
     }
 
     @Override

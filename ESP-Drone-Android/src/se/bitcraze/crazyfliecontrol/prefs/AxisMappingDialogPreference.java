@@ -86,9 +86,12 @@ public class AxisMappingDialogPreference extends DialogPreference implements OnK
 
         mValueTextView.setOnGenericMotionListener(this);
         //TODO: is there an easier way to make this work?
+        //TODO: có cách nào dễ hơn để làm phần này hoạt động không?
         //motion events are not captured when view is not focusable
+        // sự kiện chuyển động không được bắt khi view không thể lấy tiêu điểm
         mValueTextView.setFocusableInTouchMode(true);
         //if focus is not set, right analog stick events are only recognized after the left analog stick is moved!?!
+        // nếu không đặt tiêu điểm, sự kiện cần analog bên phải chỉ được nhận ra sau khi cần analog bên trái di chuyển!?!
         mValueTextView.requestFocus();
 
         layout.addView(promptTextView, params);

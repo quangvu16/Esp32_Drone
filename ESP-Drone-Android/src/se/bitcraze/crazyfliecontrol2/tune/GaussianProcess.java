@@ -7,6 +7,10 @@ import java.util.List;
  * inputs (port of the balance tuner's GaussianProcess, itself ml_tune.py). The length
  * scale and noise are picked by log marginal likelihood over a small fixed grid; the
  * Cholesky factor is reused for every prediction.
+ * Quy trình Gaussian trung bình không trên các mục tiêu đã chuẩn hóa, kernel RBF dùng chung
+ * trên đầu vào trong khối lập phương đơn vị (port từ GaussianProcess của bộ tinh chỉnh balance,
+ * vốn là port từ ml_tune.py). Thang độ dài và nhiễu được chọn bằng log marginal likelihood trên
+ * một lưới nhỏ cố định; nhân tử Cholesky được dùng lại cho mọi lần dự đoán.
  */
 public class GaussianProcess {
 
@@ -73,6 +77,8 @@ public class GaussianProcess {
         if (bestChol == null) {
             // Degenerate sample set (every grid candidate failed). The Kotlin original
             // crashed on its lateinit fields here; answer with a jittered prior instead.
+            // Tập mẫu suy biến (mọi ứng viên trên lưới đều thất bại). Bản Kotlin gốc
+            // bị lỗi crash ở các trường lateinit tại đây; thay vào đó trả về một prior có jitter.
             int n = xs.size();
             double[][] k = new double[n][n];
             for (int i = 0; i < n; i++) {
@@ -97,6 +103,7 @@ public class GaussianProcess {
     }
 
     /** Posterior {mean, std} of the target at x, in the original (un-standardised) units. */
+    /** Posterior {mean, std} của mục tiêu tại x, theo đơn vị gốc (chưa chuẩn hóa). */
     public double[] predict(double[] x) {
         double[] ks = new double[mXs.size()];
         for (int i = 0; i < ks.length; i++) {
@@ -136,6 +143,7 @@ public class GaussianProcess {
     }
 
     /** Abramowitz-Stegun 7.1.26 erf, |error| < 1.5e-7. */
+    /** Hàm erf xấp xỉ theo Abramowitz-Stegun 7.1.26, |error| < 1.5e-7. */
     public static double normCdf(double z) {
         double x = Math.abs(z) / Math.sqrt(2.0);
         double t = 1 / (1 + 0.3275911 * x);

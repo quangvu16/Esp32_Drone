@@ -81,11 +81,14 @@ public class MainPresenter {
             CrtpDriver driver = mCrazyflie.getDriver();
             if (driver instanceof BleLink) {
                 // FIXME: Hack to circumvent BLE reconnect problem
+                // FIXME: cách vá tạm để né vấn đề kết nối lại BLE
                 mainActivity.setConnectionButtonConnectedBle();
                 mCrazyflie.startConnectionSetup_BLE();
             } else if (driver instanceof EspUdpDriver || driver instanceof BtSppLink) {
                 // Both speak full CRTP, but neither emits the Bitcraze null packet the
                 // radio path uses to notice a link, so run setup straight away.
+                // Cả hai đều nói đầy đủ CRTP, nhưng không bên nào phát gói tin null kiểu
+                // Bitcraze mà đường radio dùng để nhận biết liên kết, nên chạy setup ngay.
                 mainActivity.setConnectionButtonConnected();
                 mCrazyflie.startConnectionSetup_BLE();
             } else {
@@ -149,13 +152,16 @@ public class MainPresenter {
     };
 
     // TODO: Replace with specific test for buzzer deck
+    // TODO: thay bằng phép kiểm tra riêng cho buzzer deck
     private void checkForBuzzerDeck() {
         //activate buzzer sound button when a CF2 is recognized (a buzzer can not yet be detected separately)
+        //bật nút âm thanh buzzer khi nhận diện được CF2 (hiện chưa thể phát hiện buzzer riêng)
         mCrazyflie.getParam().addParamListener(new ParamListener("cpu", "flash") {
             @Override
             public void updated(String name, Number value) {
                 mCpuFlash = mCrazyflie.getParam().getValue("cpu.flash").intValue();
                 //enable buzzer action button when a CF2 is found (cpu.flash == 1024)
+                //bật nút buzzer khi tìm thấy CF2 (cpu.flash == 1024)
                 if (mCpuFlash == 1024) {
                     mainActivity.setBuzzerSoundButtonEnablement(true);
                 }
@@ -167,11 +173,13 @@ public class MainPresenter {
 
     private void checkForZRanger() {
         //this should return true when either a zRanger or a flow deck is connected
+        //giá trị này phải đúng khi có zRanger hoặc flow deck được kết nối
         mCrazyflie.getParam().addParamListener(new ParamListener("deck", "bcZRanger") {
             @Override
             public void updated(String name, Number value) {
                 isZrangerAvailable = mCrazyflie.getParam().getValue("deck.bcZRanger").intValue() == 1;
                 // TODO: indicate in the UI that the zRanger sensor is installed
+                // TODO: hiển thị trên UI rằng cảm biến zRanger đã được lắp
                 if (isZrangerAvailable) {
                     mainActivity.showToastie("Found zRanger sensor.");
                 }
@@ -183,11 +191,13 @@ public class MainPresenter {
 
     private void checkForNoOfRingEffects() {
         //set number of LED ring effects
+        //đặt số hiệu ứng vòng LED
         mCrazyflie.getParam().addParamListener(new ParamListener("ring", "neffect") {
             @Override
             public void updated(String name, Number value) {
                 mNoRingEffect = mCrazyflie.getParam().getValue("ring.neffect").intValue();
                 //enable LED ring action buttons only when ring.neffect parameter is set correctly (=> hence it's a CF2 with a LED ring)
+                //chỉ bật các nút vòng LED khi tham số ring.neffect đúng (=> tức là CF2 có vòng LED)
                 if (mNoRingEffect > 0) {
                     mainActivity.setRingEffectButtonEnablement(true);
                     mainActivity.setHeadlightButtonEnablement(true);
@@ -206,6 +216,7 @@ public class MainPresenter {
 
     /**
      * Start thread to periodically send commands containing the user input
+     * Khởi chạy luồng định kỳ gửi lệnh chứa đầu vào của người dùng
      */
     private void startSendJoystickDataThread() {
         mSendJoystickDataThread = new Thread(new Runnable() {
@@ -222,6 +233,8 @@ public class MainPresenter {
                     float yaw = controller.getYaw();
                     // Tilt-to-fly replaces the attitude source only. Thrust stays on
                     // the stick/slider so the pilot always owns the throttle.
+                    // Nghiêng để bay chỉ thay nguồn tư thế. Lực đẩy vẫn nằm trên
+                    // cần/thanh trượt để người lái luôn nắm throttle.
                     TiltController tilt = getTiltController();
                     if (tilt != null && tilt.isEnabled()) {
                         roll = tilt.getRollDeg();
@@ -251,6 +264,7 @@ public class MainPresenter {
     public void connectCrazyradio(int radioChannel, int radioDatarate, File mCacheDir) {
         Log.d(LOG_TAG, "connectCrazyradio()");
         // ensure previous link is disconnected
+        // đảm bảo liên kết trước đó đã được ngắt
         disconnect();
         mDriver = null;
         try {
@@ -270,6 +284,7 @@ public class MainPresenter {
     }
 
     /** @param host null/empty falls back to the SoftAP default 192.168.43.42 */
+    /** @param host null/rỗng sẽ dùng mặc định của SoftAP là 192.168.43.42 */
     public void connectUDP(File cacheDir, String host, int devicePort, int appPort) {
         Log.d(LOG_TAG, "connectUDP()");
         disconnect();
@@ -289,6 +304,7 @@ public class MainPresenter {
     public void connectBle(boolean writeWithResponse, File mCacheDir) {
         Log.d(LOG_TAG, "connectBle()");
         // ensure previous link is disconnected
+        // đảm bảo liên kết trước đó đã được ngắt
         disconnect();
         mDriver = null;
         mDriver = new BleLink(mainActivity, writeWithResponse);
@@ -298,6 +314,7 @@ public class MainPresenter {
     private void connect(File mCacheDir, ConnectionData connectionData) {
         if (mDriver != null) {
             // add listener for connection status
+            // thêm listener cho trạng thái kết nối
             mDriver.addConnectionListener(crazyflieConnectionAdapter);
 
             mCrazyflie = new Crazyflie(mDriver, mCacheDir);
@@ -306,6 +323,8 @@ public class MainPresenter {
             }
             // Hand the live link to the tuning and GPS screens before connect() so
             // they can see it the moment the activity is launched.
+            // Giao liên kết đang sống cho màn hình Tune và GPS trước khi connect() để
+            // chúng thấy được ngay lúc activity được mở.
             DroneSession.set(mCrazyflie);
             // connect
             mCrazyflie.connect();
@@ -325,6 +344,7 @@ public class MainPresenter {
         Log.d(LOG_TAG, "disconnect()");
         DroneSession.clear();
         // kill sendJoystickDataThread first to avoid NPE
+        // dừng sendJoystickDataThread trước để tránh NPE
         if (mSendJoystickDataThread != null) {
             mSendJoystickDataThread.interrupt();
             mSendJoystickDataThread = null;
@@ -341,15 +361,18 @@ public class MainPresenter {
         }
 
         // link quality is not available when there is no active connection
+        // chất lượng liên kết không có khi không có kết nối đang hoạt động
         mainActivity.setLinkQualityText("N/A");
     }
 
     public void enableAltHoldMode(boolean hover) {
         // For safety reasons, altHold mode is only supported when the Crazyradio and a game pad are used
+        // Vì lý do an toàn, chế độ altHold chỉ được hỗ trợ khi dùng Crazyradio và gamepad
         if (mCrazyflie != null && mCrazyflie.getDriver() instanceof RadioDriver && mainActivity.getController() instanceof GamepadController) {
             if (isZrangerAvailable) {
                 heightHold = hover;
                 // reset target height, when hover is deactivated
+                // đặt lại độ cao mục tiêu khi tắt hover
                 if (!hover) {
                     ((GamepadController) mainActivity.getController()).setTargetHeight(AbstractController.INITIAL_TARGET_HEIGHT);
                 }
@@ -361,22 +384,26 @@ public class MainPresenter {
     }
 
     //TODO: make runAltAction more universal
+    //TODO: làm runAltAction tổng quát hơn
     public void runAltAction(String action) {
         Log.i(LOG_TAG, "runAltAction: " + action);
         if (mCrazyflie != null) {
             if ("ring.headlightEnable".equalsIgnoreCase(action)) {
                 // Toggle LED ring headlight
+                // Bật/tắt đèn pha vòng LED
                 mHeadlightToggle = !mHeadlightToggle;
                 mCrazyflie.setParamValue(action, mHeadlightToggle ? 1 : 0);
                 mainActivity.toggleHeadlightButtonColor(mHeadlightToggle);
             } else if ("ring.effect".equalsIgnoreCase(action)) {
                 // Cycle through LED ring effects
+                // Chuyển tuần tự qua các hiệu ứng vòng LED
                 Log.i(LOG_TAG, "Ring effect: " + mRingEffect);
                 mCrazyflie.setParamValue(action, mRingEffect);
                 mRingEffect++;
                 mRingEffect = (mRingEffect > mNoRingEffect) ? 0 : mRingEffect;
             } else if (action.startsWith("sound.effect")) {
                 // Toggle buzzer deck sound effect
+                // Bật/tắt hiệu ứng âm thanh của buzzer deck
                 String[] split = action.split(":");
                 Log.i(LOG_TAG, "Sound effect: " + split[1]);
                 mCrazyflie.setParamValue(split[0], mSoundToggle ? Integer.parseInt(split[1]) : 0);
@@ -395,12 +422,16 @@ public class MainPresenter {
      * Flight-control extension on port 7, channel 0 (PROTOCOL.md section 5). Every
      * command is idempotent on the drone, so the library's 500 ms resend queue can
      * repeat any of these safely.
+     * Phần mở rộng điều khiển bay trên cổng 7, kênh 0 (PROTOCOL.md mục 5). Mọi lệnh
+     * đều idempotent trên drone, nên hàng đợi gửi lại 500 ms của thư viện có thể
+     * lặp lại bất kỳ lệnh nào trong số này một cách an toàn.
      */
     public void sendFlightControl(FlightControlPacket packet) {
         sendPacket(packet);
     }
 
     /** Navigation extension on port 7, channel 1 (PROTOCOL.md section 6). */
+    /** Phần mở rộng điều hướng trên cổng 7, kênh 1 (PROTOCOL.md mục 6). */
     public void sendNav(NavPacket packet) {
         sendPacket(packet);
     }
@@ -408,6 +439,8 @@ public class MainPresenter {
     /**
      * Exposes the phone IMU tilt-to-fly source so the 50 Hz commander thread can
      * read it instead of the stick values while tilt control is active.
+     * Lộ nguồn nghiêng để bay từ IMU của điện thoại để luồng điều khiển 50 Hz đọc
+     * thay cho giá trị cần khi chế độ điều khiển nghiêng đang bật.
      */
     public TiltController getTiltController() {
         return mainActivity != null ? mainActivity.getTiltController() : null;
@@ -425,6 +458,7 @@ public class MainPresenter {
                     DroneSession.setBattery(vbat.floatValue());
                 }
                 // Flight status for the Fly screen header (mode chip, ARMED) and numbers.
+                // Trạng thái bay cho header màn hình Fly (ô chế độ, ARMED) và các số liệu.
                 Number mode = data.get("flight.mode");
                 Number armed = data.get("flight.armed");
                 if (mode != null && armed != null) {
@@ -449,6 +483,8 @@ public class MainPresenter {
     private LogConfig createDefaultLogConfig() {
         // 4 Hz is quick enough that ARMED shows within a glance of arming.
         // 15 bytes of values: well inside the firmware's 25-byte block budget.
+        // 4 Hz đủ nhanh để ARMED hiện ra trong một cái liếc sau khi arm.
+        // 15 byte giá trị: nằm gọn trong ngân sách 25 byte mỗi khối của firmware.
         LogConfig logConfigStandard = new LogConfig("Standard", 250);
         logConfigStandard.addVariable("pm.vbat", VariableType.FLOAT);
         logConfigStandard.addVariable("flight.mode", VariableType.UINT8_T);
@@ -461,6 +497,7 @@ public class MainPresenter {
 
     /**
      * Start logging config
+     * Bắt đầu cấu hình log
      */
     private void startLogConfigs(LogConfig logConfig) {
         if (mLogg == null) {
@@ -478,6 +515,7 @@ public class MainPresenter {
 
     /**
      * Stop logging config
+     * Dừng cấu hình log
      */
     private void stopLogConfigs(LogConfig logConfig) {
         if (mLogg == null) {

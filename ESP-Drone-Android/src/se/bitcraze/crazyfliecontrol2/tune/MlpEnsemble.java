@@ -6,10 +6,17 @@ import java.util.Random;
  * Deep ensemble (Lakshminarayanan et al. 2017) of small neural networks, d -&gt; 32 -&gt; 32 -&gt; 1
  * (tanh hidden layers, linear output), each from its own random start, trained full-batch with
  * Adam and weight decay in plain Java (port of ml_tune.py's MlpEnsemble, no dependencies).
+ * Tập mô hình sâu (Lakshminarayanan và cộng sự, 2017) gồm các mạng nơ-ron nhỏ, d -&gt; 32 -&gt; 32 -&gt; 1
+ * (các lớp ẩn tanh, đầu ra tuyến tính), mỗi mạng khởi tạo ngẫu nhiên riêng, huấn luyện full-batch
+ * với Adam và weight decay bằng Java thuần (port từ MlpEnsemble của ml_tune.py, không phụ thuộc).
  *
  * <p>Targets are standardised to zero mean / unit sd before training and de-standardised after.
  * The spread between the members (population std) stands in for the GP's uncertainty — it is
  * what the neural tuner's lower confidence bound balances against the mean.
+ * <p>Các mục tiêu được chuẩn hóa về trung bình không / độ lệch chuẩn đơn vị trước khi huấn luyện
+ * và được giải chuẩn hóa sau đó. Độ phân tán giữa các thành viên (population std) thay cho sự
+ * bất định của GP — đó là thứ mà lower confidence bound của bộ tinh chỉnh nơ-ron cân bằng
+ * với trung bình.
  */
 public class MlpEnsemble {
 
@@ -25,6 +32,7 @@ public class MlpEnsemble {
     private final double mMu;
     private final double mSd;
     /** One net = the 6 parameter matrices W0, b0, W1, b1, W2, b2 of ml_tune.py's train(). */
+    /** Một mạng = 6 ma trận tham số W0, b0, W1, b1, W2, b2 trong hàm train() của ml_tune.py. */
     private final double[][][][] mNets;
 
     public MlpEnsemble(double[][] x, double[] y, Random rng) {
@@ -54,6 +62,9 @@ public class MlpEnsemble {
     /**
      * Predict {mean, std} over the rows of {@code xs}: the ensemble mean de-standardised, and
      * the spread across members (population std) de-scaled by the target sd.
+     * Dự đoán {mean, std} trên các dòng của {@code xs}: trung bình của tập mô hình được giải
+     * chuẩn hóa, và độ phân tán giữa các thành viên (population std) được đưa về thang gốc theo
+     * độ lệch chuẩn của mục tiêu.
      */
     public double[][] predict(double[][] xs) {
         int n = xs.length;
@@ -81,6 +92,7 @@ public class MlpEnsemble {
     }
 
     /** Forward pass of one net over the rows of x: tanh(tanh(x W0 + b0) W1 + b1) W2 + b2. */
+    /** Lan truyền xuôi của một mạng trên các dòng của x: tanh(tanh(x W0 + b0) W1 + b1) W2 + b2. */
     private static double[] forward(double[][][] w, double[][] x) {
         double[][] h1 = tanh(addBias(matmul(x, w[0]), w[1]));
         double[][] h2 = tanh(addBias(matmul(h1, w[2]), w[3]));
@@ -93,6 +105,7 @@ public class MlpEnsemble {
     }
 
     /** One member: 500 full-batch Adam steps with weight decay, from its own random start. */
+    /** Một thành viên: 500 bước Adam full-batch với weight decay, khởi tạo ngẫu nhiên riêng. */
     private static double[][][] train(double[][] x, double[] z, Random rng) {
         int n = x.length;
         int d = x[0].length;
@@ -108,10 +121,12 @@ public class MlpEnsemble {
                 new double[1][h], new double[h][1], new double[1][1]};
         for (int t = 1; t <= STEPS; t++) {
             // forward
+            // lan truyền xuôi
             double[][] h1 = tanh(addBias(matmul(x, w[0]), w[1]));
             double[][] h2 = tanh(addBias(matmul(h1, w[2]), w[3]));
             double[][] out = addBias(matmul(h2, w[4]), w[5]);
             // backward: g_out = 2 * (out - z) / n, then the chain rule per layer
+            // ngược: g_out = 2 * (out - z) / n, sau đó quy tắc chuỗi cho từng lớp
             double[][] gOut = new double[n][1];
             for (int i = 0; i < n; i++) {
                 gOut[i][0] = 2 * (out[i][0] - z[i]) / n;
@@ -126,6 +141,7 @@ public class MlpEnsemble {
             g[0] = matmul(transpose(x), gH1);                      // d x h
             g[1] = colSums(gH1);                                   // 1 x h
             // Adam step; weight decay rides on the gradient, biases included
+            // bước Adam; weight decay được cộng vào gradient, kể cả bias
             double c1 = 1 - Math.pow(BETA1, t);
             double c2 = 1 - Math.pow(BETA2, t);
             for (int j = 0; j < 6; j++) {
@@ -195,6 +211,7 @@ public class MlpEnsemble {
     }
 
     /** Row-wise + a 1 x m bias row (numpy broadcasting of the bias vectors). */
+    /** Cộng theo từng dòng với một hàng bias 1 x m (numpy broadcasting của các vector bias). */
     private static double[][] addBias(double[][] a, double[][] bias) {
         double[][] out = new double[a.length][a[0].length];
         for (int i = 0; i < a.length; i++) {
@@ -226,6 +243,7 @@ public class MlpEnsemble {
     }
 
     /** Column sums as a 1 x m matrix (the bias gradients). */
+    /** Tổng theo cột dưới dạng ma trận 1 x m (các gradient của bias). */
     private static double[][] colSums(double[][] a) {
         double[][] out = new double[1][a[0].length];
         for (int i = 0; i < a.length; i++) {

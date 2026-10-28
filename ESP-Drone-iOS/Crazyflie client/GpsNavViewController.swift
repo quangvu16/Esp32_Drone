@@ -5,10 +5,16 @@
 //  GPS mission navigation screen (PROTOCOL.md §10). MapKit shows the plan and
 //  the drone's estimated track; the phone runs the mission and the drone chases
 //  one launch-frame offset at a time.
+//  Màn hình dẫn đường sứ mệnh GPS (PROTOCOL.md §10). MapKit hiển thị kế hoạch
+//  và đường bay ước tính của drone; điện thoại chạy sứ mệnh và drone bám theo
+//  từng offset của khung cất cánh một.
 //
 //  The drone marker is labelled "estimated" — it is accelerometer dead
 //  reckoning (§6), not GPS tracking, and NAV_FWD_SIGN / NAV_LEFT_SIGN are
 //  still unverified hardware constants.
+//  Marker của drone được gắn nhãn "estimated" — đó là tự dẫn đường quán tính
+//  bằng gia tốc kế (§6), không phải theo dõi GPS, và NAV_FWD_SIGN / NAV_LEFT_SIGN
+//  vẫn là các hằng số phần cứng chưa được kiểm chứng.
 //
 
 import UIKit
@@ -32,6 +38,7 @@ final class GpsNavViewController: UIViewController {
     private let loadFileButton = UIButton(type: .system)
     private let clearButton = UIButton(type: .system)
     /// Set by the Fly screen: opens another section after this screen closes.
+    /// Do màn hình Fly đặt: mở một khu vực khác sau khi màn hình này đóng.
     var onSwitchSection: ((AppSection) -> Void)?
     private var sectionHeader: SectionHeader?
 
@@ -40,10 +47,12 @@ final class GpsNavViewController: UIViewController {
     private var tapTarget: Waypoint?
 
     /// TARGET is sent at ~5 Hz while FOLLOW/RTH/mission is active (§9).
+    /// TARGET được gửi ở ~5 Hz khi FOLLOW/RTH/sứ mệnh đang hoạt động (§9).
     private var sendTimer: Timer?
     private var listener: ((LogSample) -> Void)?
 
     /// Current phone fix. Used only to define the plan and the launch frame.
+    /// Fix hiện tại của điện thoại. Chỉ dùng để định nghĩa kế hoạch và khung cất cánh.
     private var phoneFix: CLLocation?
     private var alphaDegrees: Double = 0
     private var aligned = false
@@ -77,6 +86,9 @@ final class GpsNavViewController: UIViewController {
             barButtonSystemItem: .done, target: self, action: #selector(close))
         // Shared header; CUT MOTORS moved up here from the bottom row (same place on
         // every screen). One tap on this screen, as on Android's Mission screen.
+        // Header dùng chung; CUT MOTORS được chuyển lên đây từ hàng dưới cùng (cùng
+        // vị trí trên mọi màn hình). Chạm một lần trên màn hình này, như màn hình
+        // Mission trên Android.
         let header = SectionHeader(host: self, selected: .mission, telemetry: telemetry, twoTapCut: false) { [weak self] in
             self?.cutMotors()
         }
@@ -121,6 +133,7 @@ final class GpsNavViewController: UIViewController {
         modeControl.selectedSegmentIndex = 0
 
         // Flight commands: icon above text so four fit across a phone.
+        // Lệnh bay: biểu tượng nằm trên chữ để bốn nút vừa ngang một chiếc điện thoại.
         let rowFont = UIFont.systemFont(ofSize: 13, weight: .semibold)
         armAlignButton.applyLabel("Arm + ALIGN", symbol: "airplane.departure", font: rowFont, imageOnTop: true)
         armAlignButton.addTarget(self, action: #selector(armAndAlign), for: .touchUpInside)
@@ -134,10 +147,13 @@ final class GpsNavViewController: UIViewController {
 
         // Was a red "Stop", which looked like the motor cut. It ends the mission and
         // hands control back to the sticks; red is kept for CUT MOTORS only.
+        // Trước đây là nút "Stop" màu đỏ, dễ nhầm với cắt động cơ. Nó kết thúc sứ
+        // mệnh và trả quyền điều khiển về cần; màu đỏ chỉ dành cho CUT MOTORS.
         stopButton.applyLabel("End mission", symbol: "stop.fill", font: rowFont, imageOnTop: true)
         stopButton.addTarget(self, action: #selector(stopNav), for: .touchUpInside)
 
         // Routine tools: icon-only, words in the VoiceOver label.
+        // Công cụ thường ngày: chỉ có biểu tượng, chữ nằm trong nhãn VoiceOver.
         loadFileButton.applyLabel(nil, symbol: "folder", accessibilityText: "Load waypoints file")
         loadFileButton.addTarget(self, action: #selector(loadFile), for: .touchUpInside)
 
@@ -163,10 +179,12 @@ final class GpsNavViewController: UIViewController {
         stack.addArrangedSubview(statusLabel)
 
         // Tap the map to drop a GUIDED target.
+        // Chạm vào bản đồ để đặt mục tiêu GUIDED.
         let tap = UITapGestureRecognizer(target: self, action: #selector(mapTapped(_:)))
         mapView.addGestureRecognizer(tap)
 
         // Long-press to add a mission waypoint.
+        // Nhấn giữ để thêm điểm hành trình vào sứ mệnh.
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(mapLongPressed(_:)))
         mapView.addGestureRecognizer(longPress)
 
@@ -178,6 +196,7 @@ final class GpsNavViewController: UIViewController {
         locationManager.startUpdatingHeading()
 
         // Telemetry listener for nav.pos_* and flight state.
+        // Listener dữ liệu từ xa cho nav.pos_* và trạng thái bay.
         let listener: (LogSample) -> Void = { [weak self] _ in
             self?.tickFromTelemetry()
         }
@@ -185,6 +204,7 @@ final class GpsNavViewController: UIViewController {
         telemetry.listeners.append(listener)
 
         // TARGET sender at 5 Hz.
+        // Bộ gửi TARGET ở 5 Hz.
         sendTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             self?.sendTargetIfNeeded()
         }
@@ -215,6 +235,8 @@ final class GpsNavViewController: UIViewController {
         }
         // Compass bearing of the nose at launch. `locationManager.heading` is
         // magnetic; the drone's SET_HEADING is also a compass bearing (§6).
+        // Phương hướng la bàn của mũi lúc cất cánh. `locationManager.heading` là
+        // hướng từ; SET_HEADING của drone cũng là phương hướng la bàn (§6).
         let heading = locationManager.heading?.magneticHeading ?? 0
         alphaDegrees = heading
         navigator.align(launchLatitude: fix.coordinate.latitude,
@@ -294,6 +316,7 @@ final class GpsNavViewController: UIViewController {
     }
 
     /// The icon shows what a tap will do, like the text.
+    /// Biểu tượng cho biết chạm vào sẽ làm gì, giống như chữ.
     private func setPauseLabel(paused: Bool) {
         pauseButton.applyLabel(paused ? "Resume" : "Pause", symbol: paused ? "play.fill" : "pause.fill",
                                font: .systemFont(ofSize: 13, weight: .semibold), imageOnTop: true)
@@ -302,6 +325,8 @@ final class GpsNavViewController: UIViewController {
     @objc private func loadFile() {
         // `asCopy: true` is the old `.import` mode: take a copy of the file
         // rather than hold security-scoped access to the original.
+        // `asCopy: true` là chế độ `.import` cũ: lấy một bản sao của file
+        // thay vì giữ quyền truy cập phạm vi bảo mật vào file gốc.
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.plainText],
                                                     asCopy: true)
         picker.delegate = self
@@ -319,6 +344,7 @@ final class GpsNavViewController: UIViewController {
         let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
         tapTarget = Waypoint(latitude: coordinate.latitude, longitude: coordinate.longitude, name: "Guided")
         // Drop a pin so the user sees what they tapped.
+        // Ghim một điểm để người dùng thấy chỗ mình vừa chạm.
         mapView.removeAnnotations(mapView.annotations.filter { $0.title ?? "" == "Guided" })
         let ann = MKPointAnnotation()
         ann.title = "Guided"
@@ -346,6 +372,7 @@ final class GpsNavViewController: UIViewController {
 
     private func tickFromTelemetry() {
         // Drone position from the nav log block (ids 15/16), launch frame.
+        // Vị trí drone từ khối log điều hướng (ids 15/16), theo khung cất cánh.
         let droneX = telemetry.value("nav.pos_x") ?? 0
         let droneY = telemetry.value("nav.pos_y") ?? 0
         guard let fix = phoneFix else { return }
@@ -369,6 +396,9 @@ final class GpsNavViewController: UIViewController {
         // TARGET is a north/east offset from launch (§6) — the firmware does
         // the launch-frame rotation. ~5 Hz is the keepalive; the drone holds
         // after 3 s of silence.
+        // TARGET là offset bắc/đông từ điểm cất cánh (§6) — firmware làm phép
+        // xoay sang khung cất cánh. ~5 Hz là tín hiệu giữ kết nối; drone giữ
+        // nguyên sau 3 giây im lặng.
         guard phoneFix != nil else { return }
         let ne = GeoMath.northEastOffset(
             fromLat: navigator.launchLatitude, fromLon: navigator.launchLongitude,
@@ -383,6 +413,7 @@ final class GpsNavViewController: UIViewController {
         mapView.removeOverlays(mapView.overlays)
 
         // Mission legs.
+        // Các chặng của sứ mệnh.
         let mission = navigator.mission
         var coords: [CLLocationCoordinate2D] = []
         if let lat = mission.homeLatitude, let lon = mission.homeLongitude {
@@ -397,6 +428,7 @@ final class GpsNavViewController: UIViewController {
         }
 
         // Waypoint annotations.
+        // Các annotation điểm hành trình.
         let existing = mapView.annotations.filter { !($0 is MKUserLocation) }
         mapView.removeAnnotations(existing)
         if let lat = mission.homeLatitude, let lon = mission.homeLongitude {
@@ -414,6 +446,8 @@ final class GpsNavViewController: UIViewController {
 
         // Drone estimated marker. We only have the launch-frame position, so
         // convert it back to lat/lon via the ALIGN frame. Label is "estimated".
+        // Marker ước tính của drone. Ta chỉ có vị trí theo khung cất cánh, nên
+        // quy ngược về vĩ/kinh độ qua khung ALIGN. Nhãn là "estimated".
         if aligned, let fix = phoneFix {
             let x = telemetry.value("nav.pos_x") ?? 0
             let y = telemetry.value("nav.pos_y") ?? 0
@@ -423,6 +457,7 @@ final class GpsNavViewController: UIViewController {
                 0, ne.north
             )
             // east offset from the north-shifted point
+            // offset về phía đông từ điểm đã dịch về phía bắc
             let final = GeoMath.destinationPoint(
                 dest.latitude, dest.longitude,
                 90, ne.east
@@ -477,6 +512,8 @@ extension GpsNavViewController: CLLocationManagerDelegate {
         guard let fix = locations.last else { return }
         // Ignore fixes worse than ~15 m — navigating on a bad fix is worse
         // than waiting (PROTOCOL.md §10).
+        // Bỏ qua fix tệ hơn ~15 m — dẫn đường trên fix tệ còn tệ hơn là chờ
+        // (PROTOCOL.md §10).
         if fix.horizontalAccuracy > Navigator.maxPositionAccuracyMeters {
             accuracyLabel.text = String(
                 format: "GPS accuracy %.1f m, holding — waiting for a better fix.",
@@ -491,6 +528,8 @@ extension GpsNavViewController: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         // Kept for the ALIGN capture; no continuous use — the drone holds its
         // own heading after SET_HEADING.
+        // Giữ lại để bắt hướng lúc ALIGN; không dùng liên tục — drone tự giữ
+        // hướng mũi sau SET_HEADING.
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

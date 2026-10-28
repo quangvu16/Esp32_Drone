@@ -10,23 +10,32 @@ import java.util.Locale;
 
 /**
  * An ordered GPS mission: a home position plus a list of waypoints to visit.
+ * Một sứ mệnh GPS có thứ tự: vị trí home cộng với danh sách điểm hành trình cần ghé.
  *
  * <p>Serialises to the Mission Planner / QGroundControl {@code .waypoints} format ({@code QGC WPL
  * 110}) so a flight can be planned on a desktop and loaded on the phone. Only the horizontal
  * component is meaningful here: the altitude column is written as zero and ignored on read (the
  * firmware holds a thrust level, not an altitude).
+ * <p>Tuần tự hoá theo định dạng {@code .waypoints} của Mission Planner / QGroundControl
+ * ({@code QGC WPL 110}) để có thể lên kế hoạch bay trên máy tính rồi tải vào điện thoại. Chỉ
+ * thành phần nằm ngang là có ý nghĩa ở đây: cột độ cao được ghi bằng 0 và bị bỏ qua khi đọc
+ * (firmware giữ một mức lực đẩy, không phải độ cao).
  */
 public class Mission {
 
     /** Header line every {@code .waypoints} file starts with. */
+    /** Dòng tiêu đề mọi tệp {@code .waypoints} đều bắt đầu bằng. */
     public static final String WPL_HEADER = "QGC WPL 110";
 
     /** MAVLink {@code MAV_CMD_NAV_WAYPOINT} — the only command read back as a waypoint. */
+    /** MAVLink {@code MAV_CMD_NAV_WAYPOINT} — lệnh duy nhất được đọc lại thành điểm hành trình. */
     public static final int CMD_NAV_WAYPOINT = 16;
 
     /**
      * Home / launch position. {@code Double.NaN} until set — the navigator must not invent one,
      * because RTL aims at it and every target offset is measured from it.
+     * Vị trí home (điểm cất cánh). {@code Double.NaN} cho đến khi được đặt — bộ điều hướng không
+     * được bịa ra một vị trí, vì RTL nhắm vào nó và mọi độ lệch của mục tiêu đều đo từ đó.
      */
     private double mHomeLatitude = Double.NaN;
 
@@ -35,6 +44,7 @@ public class Mission {
     private final List<Waypoint> mWaypoints = new ArrayList<Waypoint>();
 
     /** Removes every waypoint but keeps the home position. */
+    /** Xóa mọi điểm hành trình nhưng giữ nguyên vị trí home. */
     public void clearWaypoints() {
         mWaypoints.clear();
     }
@@ -112,6 +122,7 @@ public class Mission {
     }
 
     /** Total along-track length in metres, home to last waypoint. */
+    /** Tổng chiều dài dọc đường bay, từ home đến điểm hành trình cuối, đơn vị mét. */
     public double totalDistanceMeters() {
         if (mWaypoints.isEmpty()) {
             return 0.0;
@@ -136,10 +147,15 @@ public class Mission {
 
     /**
      * Serialises this mission to the Mission Planner / QGroundControl waypoint file format.
+     * Tuần tự hoá sứ mệnh này theo định dạng tệp điểm hành trình của Mission Planner /
+     * QGroundControl.
      *
      * <p>Index 0 is the home position ({@code current} flag 1), matching what Mission Planner
      * writes. When no home has been recorded yet the first waypoint is used so the file stays
      * valid.
+     * <p>Chỉ số 0 là vị trí home (cờ {@code current} bằng 1), khớp với những gì Mission Planner
+     * ghi. Khi chưa có vị trí home nào được lưu, điểm hành trình đầu tiên sẽ được dùng để tệp
+     * vẫn hợp lệ.
      */
     public String toWaypointsFile() {
         StringBuilder builder = new StringBuilder();
@@ -171,10 +187,14 @@ public class Mission {
 
     /**
      * Parses a Mission Planner / QGroundControl waypoint file.
+     * Phân tích cú pháp một tệp điểm hành trình của Mission Planner / QGroundControl.
      *
      * <p>Row 0 is treated as the home position; every subsequent {@code NAV_WAYPOINT} row becomes a
      * mission waypoint. Non-navigation commands are skipped rather than rejected, so files planned
      * with extra {@code DO_} commands still load their waypoints.
+     * <p>Dòng 0 được coi là vị trí home; mỗi dòng {@code NAV_WAYPOINT} tiếp theo trở thành một điểm
+     * hành trình của sứ mệnh. Các lệnh không phải điều hướng bị bỏ qua thay vì từ chối, nên tệp được
+     * lên kế hoạch với các lệnh {@code DO_} thêm vào vẫn tải được các điểm hành trình.
      */
     public static Mission parseWaypointsFile(String contents) throws IOException {
         Mission mission = new Mission();
@@ -198,6 +218,7 @@ public class Mission {
                     continue;
                 }
                 // Mission Planner writes tabs; tolerate any whitespace so hand-edited files load.
+                // Mission Planner ghi bằng tab; chấp nhận mọi khoảng trắng để tệp sửa tay vẫn tải được.
                 String[] fields = line.split("\\t");
                 if (fields.length < 11) {
                     fields = line.split("\\s+");

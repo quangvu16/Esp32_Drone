@@ -76,6 +76,8 @@ public class PreferencesActivity extends PreferenceActivity {
 
     // Transport picker (PROTOCOL.md section 8). Stored as strings so the ListPreference
     // entryValues stay readable in the preference XML.
+    // Bộ chọn tầng truyền (PROTOCOL.md mục 8). Lưu dạng chuỗi để entryValues của
+    // ListPreference vẫn dễ đọc trong XML thiết lập.
     public static final String KEY_PREF_LINK_METHOD = "pref_link_method";
     public static final String KEY_PREF_LINK_HOST = "pref_link_host";
     public static final String KEY_PREF_LINK_DEVICE_PORT = "pref_link_device_port";
@@ -136,6 +138,7 @@ public class PreferencesActivity extends PreferenceActivity {
         super.onCreate(savedInstanceState);
 
         // Display the fragment as the main content.
+        // Hiển thị fragment làm nội dung chính.
         getFragmentManager().beginTransaction().replace(android.R.id.content, new PreferencesFragment()).commit();
 
         this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
@@ -183,9 +186,13 @@ public class PreferencesActivity extends PreferenceActivity {
             // Make sure default values are applied.  In a real app, you would
             // want this in a shared function that is used to retrieve the
             // SharedPreferences wherever they are needed.
+            // Đảm bảo các giá trị mặc định được áp dụng. Trong ứng dụng thật, bạn
+            // nên để phần này trong một hàm dùng chung để lấy SharedPreferences
+            // ở bất kỳ đâu cần.
 //            PreferenceManager.setDefaultValues(getActivity(), R.xml.advanced_preferences, false);
 
             // Load the preferences from an XML resource
+            // Tải các thiết lập từ tài nguyên XML
             addPreferencesFromResource(R.xml.preferences);
 
             mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
@@ -218,9 +225,11 @@ public class PreferencesActivity extends PreferenceActivity {
 
         /**
          * Set initial summaries and get default values
+         * Đặt phần tóm tắt ban đầu và lấy giá trị mặc định
          */
         private void setInitialSummaries() {
             // Transport picker
+            // Bộ chọn tầng truyền
             setSummaryArrayString(KEY_PREF_LINK_METHOD, R.string.preferences_link_method_default,
                     R.array.connectionMethodEntries, R.array.connectionMethodValues);
             setInitialSummaryAndReturnDefaultValue(KEY_PREF_LINK_HOST, R.string.preferences_link_host_default);
@@ -228,6 +237,7 @@ public class PreferencesActivity extends PreferenceActivity {
             setInitialSummaryAndReturnDefaultValue(KEY_PREF_LINK_APP_PORT, R.string.preferences_link_app_port_default);
 
             // Connection settings
+            // Thiết lập kết nối
             mRadioChannelDefaultValue = setInitialSummaryAndReturnDefaultValue(KEY_PREF_RADIO_CHANNEL, R.string.preferences_radio_channel_defaultValue);
             setSummaryArray(KEY_PREF_RADIO_DATARATE, R.string.preferences_radio_datarate_defaultValue, R.array.radioDatarateEntries, 0);
             findPreference(KEY_PREF_RADIO_SCAN).setOnPreferenceClickListener(new OnPreferenceClickListener() {
@@ -240,6 +250,7 @@ public class PreferencesActivity extends PreferenceActivity {
             });
 
             //Radio stats
+            // Thống kê radio
             setRadioStats();
             findPreference(KEY_PREF_RADIO_STATS).setOnPreferenceClickListener(new OnPreferenceClickListener() {
 
@@ -251,18 +262,21 @@ public class PreferencesActivity extends PreferenceActivity {
             });
 
             // Flight control settings
+            // Thiết lập điều khiển bay
             setSummaryArray(KEY_PREF_MODE, R.string.preferences_mode_defaultValue, R.array.modeEntries, -1);
 
             mDeadzoneDefaultValue = setInitialSummaryAndReturnDefaultValue(KEY_PREF_DEADZONE, R.string.preferences_deadzone_defaultValue);
             setInitialSummaryAndReturnDefaultValue(KEY_PREF_PITCHTRIM, R.string.preferences_trim_defaultValue);
 
             // Controller settings
+            // Thiết lập bộ điều khiển
             setSummaryArray(KEY_PREF_CONTROLLER, R.string.preferences_controller_defaultValue, R.array.controllerEntries, 0);
             setControllerSpecificPreferences();
             mGyroAmpDefaultValue = setInitialSummaryAndReturnDefaultValue(KEY_PREF_GYRO_AMP, R.string.preferences_gyro_amp_defaultValue);
             mJoystickSizeDefaultValue = setInitialSummaryAndReturnDefaultValue(KEY_PREF_JOYSTICK_SIZE, R.string.preferences_joystick_size_defaultValue);
 
             // Gamepad and button mapping
+            // Ánh xạ gamepad và nút
             mRightAnalogXAxisDefaultValue = setInitialSummaryAndReturnDefaultValue(KEY_PREF_RIGHT_ANALOG_X_AXIS, R.string.preferences_right_analog_x_axis_defaultValue);
             mRightAnalogYAxisDefaultValue = setInitialSummaryAndReturnDefaultValue(KEY_PREF_RIGHT_ANALOG_Y_AXIS, R.string.preferences_right_analog_y_axis_defaultValue);
             mLeftAnalogXAxisDefaultValue = setInitialSummaryAndReturnDefaultValue(KEY_PREF_LEFT_ANALOG_X_AXIS, R.string.preferences_left_analog_x_axis_defaultValue);
@@ -310,6 +324,7 @@ public class PreferencesActivity extends PreferenceActivity {
             });
 
             // Advanced flight control settings
+            // Thiết lập điều khiển bay nâng cao
             findPreference(KEY_PREF_AFC_SCREEN).setEnabled(mSharedPreferences.getBoolean(KEY_PREF_AFC_BOOL, false));
 
             mMaxRollPitchAngleDefaultValue = setInitialSummaryAndReturnDefaultValue(KEY_PREF_MAX_ROLLPITCH_ANGLE, R.string.preferences_maxRollPitchAngle_defaultValue);
@@ -333,6 +348,7 @@ public class PreferencesActivity extends PreferenceActivity {
 
         private void checkGyroSensors() {
             //Test the available sensors
+            // Kiểm tra các cảm biến khả dụng
             SensorManager sensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
             CheckBoxPreference pref = (CheckBoxPreference) findPreference(KEY_PREF_USE_GYRO_BOOL);
 
@@ -394,8 +410,10 @@ public class PreferencesActivity extends PreferenceActivity {
         }
 
         // Set summary to be the user-description for the selected value
+        // Đặt phần tóm tắt thành mô tả cho người dùng của giá trị đã chọn
         public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
             // Transport picker
+            // Bộ chọn tầng truyền
             if (key.equals(KEY_PREF_LINK_METHOD)) {
                 setSummaryArrayString(KEY_PREF_LINK_METHOD, R.string.preferences_link_method_default,
                         R.array.connectionMethodEntries, R.array.connectionMethodValues);
@@ -411,6 +429,7 @@ public class PreferencesActivity extends PreferenceActivity {
             }
 
             // Connection settings
+            // Thiết lập kết nối
             if (key.equals(KEY_PREF_RADIO_CHANNEL)) {
                 setSummaryInt(key, mRadioChannelDefaultValue, RADIOCHANNEL_UPPER_LIMIT, "Radio channel");
             }
@@ -419,6 +438,7 @@ public class PreferencesActivity extends PreferenceActivity {
             }
 
             // Flight control settings
+            // Thiết lập điều khiển bay
             if (key.equals(KEY_PREF_MODE)) {
                 setSummaryArray(key, R.string.preferences_mode_defaultValue, R.array.modeEntries, -1);
             }
@@ -427,6 +447,7 @@ public class PreferencesActivity extends PreferenceActivity {
             }
 
             // Controller settings
+            // Thiết lập bộ điều khiển
             if (key.equals(KEY_PREF_CONTROLLER)) {
                 setSummaryArray(key, R.string.preferences_controller_defaultValue, R.array.controllerEntries, 0);
                 setControllerSpecificPreferences();
@@ -437,6 +458,7 @@ public class PreferencesActivity extends PreferenceActivity {
                 boolean useGyro = sharedPreferences.getBoolean(key, false);
                 pref.setChecked(useGyro);
                 // automatically activate the screen rotation lock preference
+                // tự động kích hoạt thiết lập khóa xoay màn hình
                 CheckBoxPreference screenRotationLock = (CheckBoxPreference) findPreference(KEY_PREF_SCREEN_ROTATION_LOCK_BOOL);
                 if (useGyro) {
                     Toast.makeText(getActivity(), "Activating screen rotation lock...", Toast.LENGTH_LONG).show();
@@ -461,6 +483,7 @@ public class PreferencesActivity extends PreferenceActivity {
             }
 
             // Gamepad and button mapping
+            // Ánh xạ gamepad và nút
             if (key.equals(KEY_PREF_RIGHT_ANALOG_X_AXIS)){
                 findPreference(key).setSummary(sharedPreferences.getString(key, mRightAnalogXAxisDefaultValue));
             }
@@ -520,6 +543,7 @@ public class PreferencesActivity extends PreferenceActivity {
             }
 
             // Advanced flight control settings
+            // Thiết lập điều khiển bay nâng cao
             if (key.equals(KEY_PREF_AFC_BOOL)) {
                 Preference afcScreenPref = findPreference(KEY_PREF_AFC_SCREEN);
                 afcScreenPref.setEnabled(sharedPreferences.getBoolean(key, false));
@@ -551,6 +575,7 @@ public class PreferencesActivity extends PreferenceActivity {
             }
 
             // App settings
+            // Thiết lập ứng dụng
             if (key.equals(KEY_PREF_SCREEN_ROTATION_LOCK_BOOL)) {
                 CheckBoxPreference pref = (CheckBoxPreference) findPreference(key);
                 pref.setChecked(sharedPreferences.getBoolean(key, false));
@@ -669,9 +694,11 @@ public class PreferencesActivity extends PreferenceActivity {
                             throw new IllegalArgumentException("Scanning is only supported with Crazyradio.");
                         }
                         //For testing purposes only
+                        // Chỉ dùng cho mục đích kiểm thử
 //                        return new ConnectionData[0];
                         boolean useSlowScan = true;
                         //Use slow scan, when Crazyradio firmware version is 0.52 or 0.53
+                        // Dùng quét chậm khi firmware Crazyradio là bản 0.52 hoặc 0.53
                         float firmwareVersion = usbLinkAndroid.getFirmwareVersion();
                         if(firmwareVersion < 0.5){
                             useSlowScan = true;
@@ -698,6 +725,7 @@ public class PreferencesActivity extends PreferenceActivity {
                         Toast.makeText(getActivity(), mException.getMessage(), Toast.LENGTH_SHORT).show();
                     } else {
                         //TEST DATA for debugging SelectionConnectionDialogFragment (replace with test!)
+                        // DỮ LIỆU TEST để gỡ lỗi SelectionConnectionDialogFragment (thay bằng test!)
 //                      result = new ConnectionData[3];
 //                      result[0] = new ConnectionData(13, 2);
 //                      result[1] = new ConnectionData(15, 1);
@@ -706,9 +734,11 @@ public class PreferencesActivity extends PreferenceActivity {
                         if (result != null && result.length > 0) {
                             if(result.length > 1){
                                 // let user choose connection, if there is more than one Crazyflie
+                                // để người dùng chọn kết nối nếu có nhiều hơn một Crazyflie
                                 showSelectConnectionDialog(result);
                             }else{
                                 // use first channel
+                                // dùng kênh đầu tiên
                                 setRadioChannelAndDatarate(result[0].getChannel(), result[0].getDataRate());
                             }
                         } else {
@@ -723,6 +753,7 @@ public class PreferencesActivity extends PreferenceActivity {
         private void showSelectConnectionDialog(final ConnectionData[] result) {
             SelectConnectionDialogFragment selectConnectionDialogFragment = new SelectConnectionDialogFragment();
             //supply list of Crazyflie connections as arguments
+            // cung cấp danh sách kết nối Crazyflie làm đối số
             Bundle args = new Bundle();
             String[] crazyflieArray = new String[result.length];
             for(int i = 0; i < result.length; i++){
@@ -754,6 +785,7 @@ public class PreferencesActivity extends PreferenceActivity {
 
     /**
      * Set default joystick size according to screen size
+     * Đặt kích thước joystick mặc định theo kích thước màn hình
      *
      * @param context
      */
@@ -761,6 +793,7 @@ public class PreferencesActivity extends PreferenceActivity {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
 
         // If no default value exists, set new default value according to screen size
+        // Nếu chưa có giá trị mặc định, đặt giá trị mặc định mới theo kích thước màn hình
         if(!sharedPreferences.contains(KEY_PREF_JOYSTICK_SIZE)) {
             String defaultValue = getDefaultJoystickSize(context);
             Log.d(LOG_TAG, "Prefs do NOT contain joystick size. Setting new default: " + defaultValue);
@@ -775,6 +808,7 @@ public class PreferencesActivity extends PreferenceActivity {
 
     /**
      * Set up the {@link android.app.ActionBar}, if the API is available.
+     * Thiết lập {@link android.app.ActionBar} nếu API khả dụng.
      */
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private void setupActionBar() {

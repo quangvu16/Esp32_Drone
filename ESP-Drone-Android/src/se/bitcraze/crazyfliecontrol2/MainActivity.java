@@ -132,8 +132,10 @@ public class MainActivity extends EspActivity {
     private FlightModePanel mFlightModePanel;
 
     // Fly screen (redesign stage 2): header status, CUT MOTORS, More panel.
+    // Màn hình Fly (giai đoạn thiết kế lại 2): trạng thái trên header, CUT MOTORS, bảng More.
     private static final String[] MODE_NAMES = {"MANUAL", "HOLD", "AUTO", "FOLLOW", "RTH"};
     /** Window in which the second CUT MOTORS press counts, ms. */
+    /** Khoảng thời gian mà lần bấm CUT MOTORS thứ hai còn được tính, theo mili giây. */
     private static final long CUT_CONFIRM_WINDOW_MS = 3000;
     private MaterialButton mCutMotorsButton;
     private long mCutPrimedAtMs;
@@ -152,6 +154,7 @@ public class MainActivity extends EspActivity {
     };
     private TiltController mTiltController;
     /** Set just before starting a child screen so onPause() leaves the link up. */
+    /** Được đặt ngay trước khi mở màn hình con để onPause() không ngắt liên kết. */
     private boolean mSuppressDisconnect;
 
     @Override
@@ -199,6 +202,7 @@ public class MainActivity extends EspActivity {
         mFlightDataView = (FlightDataView) findViewById(R.id.flightdataview);
 
         // Fly screen (redesign stage 2): header, centre panel, More panel.
+        // Màn hình Fly (giai đoạn thiết kế lại 2): header, bảng giữa, bảng More.
         mTiltController = new TiltController(this);
         mFlightModePanel = (FlightModePanel) findViewById(R.id.flightmodepanel);
         mMorePanel = findViewById(R.id.fly_more_panel);
@@ -233,11 +237,13 @@ public class MainActivity extends EspActivity {
             @Override
             public void onConnect() {
                 // Same path as the old header button, so every link type keeps its checks.
+                // Đi cùng một đường với nút header cũ, để mọi loại liên kết giữ nguyên bước kiểm tra.
                 mToggleConnectButton.performClick();
             }
         });
 
         // Header sections. Fly is this screen.
+        // Các mục trên header. Fly chính là màn hình này.
         findViewById(R.id.tab_mission).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -259,6 +265,7 @@ public class MainActivity extends EspActivity {
         });
 
         // CUT MOTORS: header, every screen, tap twice within 3 s.
+        // CUT MOTORS: trên header, mọi màn hình, phải bấm hai lần trong vòng 3 giây.
         mCutMotorsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -295,6 +302,7 @@ public class MainActivity extends EspActivity {
             }
         });
         // SeekBar is 0..47000 mapped onto the firmware's 8000..55000 range.
+        // SeekBar nhận giá trị 0..47000, ánh xạ vào dải 8000..55000 của firmware.
         mHoverSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -319,6 +327,8 @@ public class MainActivity extends EspActivity {
             public void onCheckedChanged(android.widget.CompoundButton buttonView, boolean isChecked) {
                 // The toggle itself is the loud affordance: tilt-to-fly can only be
                 // engaged by a deliberate press on the labelled switch.
+                // Bản thân công tắc là điểm tương tác rõ ràng: chế độ nghiêng để bay chỉ
+                // được kích hoạt bằng một cú bấm có chủ đích vào công tắc có nhãn.
                 mTiltController.setEnabled(isChecked);
                 mTiltStatus.setText(isChecked
                         ? "TILT CONTROL ACTIVE — phone attitude is driving the drone"
@@ -421,6 +431,8 @@ public class MainActivity extends EspActivity {
                     } else {
                         // Only BLE needs the radio/permission pre-checks; WiFi and SPP
                         // do not scan, so gating them on BLE support would block them.
+                        // Chỉ BLE cần kiểm tra radio/quyền trước; WiFi và SPP không quét
+                        // thiết bị, nên chặn chúng bằng điều kiện hỗ trợ BLE sẽ làm chúng bị chặn oan.
                         String method = mPreferences.getString(PreferencesActivity.KEY_PREF_LINK_METHOD,
                                 PreferencesActivity.LINK_METHOD_SOFTAP);
                         if (isCrazyradioAvailable(MainActivity.this)) {
@@ -456,18 +468,21 @@ public class MainActivity extends EspActivity {
 
     private void connectBlePreChecks() {
         // Check if Bluetooth LE is supported by the Android version
+        // Kiểm tra phiên bản Android có hỗ trợ Bluetooth LE không
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
             Log.e(LOG_TAG, Build.VERSION.SDK_INT + "does not support Bluetooth LE.");
             Toast.makeText(this, Build.VERSION.SDK_INT + "does not support Bluetooth LE. Please use a Crazyradio to connect to the Crazyflie instead.", Toast.LENGTH_LONG).show();
             return;
         }
         // Check if Bluetooth LE is supported by the hardware
+        // Kiểm tra phần cứng có hỗ trợ Bluetooth LE không
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Log.e(LOG_TAG, "Device does not support Bluetooth LE.");
             Toast.makeText(this,  "Device does not support Bluetooth LE. Please use a Crazyradio to connect to the Crazyflie instead.", Toast.LENGTH_LONG).show();
             return;
         }
         // Since Android version 6, ACCESS_COARSE_LOCATION is required for Bluetooth scanning
+        // Từ Android 6 trở đi, quét Bluetooth cần quyền ACCESS_COARSE_LOCATION
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Log.e(LOG_TAG, "Android version >= 6 requires ACCESS_COARSE_LOCATION permissions for Bluetooth scanning.");
             requestPermissions(Manifest.permission.ACCESS_FINE_LOCATION, MY_PERMISSIONS_REQUEST_LOCATION);
@@ -479,6 +494,8 @@ public class MainActivity extends EspActivity {
     private void connect() {
         // Dispatch on the transport the pilot picked. SoftAP is the default because
         // it needs no infrastructure: the drone hosts the network itself.
+        // Chuyển tiếp theo tầng truyền mà người lái chọn. SoftAP là mặc định vì
+        // không cần hạ tầng sẵn có: chính drone tự phát mạng.
         String method = mPreferences.getString(PreferencesActivity.KEY_PREF_LINK_METHOD,
                 PreferencesActivity.LINK_METHOD_SOFTAP);
         if (PreferencesActivity.LINK_METHOD_STATION.equals(method)
@@ -549,9 +566,12 @@ public class MainActivity extends EspActivity {
     private void requestPermissions(String permission, int request) {
         if (ContextCompat.checkSelfPermission(MainActivity.this, permission) != PackageManager.PERMISSION_GRANTED) {
             // Permission is not granted. Should we show an explanation?
+            // Chưa được cấp quyền. Có nên hiển thị lời giải thích không?
             if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, permission)) {
                 // Show an explanation to the user *asynchronously* -- don't block this thread waiting for the user's response!
                 // After the user sees the explanation, try again to request the permission.
+                // Hiển thị lời giải thích cho người dùng một cách *bất đồng bộ* -- đừng chặn luồng này để chờ người dùng trả lời!
+                // Sau khi người dùng xem lời giải thích, thử yêu cầu quyền lại.
                 Log.d(LOG_TAG, "ACCESS_COARSE_LOCATION permission request has been denied.");
                 //Toast.makeText(this,  "Android version >= 6 requires ACCESS_COARSE_LOCATION permissions for Bluetooth scanning.", Toast.LENGTH_LONG).show();
                 ActivityCompat.requestPermissions(MainActivity.this, new String[]{permission}, request);
@@ -560,6 +580,7 @@ public class MainActivity extends EspActivity {
             }
         } else {
             // Permission has already been granted
+            // Quyền đã được cấp từ trước
             checkLocationSettings();
         }
     }
@@ -569,11 +590,14 @@ public class MainActivity extends EspActivity {
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_LOCATION: {
                 // If request is cancelled, the result arrays are empty.
+                // Nếu yêu cầu bị huỷ, mảng kết quả sẽ rỗng.
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // permission was granted, yay! Do the contacts-related task you need to do.
+                    // quyền đã được cấp! Thực hiện công việc cần quyền này.
                     checkLocationSettings();
                 } else {
                     // permission denied, boo! Disable the functionality that depends on this permission.
+                    // quyền bị từ chối! Tắt các chức năng phụ thuộc vào quyền này.
                     Log.d(LOG_TAG, "ACCESS_COARSE_LOCATION permission request has been denied.");
                     Toast.makeText(this,  "Android version >= 6 requires ACCESS_COARSE_LOCATION permissions for Bluetooth scanning.", Toast.LENGTH_LONG).show();
                 }
@@ -604,6 +628,8 @@ public class MainActivity extends EspActivity {
 
         // Returning from a child screen: drop the guard and refresh the tilt readout
         // so a stale "TILT CONTROL ACTIVE" cannot outlive the sensor registration.
+        // Quay lại từ màn hình con: bỏ cờ chặn và làm mới phần hiển thị nghiêng
+        // để chuỗi "TILT CONTROL ACTIVE" cũ không tồn tại lâu hơn việc đăng ký cảm biến.
         mSuppressDisconnect = false;
         if (mTiltStatus != null && mTiltController != null) {
             mTiltStatus.setText(mTiltController.describe());
@@ -621,6 +647,7 @@ public class MainActivity extends EspActivity {
         Log.d(LOG_TAG, "onPause()");
         if (mCutMotorsButton != null) {
             // A half-armed "TAP AGAIN: CUT" must not survive a pause.
+            // Trạng thái nửa sẵng sàng "TAP AGAIN: CUT" không được tồn tại qua lần pause.
             resetCutMotors();
         }
         if (mControls != null) {
@@ -632,18 +659,22 @@ public class MainActivity extends EspActivity {
         updateFlightData();
         // Child screens (PID Tune, GPS Nav) share the one radio link. Disconnecting
         // here would trip the firmware's 500 ms failsafe and cut the motors mid-air.
+        // Các màn hình con (PID Tune, GPS Nav) dùng chung một liên kết radio. Ngắt
+        // kết nối tại đây sẽ kích hoạt failsafe 500 ms của firmware và cắt động cơ giữa trời.
         if (!mSuppressDisconnect) {
             mPresenter.disconnect();
         }
     }
 
     /** Starts a child screen without tearing down the live CRTP link. */
+    /** Mở một màn hình con mà không gỡ liên kết CRTP đang hoạt động. */
     private void launchChild(Intent intent) {
         mSuppressDisconnect = true;
         startActivity(intent);
     }
 
     /** Used by {@link MainPresenter} so the 50 Hz commander thread can read phone tilt. */
+    /** Được {@link MainPresenter} dùng để luồng điều khiển 50 Hz đọc độ nghiêng của điện thoại. */
     public TiltController getTiltController() {
         return mTiltController;
     }
@@ -759,6 +790,7 @@ public class MainActivity extends EspActivity {
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent event) {
         // Check that the event came from a joystick since a generic motion event could be almost anything.
+        // Kiểm tra sự kiện có đến từ joystick không, vì sự kiện motion tổng quát có thể là bất cứ thứ gì.
         if ((event.getSource() & InputDevice.SOURCE_CLASS_JOYSTICK) != 0 && event.getAction() == MotionEvent.ACTION_MOVE && mController instanceof GamepadController) {
             mGamepadController.dealWithMotionEvent(event);
             updateFlightData();
@@ -771,9 +803,11 @@ public class MainActivity extends EspActivity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         // do not call super if key event comes from a gamepad, otherwise the buttons can quit the app
+        // không gọi super nếu sự kiện phím đến từ gamepad, nếu không các nút có thể thoát ứng dụng
         if (isJoystickButton(event.getKeyCode()) && mController instanceof GamepadController) {
             mGamepadController.dealWithKeyEvent(event);
             // exception for OUYA controllers
+            // ngoại lệ dành cho tay cầm OUYA
             if (!Build.MODEL.toUpperCase(Locale.getDefault()).contains("OUYA")) {
                 return true;
             }
@@ -782,6 +816,7 @@ public class MainActivity extends EspActivity {
     }
 
     // this workaround is necessary because DPad buttons are not considered to be "Gamepad buttons"
+    // cách vá này là cần thiết vì các nút DPad không được coi là "nút Gamepad"
     private static boolean isJoystickButton(int keyCode) {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
@@ -800,15 +835,18 @@ public class MainActivity extends EspActivity {
         switch (mControls.getControllerType()) {
             case 0:
                 // Use GyroscopeController if activated in the preferences
+                // Dùng GyroscopeController nếu được bật trong thiết lập
                 if (mControls.isUseGyro()) {
                     mController = new GyroscopeController(mControls, this, mJoystickViewLeft, mJoystickViewRight);
                 } else {
                     // TODO: reuse existing touch controller?
+                    // TODO: tái sử dụng touch controller hiện có?
                     mController = new TouchController(mControls, this, mJoystickViewLeft, mJoystickViewRight);
                 }
                 break;
             case 1:
                     // TODO: show warning if no game pad is found?
+                    // TODO: hiện cảnh báo nếu không tìm thấy gamepad?
                     mController = mGamepadController;
                 break;
             default:
@@ -826,6 +864,7 @@ public class MainActivity extends EspActivity {
             Log.d(LOG_TAG, "mUsbReceiver action: " + action);
             if ((MainActivity.this.getPackageName()+".USB_PERMISSION").equals(action)) {
                 //reached only when USB permission on physical connect was canceled and "Connect" or "Radio Scan" is clicked
+                // chỉ đến đây khi quyền USB khi cắm vật lý bị huỷ và bấm "Connect" hoặc "Radio Scan"
                 synchronized (this) {
                     UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
@@ -868,6 +907,7 @@ public class MainActivity extends EspActivity {
     }
 
     // extra method for onClick attribute in XML
+    // phương thức phụ cho thuộc tính onClick trong XML
     public void switchLedRingEffect(View view) {
         if (mPresenter != null) {
             mPresenter.runAltAction("ring.effect");
@@ -875,6 +915,7 @@ public class MainActivity extends EspActivity {
     }
 
     // extra method for onClick attribute in XML
+    // phương thức phụ cho thuộc tính onClick trong XML
     public void toggleHeadlight(View view) {
         if (mPresenter != null) {
             mPresenter.runAltAction("ring.headlightEnable");
@@ -882,6 +923,7 @@ public class MainActivity extends EspActivity {
     }
 
     // extra method for onClick attribute in XML
+    // phương thức phụ cho thuộc tính onClick trong XML
     public void playBuzzerSound(View view) {
         if (mPresenter != null) {
             mPresenter.runAltAction("sound.effect:10");
@@ -912,6 +954,8 @@ public class MainActivity extends EspActivity {
     /**
      * Battery as volts. The old (V - 3.0) x 100 "percentage" was not a charge level and
      * read 92% on a 1S pack that was nearly flat under load.
+     * Pin hiển thị theo vôn. Cách cũ (V - 3.0) x 100 dưới dạng "phần trăm" không phải mức
+     * sạc thật và từng báo 92% cho pin 1S gần hết dưới tải.
      */
     public void setBatteryLevel(final float battery) {
         runOnUiThread(new Runnable() {
@@ -979,6 +1023,7 @@ public class MainActivity extends EspActivity {
             public void run() {
                 mBuzzerSoundButton.setEnabled(enabled);
                 // Only shown when the drone reports the hardware (this board has none).
+                // Chỉ hiện khi drone báo có phần cứng này (bo này không có).
                 mBuzzerSoundButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
             }
         });
@@ -990,6 +1035,7 @@ public class MainActivity extends EspActivity {
             public void run() {
                 mRingEffectButton.setEnabled(enabled);
                 // Only shown when the drone reports the hardware (this board has none).
+                // Chỉ hiện khi drone báo có phần cứng này (bo này không có).
                 mRingEffectButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
             }
         });
@@ -1001,6 +1047,7 @@ public class MainActivity extends EspActivity {
             public void run() {
                 mHeadlightButton.setEnabled(enabled);
                 // Only shown when the drone reports the hardware (this board has none).
+                // Chỉ hiện khi drone báo có phần cứng này (bo này không có).
                 mHeadlightButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
             }
         });
@@ -1032,6 +1079,7 @@ public class MainActivity extends EspActivity {
     }
 
     /** Must run on the UI thread. */
+    /** Phải chạy trên luồng UI. */
     private void onLinkStateChanged(boolean connected) {
         mIsConnected = connected;
         mFlightModePanel.setConnected(connected, linkName());
@@ -1077,6 +1125,7 @@ public class MainActivity extends EspActivity {
     }
 
     /** One status report from the drone (MainPresenter's "Standard" log block). */
+    /** Một báo cáo trạng thái từ drone (khối log "Standard" của MainPresenter). */
     public void setFlightStatus(final int mode, final boolean armed, final int autoState,
                                 final float roll, final float pitch) {
         runOnUiThread(new Runnable() {
@@ -1101,6 +1150,7 @@ public class MainActivity extends EspActivity {
                 mArmedChip.setVisibility(View.VISIBLE);
                 mFlightModePanel.setFlightStatus(mode, armed, autoState, roll, pitch);
                 // The sticks only steer in Manual; dim them otherwise so that is visible.
+                // Cần chỉ lái được ở Manual; các chế độ khác làm mờ cần để thể hiện điều đó.
                 float alpha = mode == 0 ? 1f : 0.45f;
                 mJoystickViewLeft.setAlpha(alpha);
                 mJoystickViewRight.setAlpha(alpha);

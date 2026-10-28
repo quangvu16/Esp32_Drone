@@ -31,14 +31,19 @@ import java.nio.ByteBuffer;
 
 /**
  * Flight-control extension on CRTP port 7, channel 0 (PROTOCOL.md section 5).
+ * Phần mở rộng điều khiển bay trên CRTP port 7, channel 0 (PROTOCOL.md mục 5).
  *
  * <p>The ESP32 firmware answers with {@code <0x70><cmd><status>} where status 0 is OK. Every
  * command is idempotent on the drone side, which matters because {@link
  * se.bitcraze.crazyflie.lib.crazyflie.Crazyflie} retransmits unacknowledged packets every 500 ms.
+ * <p>Firmware ESP32 trả lời bằng {@code <0x70><cmd><status>}, trong đó status 0 là OK. Mọi
+ * lệnh đều idempotent phía drone, điều này quan trọng vì {@link
+ * se.bitcraze.crazyflie.lib.crazyflie.Crazyflie} gửi lại các gói tin chưa được ack mỗi 500 ms.
  */
 public class FlightControlPacket extends CrtpPacket {
 
     /** Port 7, channel 0 — the firmware's {@code FC_HDR}. */
+    /** Port 7, channel 0 — {@code FC_HDR} của firmware. */
     public static final int CHANNEL = 0;
 
     public static final int CMD_SET_MODE = 0x01;
@@ -61,6 +66,7 @@ public class FlightControlPacket extends CrtpPacket {
     public static final int MODE_RTH = 4;
 
     /** Hover thrust limits, matching the firmware's HOVER_THRUST_MIN/MAX. */
+    /** Giới hạn lực đẩy khi giữ độ cao, khớp với HOVER_THRUST_MIN/MAX của firmware. */
     public static final int HOVER_THRUST_MIN = 8000;
     public static final int HOVER_THRUST_MAX = 55000;
 
@@ -73,6 +79,8 @@ public class FlightControlPacket extends CrtpPacket {
         this.mArgs = args;
         // The reply payload starts with the command byte, so that alone is enough to retire the
         // packet from the resend queue regardless of the status byte.
+        // Phần dữ liệu trả lời bắt đầu bằng byte lệnh, nên chỉ riêng byte đó cũng đủ để gỡ
+        // gói tin khỏi hàng đợi gửi lại, bất kể byte status.
         setExpectedReply(new byte[] {(byte) cmd});
     }
 
@@ -123,6 +131,7 @@ public class FlightControlPacket extends CrtpPacket {
     }
 
     /** Selects the drone's transport profile; the board reboots about 1.5 s later. */
+    /** Chọn hồ sơ truyền của drone; bo mạch khởi động lại sau khoảng 1.5 giây. */
     public static FlightControlPacket link(int mode) {
         return new FlightControlPacket(CMD_LINK, new byte[] {(byte) mode});
     }

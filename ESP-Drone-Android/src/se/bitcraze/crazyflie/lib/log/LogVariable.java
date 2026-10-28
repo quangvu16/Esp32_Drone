@@ -31,10 +31,13 @@ import se.bitcraze.crazyflie.lib.toc.VariableType;
 
 /**
  * A LogVariable is an element of a {@link LogConfig}
+ * LogVariable là một phần tử của một {@link LogConfig}
  *
  * Instead of fetch_as/stored_as this class uses VariableType (not to be confused with LogVariable.getType())
+ * Thay cho fetch_as/stored_as, lớp này dùng VariableType (không nhầm với LogVariable.getType())
  *
  * TODO: does LogVariable need to store the ID?
+ * TODO: LogVariable có cần lưu ID không?
  */
 public class LogVariable {
 
@@ -44,6 +47,7 @@ public class LogVariable {
     private String mName;
     private VariableType mVariableType;
     private int mType = TOC_TYPE; // default is TOC_TYPE
+                                  // mặc định là TOC_TYPE
     private int mAddress = 0; //TODO: long?
 
     public LogVariable(String name) {
@@ -87,6 +91,7 @@ public class LogVariable {
 
     /**
      * Return true if the variable should be in the TOC, false if raw memory variable
+     * Trả về true nếu biến nên nằm trong TOC, false nếu là biến vùng nhớ thô
      *
      * @return
      */

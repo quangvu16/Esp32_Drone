@@ -60,6 +60,7 @@ from drone import (AXES, MOTOR_SAT_HI, MOTOR_SAT_LO, PORT_LOG, PORT_PARAMS,  # n
 from ml_tune import from_y, read_history  # noqa: E402
 
 # (subplot title, unit, [(series key, label, colour)])
+# (tiêu đề subplot, đơn vị, [(khóa chuỗi, nhãn, màu)])
 PLOTS = [
     ("Angle", "deg", [("angle", "stabilizer", "C0")]),
     ("Rate", "deg/s", [("rate", "rate", "C1")]),
@@ -71,8 +72,11 @@ SERIES = ["angle", "rate", "p", "i", "d", "control", "motor", "roll", "pitch"]
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ML_LOG = os.path.join(HERE, "ml_tune_log.csv")      # both methods' trials
+                                                    # các lần thử của cả hai phương pháp
 # method: (tuner class, default Range x, hint). The searches cover
 # current / range .. x range; twiddle steps inside autotune.py's /3..x3.
+# phương pháp: (lớp tuner, Range x mặc định, gợi ý). Các phép tìm bao trùm
+# current / range .. x range; twiddle bước trong khoảng /3..x3 của autotune.py.
 METHODS = {
     "ML (Bayesian)": (ml_tune.BayesTuner, 2.0,
                       "Gaussian process + expected improvement. Fewest trials; the default."),
@@ -162,6 +166,7 @@ class ModelWindow:
             ax.set_ylabel("predicted cost (band = 2 std)", fontsize=8)
         else:
             # first two tuned values; any others held at the current best
+            # hai giá trị được tinh chỉnh đầu tiên; các giá trị khác giữ ở mức tốt nhất hiện tại
             gx, gy = np.meshgrid(u, u)
             pts = np.tile(base, (gx.size, 1))
             pts[:, 0], pts[:, 1] = gx.ravel(), gy.ravel()
@@ -179,6 +184,7 @@ class ModelWindow:
             ax.set_title(f"predicted cost (dark = better{extra}); red = tipped, grey = past runs",
                          fontsize=8)
         # every drone gain is multiplicative: both axes logarithmic
+        # mọi gain của drone đều thay đổi theo cấp số nhân: cả hai trục đều logarit
         plain = FuncFormatter(lambda v, _: f"{v:.3g}")
         ax.xaxis.set_major_formatter(plain)
         ax.xaxis.set_minor_formatter(plain)

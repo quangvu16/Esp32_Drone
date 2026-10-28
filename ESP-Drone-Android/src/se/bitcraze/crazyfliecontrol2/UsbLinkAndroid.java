@@ -69,10 +69,12 @@ public class UsbLinkAndroid implements CrazyUsbInterface{
 
     /**
      * Initialize the USB device. Determines endpoints and prepares communication.
+     * Khởi tạo thiết bị USB. Xác định các endpoint và chuẩn bị kênh liên lạc.
      *
      * @param vid
      * @param pid
      * @throws IOException if the device cannot be opened
+     * @throws IOException nếu không mở được thiết bị
      * @throws SecurityException
      */
     public void initDevice(int vid, int pid) throws IOException, SecurityException {
@@ -86,9 +88,11 @@ public class UsbLinkAndroid implements CrazyUsbInterface{
             throw new IOException("USB device not found. (VID: " + vid + ", PID: " + pid + ")");
         }
         // TODO: Only gets the first USB device that is found
+        // TODO: Chỉ lấy thiết bị USB đầu tiên tìm được
         this.mUsbDevice = usbDevices.get(0);
 
         //request permissions
+        //yêu cầu quyền truy cập
         if (mUsbDevice != null && !mUsbManager.hasPermission(mUsbDevice)) {
             Log.d(LOG_TAG, "Request permission");
             mPermissionIntent = PendingIntent.getBroadcast(mContext, 0, new Intent(mContext.getPackageName()+".USB_PERMISSION"), 0);
@@ -102,23 +106,27 @@ public class UsbLinkAndroid implements CrazyUsbInterface{
 
         Log.d(LOG_TAG, "setDevice " + this.mUsbDevice);
         // find interface
+        // tìm giao diện
         if (this.mUsbDevice.getInterfaceCount() != 1) {
             Log.e(LOG_TAG, "Could not find interface");
             return;
         }
         mIntf = this.mUsbDevice.getInterface(0);
         // device should have two endpoints
+        // thiết bị phải có hai endpoint
         if (mIntf.getEndpointCount() != 2) {
             Log.e(LOG_TAG, "Could not find endpoints");
             return;
         }
         // endpoints should be of type bulk
+        // các endpoint phải thuộc loại bulk
         UsbEndpoint ep = mIntf.getEndpoint(0);
         if (ep.getType() != UsbConstants.USB_ENDPOINT_XFER_BULK) {
             Log.e(LOG_TAG, "Endpoint is not of type bulk");
             return;
         }
         // check endpoint direction
+        // kiểm tra hướng của endpoint
         if (ep.getDirection() == UsbConstants.USB_DIR_IN) {
             mEpIn = mIntf.getEndpoint(0);
             mEpOut = mIntf.getEndpoint(1);
@@ -195,6 +203,7 @@ public class UsbLinkAndroid implements CrazyUsbInterface{
         if (usbManager != null) {
             HashMap<String, UsbDevice> deviceList = usbManager.getDeviceList();
             // Iterate over USB devices
+            // Duyệt qua các thiết bị USB
             for (Entry<String, UsbDevice> e : deviceList.entrySet()) {
                 Log.i(LOG_TAG, "String: " + e.getKey() + " " + e.getValue().getVendorId() + " " + e.getValue().getProductId());
                 UsbDevice device = e.getValue();
@@ -241,6 +250,7 @@ public class UsbLinkAndroid implements CrazyUsbInterface{
     }
 
     //TODO: redundant?
+    //TODO: thừa?
     public boolean isUsbDeviceConnected(int vid, int pid) {
         return isUsbConnected() && isUsbDevice(mUsbDevice, vid, pid);
     }

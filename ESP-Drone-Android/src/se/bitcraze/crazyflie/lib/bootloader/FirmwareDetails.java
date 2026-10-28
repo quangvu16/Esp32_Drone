@@ -29,6 +29,7 @@ package se.bitcraze.crazyflie.lib.bootloader;
 
 /**
  * Needs to be in a separate class, otherwise more JSON serialization magic is required
+ * Cần phải là một lớp riêng, nếu không sẽ phải dùng thêm các thủ thuật tuần tự hóa JSON
  *
  */
 public class FirmwareDetails {

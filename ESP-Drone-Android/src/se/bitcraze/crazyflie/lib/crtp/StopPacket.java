@@ -20,6 +20,7 @@ public class StopPacket extends CrtpPacket {
     @Override
     protected int getDataByteCount() {
         return 1; // 1 byte (type)
+                  // 1 byte (kiểu)
     }
 
     @Override

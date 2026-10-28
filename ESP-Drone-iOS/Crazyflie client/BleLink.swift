@@ -5,6 +5,9 @@
 //  BLE GATT transport (PROTOCOL.md §8). Note this project previously only
 //  linked CoreBluetooth without using it — the GATT client is implemented
 //  here against the Bitcraze service the firmware advertises:
+//  Tầng truyền BLE GATT (PROTOCOL.md §8). Lưu ý trước đây project này chỉ
+//  liên kết CoreBluetooth mà không dùng nó — GATT client được triển khai ở
+//  đây với service Bitcraze mà firmware quảng bá:
 //
 //    00000201-1C7F-4F9E-947B-43B7C00A9A08  service
 //      00000202  CRTP      write   raw CRTP when <= 20 bytes
@@ -16,6 +19,12 @@
 //  (bit7 start | bits6..5 pid | bits4..0 totalLen-1, 19 CRTP bytes per
 //  segment). A datagram is single-segment when its announced length fits in
 //  that segment — not when the length field alone looks small.
+//  Sự bất đối xứng là của đường truyền, không phải của ta: các lần ghi ngắn từ
+//  phone sang drone được gửi thô trên 00000202, nhưng mọi notification từ drone
+//  về phone đều mang một byte điều khiển (bit7 start | bits6..5 pid |
+//  bits4..0 totalLen-1, 19 byte CRTP mỗi đoạn). Một datagram là đơn đoạn khi
+//  chiều dài được báo trước nằm gọn trong đoạn đó — không phải khi riêng trường
+//  chiều dài trông có vẻ nhỏ.
 //
 
 import Foundation
@@ -29,10 +38,12 @@ final class BleLink: NSObject, CrtpDriver {
     private static let crtpDownUUID = CBUUID(string: "00000204-1C7F-4F9E-947B-43B7C00A9A08")
 
     /// CRTP bytes per 20-byte segment: 1 control byte + 19 payload.
+    /// Số byte CRTP mỗi đoạn 20 byte: 1 byte điều khiển + 19 byte phần dữ liệu.
     private static let segmentBytes = 19
 
     var stateCallback: ((NSString) -> ())?
     /// Discovered drone names, for the connection picker.
+    /// Tên các drone đã phát hiện, dùng cho trình chọn kết nối.
     var onPeripheralsFound: (([String]) -> Void)?
 
     private var central: CBCentralManager!
@@ -43,6 +54,7 @@ final class BleLink: NSObject, CrtpDriver {
     private var packetHandler: ((Data) -> ())?
 
     // Control-byte reassembly state (§8).
+    // Trạng thái lắp ráp theo byte điều khiển (§8).
     private var rxBuffer = Data()
     private var rxExpected = 0
     private var rxPid: UInt8 = 0xFF
@@ -67,6 +79,7 @@ final class BleLink: NSObject, CrtpDriver {
         preferredName = address
         guard central.state == .poweredOn else {
             // CBCentralManagerDelegate will retry once powered on.
+            // CBCentralManagerDelegate sẽ thử lại khi Bluetooth đã được bật.
             return
         }
         scanAndConnect()
@@ -89,6 +102,8 @@ final class BleLink: NSObject, CrtpDriver {
 
     /// Sends one CRTP packet. Short packets go raw on 0x202; longer ones are
     /// segmented on 0x203 with control bytes.
+    /// Gửi một gói tin CRTP. Gói tin ngắn được gửi thô trên 0x202; gói tin dài
+    /// hơn được chia đoạn trên 0x203 kèm byte điều khiển.
     func sendPacket(_ packet: Data, callback: ((Bool) -> ())?) {
         guard let peripheral = peripheral else {
             callback?(false)
@@ -108,6 +123,7 @@ final class BleLink: NSObject, CrtpDriver {
         while offset < total {
             let n = min(BleLink.segmentBytes, total - offset)
             // Control byte: start bit, wrapping pid, announced length - 1.
+            // Byte điều khiển: bit start, pid quay vòng, chiều dài báo trước - 1.
             var ctrl = (sendPid & 0x03) << 5 | UInt8((total - 1) & 0x1F)
             if offset == 0 { ctrl |= 0x80 }
             var segment = Data([ctrl])
@@ -129,6 +145,8 @@ final class BleLink: NSObject, CrtpDriver {
         knownNames.removeAll()
         central.scanForPeripherals(withServices: [BleLink.serviceUUID], options: nil)
         // Connect to the preferred or first match; the picker can name one.
+        // Kết nối tới thiết bị ưa thích hoặc kết quả khớp đầu tiên; trình chọn
+        // có thể chỉ định một thiết bị.
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
             guard let self = self, self.peripheral == nil else { return }
             self.connectToPreferred()
@@ -154,6 +172,7 @@ final class BleLink: NSObject, CrtpDriver {
     }
 
     /// Lets the connection picker choose a specific drone by name.
+    /// Cho phép trình chọn kết nối chọn một drone cụ thể theo tên.
     func connect(toName name: String) {
         preferredName = name
         if let target = knownNames[name] {
@@ -182,6 +201,7 @@ final class BleLink: NSObject, CrtpDriver {
             rxExpected = total
             rxPid = pid
             // Single-segment when the announced length fits in this segment.
+            // Là đơn đoạn khi chiều dài báo trước nằm gọn trong đoạn này.
             if total <= body.count {
                 packetHandler?(Data(rxBuffer))
                 rxBuffer.removeAll()
@@ -214,6 +234,7 @@ extension BleLink: CBCentralManagerDelegate {
         knownNames[peripheral.name ?? peripheral.identifier.uuidString] = peripheral
         onPeripheralsFound?(knownNames.keys.sorted())
         // Auto-connect to the first advertisement unless the picker is driving.
+        // Tự động kết nối với quảng bá đầu tiên, trừ khi trình chọn đang điều khiển.
         if self.peripheral == nil, preferredName == nil {
             connectToPreferred()
         }
