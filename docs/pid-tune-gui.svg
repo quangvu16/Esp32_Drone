@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 880" width="1280" height="880" role="img" aria-labelledby="ttl desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1060" width="1280" height="1060" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone Python tuner GUI</title>
-  <desc id="desc">Screen map of the bench tuner window: link and axis picker, gains, drone safety buttons, the motor test panel with a Run and Stop pair per motor, live charts, and the auto-tune panel.</desc>
+  <desc id="desc">Screen map of the bench tuner window: left column with link, gains, drone buttons, the motor test panel with a Run and Stop pair per motor, and auto-tune; right side with the five live charts; notes on the motor test, safety and files.</desc>
 
   <defs>
     <style>
@@ -27,7 +27,7 @@
     </style>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1280" height="880"/>
+  <rect class="bg" x="0" y="0" width="1280" height="1060"/>
 
   <!-- ============================ header ============================ -->
   <text class="h1" x="40" y="44">Python tuner GUI — ESP-Drone</text>
@@ -36,9 +36,9 @@
 
   <!-- ============================ window ============================ -->
   <text class="h2" x="40" y="118">Drone Tuner — roll</text>
-  <text class="lblm" x="230" y="118">tuner_gui.py · one window, one axis at a time</text>
+  <text class="lblm" x="230" y="118">tuner_gui.py · one window, one axis at a time · left = controls, right = live charts</text>
 
-  <rect class="win" x="40" y="132" width="820" height="700" rx="10"/>
+  <rect class="win" x="40" y="132" width="820" height="880" rx="10"/>
   <rect class="winbar" x="40" y="132" width="820" height="30" rx="10"/>
   <text class="lbl" x="56" y="152">Drone Tuner — roll</text>
   <circle cx="820" cy="147" r="5" fill="#8c959f"/>
@@ -46,149 +46,193 @@
   <circle cx="856" cy="147" r="5" fill="#8c959f"/>
 
   <!-- link -->
-  <rect class="panel" x="56" y="176" width="300" height="92" rx="6"/>
+  <rect class="panel" x="56" y="176" width="300" height="104" rx="6"/>
   <text class="lbl" x="68" y="196">Link</text>
   <text class="chip" x="68" y="216">192.168.43.42</text>
-  <text class="lblm" x="68" y="236">Axis</text>
-  <rect class="btn-pri" x="112" y="222" width="56" height="22" rx="6"/>
-  <text class="lblw" x="140" y="237" text-anchor="middle">roll</text>
-  <rect class="btn" x="172" y="222" width="56" height="22" rx="6"/>
-  <text class="lbl" x="200" y="237" text-anchor="middle">pitch</text>
-  <rect class="btn" x="232" y="222" width="48" height="22" rx="6"/>
-  <text class="lbl" x="256" y="237" text-anchor="middle">yaw</text>
-  <rect class="btn" x="68" y="248" width="88" height="22" rx="6"/>
-  <text class="lbl" x="112" y="263" text-anchor="middle">Reconnect</text>
+  <text class="lblm" x="68" y="241">Axis</text>
+  <rect class="btn-pri" x="112" y="228" width="56" height="22" rx="6"/>
+  <text class="lblw" x="140" y="243" text-anchor="middle">Roll</text>
+  <rect class="btn" x="172" y="228" width="56" height="22" rx="6"/>
+  <text class="lbl" x="200" y="243" text-anchor="middle">Pitch</text>
+  <rect class="btn" x="232" y="228" width="48" height="22" rx="6"/>
+  <text class="lbl" x="256" y="243" text-anchor="middle">Yaw</text>
+  <rect class="btn" x="68" y="252" width="88" height="22" rx="6"/>
+  <text class="lbl" x="112" y="267" text-anchor="middle">Reconnect</text>
 
   <!-- gains -->
-  <rect class="panel" x="56" y="282" width="300" height="132" rx="6"/>
-  <text class="lbl" x="68" y="302">Gains</text>
-  <text class="lblm" x="68" y="324">Kp</text>
-  <text class="mono" x="112" y="324">1.30</text>
-  <rect class="btn" x="168" y="310" width="24" height="20" rx="4"/><text class="lbl" x="180" y="325" text-anchor="middle">−</text>
-  <rect class="btn" x="196" y="310" width="24" height="20" rx="4"/><text class="lbl" x="208" y="325" text-anchor="middle">+</text>
-  <rect class="btn" x="224" y="310" width="36" height="20" rx="4"/><text class="lbl" x="242" y="325" text-anchor="middle">Set</text>
-  <text class="lblm" x="68" y="352">Ki</text>
-  <text class="mono" x="112" y="352">0.040</text>
-  <rect class="btn" x="168" y="338" width="24" height="20" rx="4"/><text class="lbl" x="180" y="353" text-anchor="middle">−</text>
-  <rect class="btn" x="196" y="338" width="24" height="20" rx="4"/><text class="lbl" x="208" y="353" text-anchor="middle">+</text>
-  <rect class="btn" x="224" y="338" width="36" height="20" rx="4"/><text class="lbl" x="242" y="353" text-anchor="middle">Set</text>
-  <text class="lblm" x="68" y="380">Kd</text>
-  <text class="mono" x="112" y="380">18.0</text>
-  <rect class="btn" x="168" y="366" width="24" height="20" rx="4"/><text class="lbl" x="180" y="381" text-anchor="middle">−</text>
-  <rect class="btn" x="196" y="366" width="24" height="20" rx="4"/><text class="lbl" x="208" y="381" text-anchor="middle">+</text>
-  <rect class="btn" x="224" y="366" width="36" height="20" rx="4"/><text class="lbl" x="242" y="381" text-anchor="middle">Set</text>
-  <rect class="btn" x="68" y="390" width="44" height="18" rx="4"/><text class="lblm" x="90" y="403" text-anchor="middle">Save</text>
-  <rect class="btn" x="116" y="390" width="44" height="18" rx="4"/><text class="lblm" x="138" y="403" text-anchor="middle">Load</text>
-  <rect class="btn" x="164" y="390" width="64" height="18" rx="4"/><text class="lblm" x="196" y="403" text-anchor="middle">Defaults</text>
+  <rect class="panel" x="56" y="288" width="300" height="142" rx="6"/>
+  <text class="lbl" x="68" y="308">Gains</text>
+  <text class="mono" x="68" y="333">pid.roll_kp</text>
+  <rect class="field" x="154" y="318" width="52" height="20" rx="4"/><text class="mono" x="180" y="333" text-anchor="middle">1.30</text>
+  <rect class="btn" x="214" y="318" width="22" height="20" rx="4"/><text class="lbl" x="225" y="333" text-anchor="middle">−</text>
+  <rect class="btn" x="242" y="318" width="22" height="20" rx="4"/><text class="lbl" x="253" y="333" text-anchor="middle">+</text>
+  <rect class="btn" x="270" y="318" width="36" height="20" rx="4"/><text class="lbl" x="288" y="333" text-anchor="middle">Set</text>
+  <text class="mono" x="68" y="361">pid.roll_ki</text>
+  <rect class="field" x="154" y="346" width="52" height="20" rx="4"/><text class="mono" x="180" y="361" text-anchor="middle">0.040</text>
+  <rect class="btn" x="214" y="346" width="22" height="20" rx="4"/><text class="lbl" x="225" y="361" text-anchor="middle">−</text>
+  <rect class="btn" x="242" y="346" width="22" height="20" rx="4"/><text class="lbl" x="253" y="361" text-anchor="middle">+</text>
+  <rect class="btn" x="270" y="346" width="36" height="20" rx="4"/><text class="lbl" x="288" y="361" text-anchor="middle">Set</text>
+  <text class="mono" x="68" y="389">pid.roll_kd</text>
+  <rect class="field" x="154" y="374" width="52" height="20" rx="4"/><text class="mono" x="180" y="389" text-anchor="middle">18.0</text>
+  <rect class="btn" x="214" y="374" width="22" height="20" rx="4"/><text class="lbl" x="225" y="389" text-anchor="middle">−</text>
+  <rect class="btn" x="242" y="374" width="22" height="20" rx="4"/><text class="lbl" x="253" y="389" text-anchor="middle">+</text>
+  <rect class="btn" x="270" y="374" width="36" height="20" rx="4"/><text class="lbl" x="288" y="389" text-anchor="middle">Set</text>
+  <rect class="btn" x="68" y="402" width="48" height="20" rx="4"/><text class="lblm" x="92" y="417" text-anchor="middle">Get</text>
+  <rect class="btn" x="120" y="402" width="48" height="20" rx="4"/><text class="lblm" x="144" y="417" text-anchor="middle">Save</text>
+  <rect class="btn" x="172" y="402" width="48" height="20" rx="4"/><text class="lblm" x="196" y="417" text-anchor="middle">Load</text>
+  <rect class="btn" x="224" y="402" width="64" height="20" rx="4"/><text class="lblm" x="256" y="417" text-anchor="middle">Defaults</text>
 
   <!-- drone -->
-  <rect class="panel" x="56" y="428" width="300" height="112" rx="6"/>
-  <text class="lbl" x="68" y="448">Drone</text>
-  <rect class="btn-pri" x="68" y="458" width="64" height="24" rx="6"/>
-  <text class="lblw" x="100" y="475" text-anchor="middle">ARM</text>
-  <rect class="btn" x="138" y="458" width="72" height="24" rx="6"/>
-  <text class="lbl" x="174" y="475" text-anchor="middle">DISARM</text>
-  <rect class="btn-dan" x="216" y="458" width="94" height="24" rx="6"/>
-  <text class="lblw" x="263" y="475" text-anchor="middle">EMERGENCY</text>
-  <text class="lblm" x="68" y="502">Log Hz</text>
-  <rect class="field" x="122" y="488" width="40" height="20" rx="4"/><text class="mono" x="142" y="503" text-anchor="middle">20</text>
-  <text class="lblm" x="68" y="526">Window s</text>
-  <rect class="field" x="122" y="512" width="40" height="20" rx="4"/><text class="mono" x="142" y="527" text-anchor="middle">10</text>
-  <rect class="btn" x="180" y="488" width="56" height="20" rx="4"/><text class="lblm" x="208" y="503" text-anchor="middle">Pause</text>
-  <rect class="btn" x="180" y="512" width="88" height="20" rx="4"/><text class="lblm" x="224" y="527" text-anchor="middle">Record CSV</text>
+  <rect class="panel" x="56" y="438" width="300" height="112" rx="6"/>
+  <text class="lbl" x="68" y="458">Drone</text>
+  <rect class="btn-pri" x="68" y="468" width="64" height="24" rx="6"/>
+  <text class="lblw" x="100" y="485" text-anchor="middle">ARM</text>
+  <rect class="btn" x="138" y="468" width="72" height="24" rx="6"/>
+  <text class="lbl" x="174" y="485" text-anchor="middle">DISARM</text>
+  <rect class="btn-dan" x="216" y="468" width="94" height="24" rx="6"/>
+  <text class="lblw" x="263" y="485" text-anchor="middle">EMERGENCY</text>
+  <text class="lblm" x="68" y="513">Log Hz</text>
+  <rect class="field" x="122" y="499" width="40" height="20" rx="4"/><text class="mono" x="142" y="514" text-anchor="middle">20</text>
+  <text class="lblm" x="68" y="537">Window s</text>
+  <rect class="field" x="122" y="523" width="40" height="20" rx="4"/><text class="mono" x="142" y="538" text-anchor="middle">10</text>
+  <rect class="btn" x="180" y="499" width="56" height="20" rx="4"/><text class="lblm" x="208" y="514" text-anchor="middle">Pause</text>
+  <rect class="btn" x="180" y="523" width="88" height="20" rx="4"/><text class="lblm" x="224" y="538" text-anchor="middle">Record CSV</text>
 
   <!-- motor test -->
-  <rect class="panel" x="56" y="554" width="300" height="186" rx="6"/>
-  <text class="tag" x="68" y="574">MOTOR TEST</text>
-  <text class="lblm" x="150" y="574">disarmed only — props clear</text>
-  <text class="lblm" x="68" y="598">Speed</text>
-  <rect class="field" x="122" y="584" width="52" height="20" rx="4"/><text class="mono" x="148" y="599" text-anchor="middle">1200</text>
-  <text class="lblm" x="182" y="599">1000…1500 step 50</text>
+  <rect class="panel" x="56" y="558" width="300" height="186" rx="6"/>
+  <text class="tag" x="68" y="578">MOTOR TEST</text>
+  <text class="lblm" x="152" y="578">disarmed only — props clear</text>
+  <text class="lblm" x="68" y="602">Speed</text>
+  <rect class="field" x="122" y="588" width="52" height="20" rx="4"/><text class="mono" x="148" y="603" text-anchor="middle">1200</text>
+  <text class="lblm" x="182" y="603">1000…1500 step 50</text>
 
-  <text class="lbl" x="68" y="628">M1</text>
-  <rect class="btn-pri" x="112" y="614" width="56" height="22" rx="6"/><text class="lblw" x="140" y="629" text-anchor="middle">Run</text>
-  <rect class="btn" x="174" y="614" width="56" height="22" rx="6"/><text class="lbl" x="202" y="629" text-anchor="middle">Stop</text>
-  <text class="lbl" x="68" y="654">M2</text>
-  <rect class="btn-pri" x="112" y="640" width="56" height="22" rx="6"/><text class="lblw" x="140" y="655" text-anchor="middle">Run</text>
-  <rect class="btn" x="174" y="640" width="56" height="22" rx="6"/><text class="lbl" x="202" y="655" text-anchor="middle">Stop</text>
-  <text class="lbl" x="68" y="680">M3</text>
-  <rect class="btn-pri" x="112" y="666" width="56" height="22" rx="6"/><text class="lblw" x="140" y="681" text-anchor="middle">Run</text>
-  <rect class="btn" x="174" y="666" width="56" height="22" rx="6"/><text class="lbl" x="202" y="681" text-anchor="middle">Stop</text>
-  <text class="lbl" x="68" y="706">M4</text>
-  <rect class="btn-pri" x="112" y="692" width="56" height="22" rx="6"/><text class="lblw" x="140" y="707" text-anchor="middle">Run</text>
-  <rect class="btn" x="174" y="692" width="56" height="22" rx="6"/><text class="lbl" x="202" y="707" text-anchor="middle">Stop</text>
-  <rect class="btn-dan" x="68" y="718" width="110" height="22" rx="6"/>
-  <text class="lblw" x="123" y="733" text-anchor="middle">STOP ALL</text>
-  <text class="lblm" x="188" y="733">150 ms keepalive</text>
-
-  <!-- charts -->
-  <rect class="panel" x="376" y="176" width="468" height="300" rx="6"/>
-  <text class="lblm" x="388" y="196">angle vs. setpoint · live 20 Hz</text>
-  <rect x="560" y="186" width="9" height="9" fill="#0969da"/>
-  <text class="chip" x="573" y="194">angle</text>
-  <rect x="620" y="186" width="9" height="9" fill="#1a7f37"/>
-  <text class="chip" x="633" y="194">setpoint</text>
-  <polyline points="392,380 430,360 468,368 506,330 544,346 582,300 620,318 658,280 696,300 734,262 772,278 810,250"
-            fill="none" stroke="#0969da" stroke-width="2"/>
-  <polyline points="392,384 430,364 468,364 506,334 544,334 582,304 620,304 658,284 696,284 734,264 772,264 810,254"
-            fill="none" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="5 4"/>
-
-  <rect class="panel" x="376" y="490" width="468" height="150" rx="6"/>
-  <text class="lblm" x="388" y="510">controller output · P / I / D terms</text>
-  <polyline points="392,600 430,560 468,584 506,540 544,556 582,520 620,536 658,508 696,520 734,496 772,508 810,488"
-            fill="none" stroke="#bc4c00" stroke-width="2"/>
-  <polyline points="392,612 430,604 468,608 506,596 544,600 582,588 620,592 658,582 696,586 734,576 772,580 810,572"
-            fill="none" stroke="#8250df" stroke-width="1.5"/>
-
-  <rect class="panel" x="376" y="654" width="468" height="82" rx="6"/>
-  <text class="lblm" x="388" y="674">statistics of the visible window</text>
-  <text class="mono" x="388" y="700">rms 0.42°   p95 1.10°   rate 3.1 °/s</text>
-  <text class="lblm" x="388" y="722">Pause and Record CSV live next to the Drone panel</text>
+  <text class="lbl" x="68" y="626">M1</text>
+  <rect class="btn-pri" x="112" y="612" width="56" height="22" rx="6"/><text class="lblw" x="140" y="627" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="612" width="56" height="22" rx="6"/><text class="lbl" x="202" y="627" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="652">M2</text>
+  <rect class="btn-pri" x="112" y="638" width="56" height="22" rx="6"/><text class="lblw" x="140" y="653" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="638" width="56" height="22" rx="6"/><text class="lbl" x="202" y="653" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="678">M3</text>
+  <rect class="btn-pri" x="112" y="664" width="56" height="22" rx="6"/><text class="lblw" x="140" y="679" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="664" width="56" height="22" rx="6"/><text class="lbl" x="202" y="679" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="704">M4</text>
+  <rect class="btn-pri" x="112" y="690" width="56" height="22" rx="6"/><text class="lblw" x="140" y="705" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="690" width="56" height="22" rx="6"/><text class="lbl" x="202" y="705" text-anchor="middle">Stop</text>
+  <rect class="btn-dan" x="68" y="716" width="110" height="22" rx="6"/>
+  <text class="lblw" x="123" y="731" text-anchor="middle">STOP ALL</text>
+  <text class="lblm" x="188" y="731">150 ms keepalive</text>
 
   <!-- auto-tune -->
-  <rect class="panel" x="56" y="754" width="788" height="62" rx="6"/>
-  <text class="lbl" x="68" y="774">Auto-tune</text>
-  <rect class="field" x="136" y="760" width="150" height="20" rx="4"/>
-  <text class="mono" x="211" y="775" text-anchor="middle">twiddle (offline)</text>
-  <text class="lblm" x="300" y="775">Trials 20   Trial s 6.0   Range x 2.0   learn from past trials</text>
-  <rect class="btn-warn" x="68" y="786" width="120" height="22" rx="6"/>
-  <text class="lblw" x="128" y="801" text-anchor="middle">Start auto-tune</text>
-  <rect class="btn" x="196" y="786" width="64" height="22" rx="6"/>
-  <text class="lbl" x="228" y="801" text-anchor="middle">Model</text>
-  <text class="lblm" x="276" y="801">props spin — strap the drone down</text>
+  <rect class="panel" x="56" y="752" width="300" height="206" rx="6"/>
+  <text class="lbl" x="68" y="772">Auto-tune</text>
+  <rect class="field" x="136" y="758" width="170" height="20" rx="4"/>
+  <text class="mono" x="221" y="773" text-anchor="middle">ML (Bayesian)</text>
+  <rect class="btn" x="68" y="786" width="12" height="12" rx="2"/><text class="lblm" x="86" y="796">roll</text>
+  <rect class="btn" x="130" y="786" width="12" height="12" rx="2"/><text class="lblm" x="148" y="796">pitch</text>
+  <rect class="btn" x="202" y="786" width="12" height="12" rx="2"/><text class="lblm" x="220" y="796">yaw</text>
+  <rect class="btn" x="68" y="812" width="12" height="12" rx="2"/><text class="lblm" x="86" y="822">learn from past trials (logs)</text>
+  <text class="lblm" x="68" y="848">Trials</text>
+  <rect class="field" x="116" y="834" width="44" height="20" rx="4"/><text class="mono" x="138" y="849" text-anchor="middle">20</text>
+  <text class="lblm" x="172" y="848">Trial s</text>
+  <rect class="field" x="222" y="834" width="44" height="20" rx="4"/><text class="mono" x="244" y="849" text-anchor="middle">6.0</text>
+  <text class="lblm" x="68" y="876">Range x</text>
+  <rect class="field" x="116" y="862" width="44" height="20" rx="4"/><text class="mono" x="138" y="877" text-anchor="middle">2.0</text>
+  <rect class="btn-warn" x="68" y="890" width="120" height="22" rx="6"/>
+  <text class="lblw" x="128" y="905" text-anchor="middle">Start auto-tune</text>
+  <rect class="btn" x="196" y="890" width="64" height="22" rx="6"/>
+  <text class="lbl" x="228" y="905" text-anchor="middle">Model</text>
+  <text class="lblm" x="68" y="928">Gaussian process + expected improvement.</text>
+  <text class="lblm" x="68" y="944">Fewest trials; the default. Props spin — strap down.</text>
+
+  <!-- stats + status (bottom of the left column) -->
+  <text class="mono" x="68" y="976">rms 0.42°   p95 1.10°   rate 3.1 °/s</text>
+  <text class="lblm" x="68" y="998">window statistics · connected · logging 20 Hz</text>
+
+  <!-- ============================ charts ============================ -->
+  <rect class="panel" x="376" y="176" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="196">Angle · deg</text>
+  <rect x="700" y="186" width="9" height="9" fill="#0969da"/>
+  <text class="chip" x="713" y="194">stabilizer</text>
+  <polyline points="392,296 430,282 468,288 506,262 544,272 582,248 620,258 658,236 696,246 734,228 772,238 810,222"
+            fill="none" stroke="#0969da" stroke-width="2"/>
+
+  <rect class="panel" x="376" y="334" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="354">Rate · deg/s</text>
+  <rect x="700" y="344" width="9" height="9" fill="#bc4c00"/>
+  <text class="chip" x="713" y="352">rate</text>
+  <polyline points="392,452 430,430 468,442 506,410 544,424 582,398 620,412 658,388 696,402 734,380 772,392 810,372"
+            fill="none" stroke="#bc4c00" stroke-width="2"/>
+
+  <rect class="panel" x="376" y="492" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="512">PID terms · P / I / D</text>
+  <rect x="620" y="502" width="9" height="9" fill="#1a7f37"/>
+  <text class="chip" x="633" y="510">P</text>
+  <rect x="660" y="502" width="9" height="9" fill="#8250df"/>
+  <text class="chip" x="673" y="510">I</text>
+  <rect x="700" y="502" width="9" height="9" fill="#bc4c00"/>
+  <text class="chip" x="713" y="510">D</text>
+  <polyline points="392,610 430,584 468,596 506,566 544,578 582,552 620,564 658,542 696,554 734,534 772,544 810,528"
+            fill="none" stroke="#1a7f37" stroke-width="2"/>
+  <polyline points="392,624 430,620 468,616 506,612 544,608 582,604 620,600 658,596 696,592 734,588 772,584 810,580"
+            fill="none" stroke="#8250df" stroke-width="1.5"/>
+  <polyline points="392,600 430,606 468,594 506,602 544,590 582,598 620,588 658,594 696,586 734,592 772,584 810,588"
+            fill="none" stroke="#bc4c00" stroke-width="1.5"/>
+
+  <rect class="panel" x="376" y="650" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="670">Controller · output</text>
+  <rect x="700" y="660" width="9" height="9" fill="#0969da"/>
+  <text class="chip" x="713" y="668">output</text>
+  <polyline points="392,770 430,748 468,758 506,730 544,742 582,718 620,730 658,708 696,720 734,700 772,710 810,694"
+            fill="none" stroke="#0969da" stroke-width="2"/>
+
+  <rect class="panel" x="376" y="808" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="828">Motor m1 · µs</text>
+  <rect x="700" y="818" width="9" height="9" fill="#cf222e"/>
+  <text class="chip" x="713" y="826">m1</text>
+  <line x1="392" y1="846" x2="828" y2="846" stroke="#8c959f" stroke-width="1" stroke-dasharray="5 4"/>
+  <line x1="392" y1="938" x2="828" y2="938" stroke="#8c959f" stroke-width="1" stroke-dasharray="5 4"/>
+  <polyline points="392,920 430,918 468,922 506,910 544,916 582,906 620,912 658,902 696,908 734,898 772,904 810,896"
+            fill="none" stroke="#cf222e" stroke-width="2"/>
+  <text class="lblm" x="600" y="843">1990 sat</text>
+  <text class="lblm" x="600" y="953">1010 sat</text>
+
+  <text class="lblm" x="376" y="978">live · Log Hz 20 · shared x-axis · Window s 10 · Pause and Record CSV sit in the Drone panel</text>
 
   <!-- ============================ right column ============================ -->
-  <rect class="card" x="890" y="132" width="350" height="240" rx="10"/>
+  <rect class="card" x="890" y="132" width="350" height="250" rx="10"/>
   <text class="h2" x="908" y="158">Motor test panel</text>
   <line class="rule" x1="908" y1="168" x2="1222" y2="168"/>
   <text class="lbl" x="908" y="192">Run / Stop per motor</text>
-  <text class="lblm" x="908" y="210">only that motor runs; the others idle</text>
+  <text class="lblm" x="908" y="210">Run drives only that motor; the rest idle</text>
   <text class="lbl" x="908" y="234">Speed</text>
-  <text class="lblm" x="908" y="252">shared by all four · 1000 = idle</text>
+  <text class="lblm" x="908" y="252">shared by all four · 1000 = idle · max 1500</text>
   <text class="lbl" x="908" y="276">STOP ALL</text>
   <text class="lblm" x="908" y="294">sends motor_test off at once</text>
   <text class="lbl" x="908" y="318">Keepalive</text>
-  <text class="lblm" x="908" y="336">re-sent every 150 ms while any motor runs</text>
+  <text class="lblm" x="908" y="336">re-sent every 150 ms while a motor runs</text>
   <text class="lblm" x="908" y="360">firmware stops the test after 300 ms of silence</text>
 
-  <rect class="card" x="890" y="388" width="350" height="214" rx="10"/>
-  <text class="h2" x="908" y="414">Safety</text>
-  <line class="rule" x1="908" y1="424" x2="1222" y2="424"/>
-  <text class="lbl" x="908" y="448">Disarmed only</text>
-  <text class="lblm" x="908" y="466">the firmware refuses the test while armed</text>
-  <text class="lbl" x="908" y="490">Props clear</text>
-  <text class="lblm" x="908" y="508">a stalled or loaded prop can cut skin</text>
-  <text class="lbl" x="908" y="532">Closes cleanly</text>
-  <text class="lblm" x="908" y="550">closing the window sends motor_test off</text>
-  <text class="lbl" x="908" y="574">EMERGENCY</text>
-  <text class="lblm" x="908" y="592">also ends the test and disarms</text>
+  <rect class="card" x="890" y="398" width="350" height="214" rx="10"/>
+  <text class="h2" x="908" y="424">Safety</text>
+  <line class="rule" x1="908" y1="434" x2="1222" y2="434"/>
+  <text class="lbl" x="908" y="458">Disarmed only</text>
+  <text class="lblm" x="908" y="476">the firmware refuses the test while armed</text>
+  <text class="lbl" x="908" y="500">Props clear</text>
+  <text class="lblm" x="908" y="518">a stalled or loaded prop can cut skin</text>
+  <text class="lbl" x="908" y="542">Closes cleanly</text>
+  <text class="lblm" x="908" y="560">closing the window sends motor_test off</text>
+  <text class="lbl" x="908" y="584">EMERGENCY</text>
+  <text class="lblm" x="908" y="602">also ends the test and disarms</text>
 
-  <rect class="card" x="890" y="618" width="350" height="198" rx="10"/>
-  <text class="h2" x="908" y="644">Files</text>
-  <line class="rule" x1="908" y1="654" x2="1222" y2="654"/>
-  <text class="lblm" x="908" y="678">tools/pid-tune/tuner_gui.py</text>
-  <text class="lblm" x="908" y="702">tools/pid-tune/drone.py</text>
-  <text class="lblm" x="908" y="726">tools/pid-tune/selftest.py</text>
-  <text class="lbl" x="908" y="754">python3 -m tools.pid-tune.tuner_gui</text>
-  <text class="lblm" x="908" y="778">see tools/pid-tune/README.md</text>
+  <rect class="card" x="890" y="628" width="350" height="240" rx="10"/>
+  <text class="h2" x="908" y="654">Files</text>
+  <line class="rule" x1="908" y1="664" x2="1222" y2="664"/>
+  <text class="lblm" x="908" y="688">tools/pid-tune/tuner_gui.py</text>
+  <text class="lblm" x="908" y="712">tools/pid-tune/drone.py</text>
+  <text class="lblm" x="908" y="736">tools/pid-tune/ml_tune.py</text>
+  <text class="lblm" x="908" y="760">tools/pid-tune/selftest.py</text>
+  <text class="lbl" x="908" y="792">cd tools/pid-tune</text>
+  <text class="lbl" x="908" y="814">python tuner_gui.py</text>
+  <text class="lblm" x="908" y="838">optional: --host 192.168.43.42 --axis roll</text>
+  <text class="lblm" x="908" y="862">see tools/pid-tune/README.md</text>
 </svg>
