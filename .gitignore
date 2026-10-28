@@ -28,3 +28,14 @@ Esp32_drone_backup_*.ino.txt
 # local UI backups / scratch
 apps_ui_backup_*.zip
 zi5dtisj
+
+# agent / research scratch
+.claude-scratch/
+.claude-scratch-verify/
+.research/
+.research-tmp/
+.research_tmp/
+.research_scripts/
+
+# Python bytecode
+__pycache__/
