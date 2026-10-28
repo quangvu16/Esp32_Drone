@@ -95,6 +95,8 @@ process Bayesian optimisation, a neural ensemble, CMA-ES, differential
 evolution, PSO and the rest) and a live plot of the stabiliser. It scores a
 trial with the same cost model as the phone apps, so a gain set found on the
 desktop means the same thing as one found on the phone.
+**Spin up** streams level setpoints at a thrust you choose so the motors run on
+a tuning stand. Step-by-step: [docs/PID_TUNER_GUIDE.md](docs/PID_TUNER_GUIDE.md).
 
 ## Building
 
@@ -112,7 +114,7 @@ in the Arduino IDE. Board *ESP32 Dev Module*, partition scheme **Huge APP**.
 |---|---|---|
 | `Esp32_drone/test/` | `./run.sh` | 83 checks in five suites: the launch-frame rotation, body↔world yaw rotation, log-config parsing including the client's wire padding, the self-level sign, and SBUS failsafe/lost-frame rejection. `run.sh` also checks the accelerometer scale matches the configured range |
 | `Crazyflie clientTests` | *Product → Test* | 24 tests: great-circle geo math, `.waypoints` codec, mission edits, waypoint sequencing, launch frame |
-| `tools/pid-tune/selftest.py` | `python selftest.py` | the whole tuner without hardware: wire framing and struct budgets, the link against a fake firmware transcribed from the sketch, telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all eleven optimisers against a synthetic bowl, history seeding, and the error paths |
+| `tools/pid-tune/selftest.py` | `python selftest.py` | the whole tuner without hardware: wire framing and struct budgets, the link against a fake firmware transcribed from the sketch, the exact port-7 command bytes, the stand-thrust stream (arms on thrust-up, disarms at zero), telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all eleven optimisers against a synthetic bowl, history seeding, and the error paths |
 
 The firmware suite is deliberately self-guarding: it greps the sketch for the
 formula lines it copies and fails loudly if they drift, so the tests cannot pass

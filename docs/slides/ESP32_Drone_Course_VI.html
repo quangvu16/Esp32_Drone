@@ -1943,8 +1943,9 @@ body{background:#1B2633} .wrap{width:min(100vw,1920px);margin:0 auto}
 <tr><td>Yaw</td><td>4,0</td><td>0,02</td><td>0</td><td>0–100 / 0–20 / 0–200</td></tr>
 </table>
 <p style="font-size:30px;line-height:1.4;color:#4A5568">Thứ tự chỉnh: I = 0 → tăng P tới khi rung, giảm 30% → thêm D để hết nảy → thêm I để hết trôi → lưu.</p>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Trên máy tính: công cụ chỉnh (<b>tools/pid-tune</b>) hiện P, I và D trực tiếp — hướng dẫn ở docs/PID_TUNER_GUIDE.vi.md.</p>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Điều khiển PID · 84 · Nguồn: #define PID_*; dải trong PARAM_TOC</p>
-<aside>Thứ tự chỉnh hiệu quả cho phần lớn drone nhỏ: một, đặt I bằng 0; hai, tăng P tới khi bắt đầu rung nhanh, rồi giảm 30%; ba, tăng D tới khi drone hết nảy sau cú gạt cần nhanh; bốn, thêm I tới khi giữ thăng bằng không trôi; năm, lưu. Mỗi lần đổi một giá trị, và thử khi tháo cánh trước.</aside>
+<aside>Thứ tự chỉnh hiệu quả cho phần lớn drone nhỏ: một, đặt I bằng 0; hai, tăng P tới khi bắt đầu rung nhanh, rồi giảm 30%; ba, tăng D tới khi drone hết nảy sau cú gạt cần nhanh; bốn, thêm I tới khi giữ thăng bằng không trôi; năm, lưu. Mỗi lần đổi một giá trị, và thử khi tháo cánh trước. Công cụ chỉnh trên máy tính trong tools/pid-tune làm cùng các bước với năm biểu đồ trực tiếp; nút Spin up gửi lực đẩy liên tục để động cơ chạy trên giá chỉnh. Hướng dẫn: docs/PID_TUNER_GUIDE.vi.md.</aside>
 </section></div>
 <div class="slide"><section id="s085" style="background:#13202E;color:#F6F5F0;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
 <div style="display:flex;flex-direction:column;gap:12px">

@@ -309,6 +309,9 @@ drone to a stand or hold it tethered.**
 | **Stop tuner** (Android) | Stops after the current trial. |
 | **CUT MOTORS** | Cuts the motors **and** stops the tuner, one tap. |
 
+For live graphs on a big screen and eleven search methods, use the desktop
+tuner instead: [PID_TUNER_GUIDE.md](PID_TUNER_GUIDE.md).
+
 ---
 
 ## 10. Setup

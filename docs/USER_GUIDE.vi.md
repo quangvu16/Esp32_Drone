@@ -330,6 +330,9 @@ Buộc drone vào giá đỡ hoặc giữ bằng dây.**
 | **Stop tuner** (Android) | Dừng sau lượt thử hiện tại. |
 | **CUT MOTORS** | Tắt động cơ **và** dừng bộ tự chỉnh, chạm một lần. |
 
+Muốn có biểu đồ trực tiếp trên màn hình lớn và mười một phương pháp tìm kiếm,
+hãy dùng công cụ chỉnh trên máy tính: [PID_TUNER_GUIDE.vi.md](PID_TUNER_GUIDE.vi.md).
+
 ---
 
 <a id="s10"></a>

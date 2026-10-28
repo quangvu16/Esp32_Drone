@@ -1944,8 +1944,9 @@ body{background:#1B2633} .wrap{width:min(100vw,1920px);margin:0 auto}
 <tr><td>Yaw</td><td>4.0</td><td>0.02</td><td>0</td><td>0–100 / 0–20 / 0–200</td></tr>
 </table>
 <p style="font-size:30px;line-height:1.4;color:#4A5568">Tuning order: I = 0 → raise P until it shakes, back off 30% → add D to stop bounce → add I to stop drift → save.</p>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">On a computer: the desktop tuner (<b>tools/pid-tune</b>) shows P, I and D live — guide in docs/PID_TUNER_GUIDE.md.</p>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">PID control · 84 · Source: Esp32_drone.ino #define PID_*; PARAM_TOC ranges</p>
-<aside>Tuning order that works for most small drones: one, set I to zero; two, raise P until fast shaking starts, then back off 30%; three, raise D until the drone stops bouncing after a quick stick flick; four, add I until it holds level without drifting; five, save. Change one value at a time, and test with props off first.</aside>
+<aside>Tuning order that works for most small drones: one, set I to zero; two, raise P until fast shaking starts, then back off 30%; three, raise D until the drone stops bouncing after a quick stick flick; four, add I until it holds level without drifting; five, save. Change one value at a time, and test with props off first. The desktop tuner in tools/pid-tune does the same steps with five live graphs; its Spin up button streams thrust so the motors run on a tuning stand. Step-by-step: docs/PID_TUNER_GUIDE.md.</aside>
 </section></div>
 <div class="slide"><section id="s085" style="background:#13202E;color:#F6F5F0;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
 <div style="display:flex;flex-direction:column;gap:12px">
