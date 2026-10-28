@@ -1,9 +1,9 @@
 # Installing the apps and the firmware
 
-End-to-end: flash the board, put an app on your phone, connect, and get
-through a first flight. Protocol details live in
-**[../PROTOCOL.md](../PROTOCOL.md)**; this page is only about getting things
-installed.
+End-to-end: flash the board, put an app on your phone and connect. How to
+*fly* — every screen, CUT MOTORS, arming, the failsafe and a first-flight
+checklist — is in the **[pilot's guide](USER_GUIDE.md)**. Protocol details live
+in **[../PROTOCOL.md](../PROTOCOL.md)**.
 
 ---
 
@@ -22,7 +22,7 @@ installed.
 > The board has **only an MPU6500** — no barometer, no GPS, no magnetometer.
 > Hold keeps a thrust level rather than an altitude, Auto is
 > takeoff → hover → land, and Follow / RTH dead-reckon from the phone's GPS.
-> See the [README](../README#hardware-limits--read-this-before-flying).
+> See the [README](../README.md#hardware-limits--read-this-before-flying).
 
 ---
 
@@ -83,11 +83,15 @@ Or open `ESP-Drone-Android/` in Android Studio and press **Run**.
   scanning and for GPS mission navigation), and storage (for Mission Planner
   `.waypoints` files).
 
-Screens are all **landscape**. The flight screen has two joysticks, the
-flight-mode panel and the telemetry view; from there you can open **PID
-Tuning** and **GPS Nav**.
+Screens are all **landscape**, with the same header on every screen:
+**Fly · Mission · Tune · Setup**, link, battery, mode, ARMED and **CUT
+MOTORS**. The screens are described in the [pilot's guide](USER_GUIDE.md).
 
-![Android app](android-app.svg)
+![Fly screen](images/fly-connected.png)
+
+*Screen map — where the controls sit on the landscape layout:*
+
+![Android app screen map](android-app.svg)
 
 ---
 
@@ -108,7 +112,10 @@ under *Signing & Capabilities*, and **Run**.
 - Usage strings for Motion, Location and Bluetooth are already in the
   Info.plist; iOS will prompt on first use.
 
-![iOS app](ios-app.svg)
+The iOS app has the same sections and header as Android. Mission and Tune open
+full-screen from the Fly screen; the header sits in their navigation bar.
+
+![iOS app screen map](ios-app.svg)
 
 > **Bluetooth Classic SPP does not work on iOS.** iOS only exposes SPP to MFi
 > accessories through ExternalAccessory; a bare ESP32 SPP link cannot be
@@ -155,33 +162,18 @@ and the 20-byte MTU rules are in [PROTOCOL.md §8](../PROTOCOL.md).
 
 ## 5. First flight
 
-Do this **with props off**, then **with props on but the drone restrained**.
+Follow the **[first-flight checklist](USER_GUIDE.md#11-first-flight-checklist)**
+in the pilot's guide. In short:
 
-1. **Connect.** The parameter and log TOC fetches should both report success —
-   that proves the CRTP link is healthy.
-2. **Level the drone on a flat surface** and apply the level calibration from
-   the firmware if attitude reads non-zero at rest.
-3. **Check attitude response.** Tilt the drone by hand; the artificial horizon
-   and the telemetry must move the right way. If pitch or roll is inverted,
-   fix the sign constants before flying.
-4. **Arm.** Throttle low, yaw right to arm (or the Arm button / CH5 switch).
-   Props must not spin until armed.
-5. **Cut test.** Press **EMERGENCY** (two taps within 3 s) and confirm the
-   motors stop immediately. Do this before the first real takeoff, every time.
-6. **Hover test.** Takeoff into Hold with your hand on the Emergency button.
-
-The full CRTP command set, the flight modes and the navigation extension are
-documented in [PROTOCOL.md](../PROTOCOL.md).
-
-### Tuning and GPS
-
-- **PID Tuning** — live charts, statistics, parameter editors and auto-tune.
-  Auto-tune **spins the props**: secure the drone on a stand or hold it
-  tethered. It refuses to run while the drone is disarmed.
-- **GPS Nav** — tap the map to place waypoints, run a mission, import
-  Mission Planner `.waypoints` files, or use Follow / Return-to-launch. The
-  phone's GPS position at arming becomes the launch point; the drone has no
-  GPS of its own.
+1. **Props off.** Connect; check the mode chip and DISARMED appear.
+2. **Tilt the drone by hand** — ROLL and PITCH must follow. If one moves the
+   wrong way, fix the sign constants before going on.
+3. **Arm, then CUT MOTORS** (two taps on the Fly screen, one tap on Mission
+   and Tune). DISARMED must come back at once.
+4. **Link-loss test** — arm, switch the phone's Wi-Fi off; the motors must stop
+   within 0.5 s.
+5. **Props on, drone held or tied down**, then a first hover with a finger on
+   CUT MOTORS.
 
 ---
 
@@ -217,8 +209,9 @@ is inverted in flight, flip `YAW_DIRECTION` in the sketch.
 | Bluetooth Classic unavailable on iOS | Expected — iOS requires MFi for SPP. Use WiFi or BLE |
 | Yaw reversed in flight | Flip `YAW_DIRECTION`, and check the props match RF/LR = CW |
 | Altitude drifts in Hold | Expected — there is no barometer. Hold is a thrust level |
-| Motors refuse to arm | Throttle must be below 1050 µs, or VBAT is under the arm threshold |
-| Auto-tune will not start | The drone must be armed; the button holds 2 s as a safety |
+| Board on USB won't arm | No battery means 0 V; set `VBAT_ARM_CHECK` to 0 in the sketch for bench work |
+| Motors refuse to arm | Battery below 3.30 V, throttle not at zero first, or the Arm button pressed outside Manual/Auto-idle. See [arming](USER_GUIDE.md#6-arming-and-disarming) |
+| Auto-tune will not start | Press and *hold* the start button (2 s Android, 1.5 s iOS); the app asks to arm if disarmed |
 
 Two sign constants (`NAV_FWD_SIGN`, `NAV_LEFT_SIGN`) and all PID gains are
 still at their defaults — they need a first flight to confirm. See
