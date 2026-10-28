@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Select-mode cursor for the Indoor Map screen (the Vacuum Map Card's default "none" mode
+     where taps pick objects). Same 24dp / #FF424242 language as the other annotation icons. -->
+<!-- Con trỏ cho chế độ Chọn của màn Indoor Map (chế độ "none" mặc định của Vacuum Map Card,
+     nơi các cú chạm chọn đối tượng). Cùng ngôn ngữ 24dp / #FF424242 như các biểu tượng chú thích khác. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF424242"
+        android:pathData="M5 2 L5 21 L9.2 16.6 L12.1 22.4 L15 21 L12.2 15.3 L18.5 15 Z" />
+</vector>

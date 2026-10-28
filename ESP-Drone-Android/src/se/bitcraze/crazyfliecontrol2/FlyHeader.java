@@ -19,26 +19,28 @@ import java.util.Locale;
 
 import se.bitcraze.crazyfliecontrol.prefs.PreferencesActivity;
 import se.bitcraze.crazyfliecontrol2.gpsnav.GpsNavActivity;
+import se.bitcraze.crazyfliecontrol2.gpsnav.IndoorMapActivity;
 import se.bitcraze.crazyfliecontrol2.tune.TuneActivity;
 
 /**
- * Binds the shared screen header (res/layout/view_fly_header.xml) on the Mission and
- * Tune screens: sections, link, battery, mode, ARMED and CUT MOTORS, in the same
- * place as on the Fly screen (redesign stage 3).
+ * Binds the shared screen header (res/layout/view_fly_header.xml) on the Mission,
+ * Indoor Map and Tune screens: sections, link, battery, mode, ARMED and CUT MOTORS,
+ * in the same place as on the Fly screen (redesign stage 3).
  *
- * <p>Mission and Tune are started from the Fly screen (MainActivity), which keeps the
- * link up while they are open. So "Fly" simply finishes this screen, and moving to a
- * sibling section starts it and finishes this one: Back always returns to Fly.
+ * <p>Mission, Indoor Map and Tune are started from the Fly screen (MainActivity),
+ * which keeps the link up while they are open. So "Fly" simply finishes this screen,
+ * and moving to a sibling section starts it and finishes this one: Back always
+ * returns to Fly.
  *
  * <p>Status is read from {@link DroneSession}, which MainPresenter's log block keeps
  * current, twice a second while the screen is visible.
  * Gắn header màn hình dùng chung (res/layout/view_fly_header.xml) cho các màn hình
- * Mission và Tune: các mục, link, pin, mode, ARMED và CUT MOTORS, ở đúng vị trí
- * như trên màn hình Fly (redesign stage 3).
+ * Mission, Indoor Map và Tune: các mục, link, pin, mode, ARMED và CUT MOTORS, ở đúng
+ * vị trí như trên màn hình Fly (redesign stage 3).
  *
- * <p>Mission và Tune được mở từ màn hình Fly (MainActivity), nơi giữ link kết nối
- * trong khi các màn hình đó mở. Vì vậy "Fly" chỉ đơn giản finish màn hình này, còn
- * chuyển sang mục khác sẽ mở mục đó và finish màn hình này: Back luôn quay về Fly.
+ * <p>Mission, Indoor Map và Tune được mở từ màn hình Fly (MainActivity), nơi giữ link
+ * kết nối trong khi các màn hình đó mở. Vì vậy "Fly" chỉ đơn giản finish màn hình này,
+ * còn chuyển sang mục khác sẽ mở mục đó và finish màn hình này: Back luôn quay về Fly.
  *
  * <p>Trạng thái được đọc từ {@link DroneSession}, nơi log block của MainPresenter
  * cập nhật, hai lần mỗi giây khi màn hình đang hiển thị.
@@ -47,8 +49,9 @@ public final class FlyHeader {
 
     public static final int FLY = 0;
     public static final int MISSION = 1;
-    public static final int TUNE = 2;
-    public static final int SETUP = 3;
+    public static final int INDOOR = 2;
+    public static final int TUNE = 3;
+    public static final int SETUP = 4;
 
     private static final String[] MODE_NAMES = {"MANUAL", "HOLD", "AUTO", "FOLLOW", "RTH"};
     private static final long POLL_MS = 500;
@@ -95,7 +98,8 @@ public final class FlyHeader {
         mArmedChip = (TextView) header.findViewById(R.id.hdr_armed_chip);
         mCut = (MaterialButton) header.findViewById(R.id.hdr_cut_motors);
 
-        int[] ids = {R.id.hdr_tab_fly, R.id.hdr_tab_mission, R.id.hdr_tab_tune, R.id.hdr_tab_setup};
+        int[] ids = {R.id.hdr_tab_fly, R.id.hdr_tab_mission, R.id.hdr_tab_indoor,
+                R.id.hdr_tab_tune, R.id.hdr_tab_setup};
         int surface = color(R.color.fly_surface);
         for (int i = 0; i < ids.length; i++) {
             final int section = i;
@@ -158,6 +162,10 @@ public final class FlyHeader {
                 break;
             case MISSION:
                 mActivity.startActivity(new Intent(mActivity, GpsNavActivity.class));
+                mActivity.finish();
+                break;
+            case INDOOR:
+                mActivity.startActivity(new Intent(mActivity, IndoorMapActivity.class));
                 mActivity.finish();
                 break;
             case TUNE:

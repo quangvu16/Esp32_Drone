@@ -24,6 +24,10 @@ final class ConnectionViewController: UIViewController {
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
 
+    /// Landscape-only, matching the connect screen that presents it.
+    /// Chỉ nằm ngang, theo màn hình kết nối mở nó ra.
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscapeRight }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground

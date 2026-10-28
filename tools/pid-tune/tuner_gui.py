@@ -15,8 +15,9 @@ robot's eight parameters.
   motor m1        one motor's command, 1000..2000 us; dashed lines at the rails
 
 Left panel: the axis picker, parameter editors (Enter or Set applies at once,
--/+ step 10 %), Get/Save (NVS)/Load/Defaults, arm/disarm/emergency, the log
-rate, statistics of the visible window, and CSV recording.
+-/+ step 10 %), Get/Save (NVS)/Load/Defaults, arm/disarm/emergency, per-motor
+bench test (Run/Stop M1..M4), the log rate, statistics of the visible window,
+and CSV recording.
 
 Auto-tune: tunes the ticked gains while the drone sits armed on a stand
 (ml_tune.py), with the method picked in the list (METHODS below):
@@ -203,6 +204,10 @@ class TunerGui:
         self.paused = False
         self.rec = None                     # (file, writer, host time of the last row)
         self.params = [None] * 3
+        self.motor_vals = [1000] * 4        # bench test m1..m4 in µs, 1000 = stopped
+                                            # thử trên bàn: m1..m4 theo µs, 1000 = dừng
+        self.motor_hold = False             # a keepalive resend is scheduled
+                                            # đã lên lịch gửi gói giữ (keepalive)
         self.ml_thread = None
         self.ml_stop = threading.Event()
         self.ml_queue = queue.Queue()
@@ -216,6 +221,7 @@ class TunerGui:
         self._build_link(side)
         self._build_params(side)
         self._build_controls(side)
+        self._build_motor_test(side)
         self._build_autotune(side)
         self.stats = tk.StringVar(value="")
         ttk.Label(side, textvariable=self.stats, font=("TkFixedFont", 9), justify=tk.LEFT
@@ -298,6 +304,31 @@ class TunerGui:
         self.pause_btn.grid(row=3, column=0, sticky=tk.W, pady=(4, 0))
         self.rec_btn = ttk.Button(box, text="Record CSV", command=self.toggle_record)
         self.rec_btn.grid(row=3, column=1, columnspan=2, pady=(4, 0), sticky=tk.W)
+
+    def _build_motor_test(self, parent):
+        # Bench motor test (FC_MOTOR_TEST, PROTOCOL.md §5): one Run/Stop pair per
+        # motor, a shared speed, and STOP ALL. Disarmed bench use only — firmware
+        # refuses the test while armed and never auto-arms here.
+        # Thử động cơ trên bàn (FC_MOTOR_TEST, PROTOCOL.md §5): mỗi motor một cặp
+        # Run/Stop, tốc độ dùng chung, và STOP ALL. Chỉ dùng khi chưa armed trên
+        # bàn — firmware từ chối khi đang armed và không bao giờ tự arm ở đây.
+        box = ttk.LabelFrame(parent, text="Motor test", padding=4)
+        box.pack(fill=tk.X, pady=(6, 0))
+        ttk.Label(box, text="disarmed only — props clear").grid(row=0, column=0,
+                                                               columnspan=3, sticky=tk.W)
+        ttk.Label(box, text="Speed").grid(row=1, column=0, sticky=tk.W)
+        self.motor_speed = tk.IntVar(value=1200)
+        ttk.Spinbox(box, from_=1000, to=1500, increment=50, width=5,
+                    textvariable=self.motor_speed).grid(row=1, column=1, sticky=tk.W)
+        for n in range(4):
+            ttk.Label(box, text=f"M{n + 1}").grid(row=2 + n, column=0, sticky=tk.W)
+            ttk.Button(box, text="Run", width=6,
+                       command=lambda n=n: self.motor_run(n)).grid(row=2 + n, column=1, sticky=tk.W)
+            ttk.Button(box, text="Stop", width=6,
+                       command=lambda n=n: self.motor_stop(n)).grid(row=2 + n, column=2, sticky=tk.W)
+        ttk.Button(box, text="STOP ALL", width=11,
+                   command=self.motor_stop_all).grid(row=6, column=0, columnspan=3,
+                                                     sticky=tk.W, pady=(4, 0))
 
     def _build_autotune(self, parent):
         box = ttk.LabelFrame(parent, text="Auto-tune", padding=4)
@@ -449,6 +480,82 @@ class TunerGui:
     def emergency(self):
         if messagebox.askyesno("Emergency", "Cut the motors now?"):
             self.run("emergency", self.drone.emergency)
+
+    # ---------------------------------------------------------------- motor test
+    def motor_run(self, n):
+        # Run drives ONLY motor n at the chosen speed; the other three go to 1000.
+        # Run chỉ chạy RIÊNG motor n ở tốc độ chọn; ba motor kia về 1000.
+        try:
+            speed = max(1000, min(1500, int(self.motor_speed.get())))
+        except (tk.TclError, ValueError):
+            self.status.set("motor speed: not a number")
+            return
+        self.motor_vals = [1000] * 4
+        self.motor_vals[n] = speed
+        if not self._motor_apply():
+            return
+        self.status.set(f"M{n + 1} running at {speed}")
+        self._motor_hold_start()
+
+    def motor_stop(self, n):
+        # Stop motor n only, keeping the other motors' current run state.
+        # Chỉ dừng motor n, giữ nguyên trạng thái chạy của các motor kia.
+        self.motor_vals[n] = 1000
+        if not any(v > 1000 for v in self.motor_vals):
+            self.motor_stop_all(f"M{n + 1} stopped (test off)")
+            return
+        if not self._motor_apply():
+            return
+        self.status.set(f"M{n + 1} stopped")
+        self._motor_hold_start()
+
+    def motor_stop_all(self, msg="all motors stopped"):
+        # PROTOCOL.md §5: enable=0 is the stop form — it ends the whole test at
+        # once (enable=1 with 1000s would keep the PID bypassed).
+        # PROTOCOL.md §5: enable=0 là dạng dừng — kết thúc toàn bộ phép thử ngay
+        # (enable=1 với toàn 1000 vẫn giữ PID bị bỏ qua).
+        self.motor_vals = [1000] * 4
+        self.motor_hold = False
+        ok = self.run("motor test", lambda: self.drone.motor_test(0))
+        if ok is None:
+            return
+        if not ok:
+            self.status.set("motor test not acked — drone must be disarmed")
+            return
+        self.status.set(msg)
+
+    def _motor_apply(self):
+        # Send enable=1 with the tracked m1..m4; True when the drone acked.
+        # Gửi enable=1 với m1..m4 theo dõi; True khi drone xác nhận.
+        ok = self.run("motor test", lambda: self.drone.motor_test(1, *self.motor_vals))
+        if ok is None:
+            self.motor_vals = [1000] * 4
+            self.motor_hold = False
+            return False
+        if not ok:
+            self.motor_vals = [1000] * 4
+            self.motor_hold = False
+            self.status.set("motor test not acked — drone must be disarmed")
+            return False
+        return True
+
+    def _motor_hold_start(self):
+        # The firmware stops the test after 300 ms of silence (PROTOCOL.md §5),
+        # so re-send every 150 ms while any motor is spinning.
+        # Firmware dừng phép thử sau 300 ms im lặng (PROTOCOL.md §5), nên gửi lại
+        # mỗi 150 ms khi còn motor đang quay.
+        if self.motor_hold:
+            return
+        self.motor_hold = True
+        self.root.after(150, self._motor_resend)
+
+    def _motor_resend(self):
+        if not any(v > 1000 for v in self.motor_vals):
+            self.motor_hold = False
+            return
+        if not self._motor_apply():
+            return
+        self.root.after(150, self._motor_resend)
 
     # ---------------------------------------------------------------- auto-tune
     def toggle_autotune(self):
@@ -606,6 +713,15 @@ class TunerGui:
         self.ml_stop.set()
         if self.rec:
             self.rec[0].close()
+        if any(v > 1000 for v in self.motor_vals):
+            # Best-effort test stop before closing; the firmware's 300 ms watchdog
+            # would stop the motors anyway (PROTOCOL.md §5).
+            # Dừng phép thử trước khi đóng nếu có thể; watchdog 300 ms của firmware
+            # cũng sẽ dừng motor (PROTOCOL.md §5).
+            try:
+                self.drone.motor_test(0)
+            except (TimeoutError, OSError, RuntimeError):
+                pass
         try:
             stop_log_blocks(self.drone)
         except (TimeoutError, OSError, RuntimeError):

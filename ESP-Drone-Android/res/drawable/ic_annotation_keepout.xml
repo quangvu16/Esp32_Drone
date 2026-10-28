@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Valetudo map-annotation add icon (AddNoGoAreaIcon, hypfer/valetudo CustomIcons.tsx).
+     Biểu tượng thêm chú thích bản đồ của Valetudo (AddNoGoAreaIcon, CustomIcons.tsx). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF424242"
+        android:pathData="M 12 2 C 6.4771635 2 2 6.4771635 2 12 C 2 17.522835 6.4771635 22 12 22 C 12.592362 22 13.17226 21.946433 13.736328 21.847656 A 6 6 0 0 1 13 19 A 6 6 0 0 1 16.623047 13.5 L 3.3457031 13.5 L 3.3457031 10.5 L 20.650391 10.503906 L 20.650391 13.232422 A 6 6 0 0 1 21.849609 13.720703 C 21.946622 13.161509 22 12.586934 22 12 C 22 6.4771635 17.522835 2 12 2 z M 18 15 L 18 18 L 15 18 L 15 20 L 18 20 L 18 23 L 20 23 L 20 20 L 23 20 L 23 18 L 20 18 L 20 15 L 18 15 z " />
+</vector>

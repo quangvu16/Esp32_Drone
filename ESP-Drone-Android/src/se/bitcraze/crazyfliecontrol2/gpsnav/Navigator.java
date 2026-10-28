@@ -128,6 +128,41 @@ public class Navigator {
     /** Hướng mũi la bàn của drone lấy từ {@code flight.heading}, NaN cho tới khi có khối log đầu tiên. */
     private float mDroneHeadingDeg = Float.NaN;
 
+    /** The drone's last known latitude/longitude (launch-frame back-projection), NaN until step(). */
+    /** Vĩ độ/kinh độ đã biết gần nhất của drone (dựng ngược từ khung cất cánh), NaN cho tới khi step(). */
+    private double mDroneLat = Double.NaN;
+    private double mDroneLon = Double.NaN;
+
+    /**
+     * Pending fly-through corridor crossing, or null: when a leg crosses a corridor the drone aims
+     * at the gate first and continues to the real target after crossing it (PROTOCOL.md section 10).
+     *
+     * <p>Điểm băng qua hành lang đang chờ, hoặc null: khi một chặng cắt qua hành lang, drone nhắm
+     * vào cổng trước rồi tiếp tục tới mục tiêu thật sau khi băng qua (PROTOCOL.md mục 10).
+     */
+    private Waypoint mVia;
+
+    /** Zone-hold state: the drone drifted into a keep-out zone and targeting is suppressed. */
+    /** Trạng thái giữ trong vùng: drone lạc vào vùng cấm bay và việc nhắm mục tiêu bị ngưng. */
+    private boolean mZoneHold;
+
+    /** Pilot pressed Resume while held: fly on anyway. Cleared when the drone leaves the zone. */
+    /** Người lái bấm Tiếp tục khi đang giữ: cứ bay tiếp. Xoá khi drone rời khỏi vùng. */
+    private boolean mZoneOverride;
+
+    /** Consecutive in-radius ticks a wind-zone arrival still needs before advancing. */
+    /** Các nhịp liên tiếp trong bán kính mà việc tới vùng gió còn cần trước khi chuyển tiếp. */
+    private int mArrivalConfirmTicks;
+
+    /**
+     * Ticks a wind-zone arrival must hold inside the acceptance radius before it counts. The fix
+     * bounces in unsteady air; two consecutive ticks is the cheapest filter that notices.
+     *
+     * <p>Số nhịp việc tới vùng gió phải nằm trong bán kính chấp nhận trước khi được tính. Vị trí
+     * GPS nhảy trong khí không ổn định; hai nhịp liên tiếp là bộ lọc rẻ nhất phát hiện điều đó.
+     */
+    private static final int ARRIVAL_CONFIRM_TICKS = 2;
+
     // region mission bookkeeping
 
     public Navigator() {
@@ -147,6 +182,19 @@ public class Navigator {
 
     public boolean isPaused() {
         return mPaused;
+    }
+
+    /**
+     * True while the runner is holding the drone because it is inside a keep-out zone. The caller
+     * stops sending TARGET packets — same hold mechanism as {@link #isPaused()}, but positional:
+     * it clears itself when the drone leaves the zone, or via {@link #resume()} (pilot authority).
+     *
+     * <p>Đúng khi bộ chạy đang giữ drone vì nó ở trong vùng cấm bay. Bên gọi ngừng gửi gói TARGET —
+     * cùng cơ chế giữ như {@link #isPaused()}, nhưng theo vị trí: tự xoá khi drone rời vùng, hoặc
+     * qua {@link #resume()} (quyền của người lái).
+     */
+    public boolean isZoneHold() {
+        return mZoneHold;
     }
 
     public NavMode getMode() {
@@ -203,14 +251,144 @@ public class Navigator {
         return mMission.toWaypointsFile();
     }
 
-    /** The waypoint being sought right now, or null when idle. */
-    /** Điểm hành trình đang tìm ngay lúc này, hoặc null khi đang nhàn rỗi. */
+    /** The waypoint being sought right now, or null when idle. A pending corridor gate wins. */
+    /** Điểm hành trình đang tìm ngay lúc này, hoặc null khi đang nhàn rỗi. Cổng hành lang đang chờ được ưu tiên. */
     public Waypoint currentTarget() {
+        if (mVia != null) {
+            return mVia;
+        }
         if (mMode == NavMode.MISSION) {
             return mMission.getWaypoint(mActiveIndex);
         }
         return mGuidedTarget;
     }
+
+    // region map annotations (PROTOCOL.md section 10)
+
+    /**
+     * Non-null refusal when a waypoint may not be placed here: it sits inside a keep-out zone.
+     * Checked on every map tap and on every file load.
+     *
+     * <p>Lời từ chối khác null khi một điểm hành trình không được đặt ở đây: nó nằm trong vùng
+     * cấm bay. Được kiểm tra mỗi lần chạm bản đồ và mỗi lần nạp tệp.
+     */
+    public String checkWaypoint(double latitude, double longitude) {
+        for (MapAnnotation annotation : mMission.getAnnotations()) {
+            if (annotation.getType() == MapAnnotation.Type.KEEPOUT
+                    && annotation.containsPoint(latitude, longitude)) {
+                return "inside keep-out zone - move the waypoint";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Non-null refusal when a planned leg may not be flown as drawn: it crosses a keep-out zone
+     * and no fly-through corridor sanctions the crossing. A leg through a corridor is fine — the
+     * runner re-routes it through the gate (see {@link #corridorVia}).
+     *
+     * <p>Lời từ chối khác null khi một chặng được lên kế hoạch không được bay theo nét vẽ: nó cắt
+     * qua vùng cấm bay và không có hành lang cho phép bay qua nào chấp thuận lối băng. Chặng đi qua
+     * hành lang thì được — bộ chạy định tuyến lại qua cổng (xem {@link #corridorVia}).
+     */
+    public String checkLeg(double fromLat, double fromLon, double toLat, double toLon) {
+        for (MapAnnotation annotation : mMission.getAnnotations()) {
+            if (annotation.getType() == MapAnnotation.Type.KEEPOUT
+                    && annotation.crossesSegment(fromLat, fromLon, toLat, toLon)) {
+                return corridorVia(fromLat, fromLon, toLat, toLon) != null
+                        ? null
+                        : "leg crosses a keep-out zone with no fly-through corridor";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The point where the leg crosses a fly-through corridor, or null when it crosses none. That
+     * point is the via the runner targets before the real destination.
+     *
+     * <p>Điểm mà chặng cắt qua hành lang cho phép bay qua, hoặc null khi không cắt qua cái nào.
+     * Điểm đó là trung gian mà bộ chạy nhắm tới trước đích thật.
+     */
+    public double[] corridorVia(double fromLat, double fromLon, double toLat, double toLon) {
+        for (MapAnnotation annotation : mMission.getAnnotations()) {
+            if (annotation.getType() == MapAnnotation.Type.CORRIDOR) {
+                double[] hit = annotation.segmentCrossing(fromLat, fromLon, toLat, toLon);
+                if (hit != null) {
+                    return hit;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Validates the whole plan the way {@link #startMission()} will fly it: no waypoint inside a
+     * keep-out zone, no leg crossing one without a corridor. Returns the first refusal or null.
+     *
+     * <p>Kiểm tra toàn bộ kế hoạch đúng như {@link #startMission()} sẽ bay: không điểm hành trình
+     * nào nằm trong vùng cấm bay, không chặng nào cắt qua vùng đó mà không có hành lang. Trả về
+     * lời từ chối đầu tiên hoặc null.
+     */
+    public String checkMission() {
+        if (mMission.isEmpty()) {
+            return "no waypoints to fly";
+        }
+        double prevLat = mMission.getHomeLatitude();
+        double prevLon = mMission.getHomeLongitude();
+        boolean hasPrev = mMission.hasHome();
+        for (int i = 0; i < mMission.size(); i++) {
+            Waypoint waypoint = mMission.getWaypoint(i);
+            String refusal = checkWaypoint(waypoint.getLatitude(), waypoint.getLongitude());
+            if (refusal != null) {
+                return String.format(Locale.US, "waypoint %d: %s", i + 1, refusal);
+            }
+            if (hasPrev) {
+                refusal = checkLeg(prevLat, prevLon, waypoint.getLatitude(), waypoint.getLongitude());
+                if (refusal != null) {
+                    return String.format(Locale.US, "leg to waypoint %d: %s", i + 1, refusal);
+                }
+            }
+            prevLat = waypoint.getLatitude();
+            prevLon = waypoint.getLongitude();
+            hasPrev = true;
+        }
+        return null;
+    }
+
+    /** The annotation of this type containing the point, or null. */
+    /** Chú thích kiểu này chứa điểm đó, hoặc null. */
+    private MapAnnotation annotationAt(MapAnnotation.Type type, double lat, double lon) {
+        for (MapAnnotation annotation : mMission.getAnnotations()) {
+            if (annotation.getType() == type && annotation.containsPoint(lat, lon)) {
+                return annotation;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Arms corridor via-routing for a leg: when the straight leg crosses a fly-through corridor the
+     * drone aims at the gate first (PROTOCOL.md section 10).
+     *
+     * <p>Gắn định tuyến qua hành lang cho một chặng: khi chặng thẳng cắt qua hành lang, drone nhắm
+     * vào cổng trước (PROTOCOL.md mục 10).
+     */
+    private void armLeg(double fromLat, double fromLon, Waypoint to) {
+        mVia = null;
+        mArrivalConfirmTicks = 0;
+        if (to == null || Double.isNaN(fromLat) || Double.isNaN(fromLon)) {
+            return;
+        }
+        double[] via = corridorVia(fromLat, fromLon, to.getLatitude(), to.getLongitude());
+        if (via != null) {
+            // A small acceptance radius: the gate is narrow and the point is a crossing, not a stop.
+            // Bán kính chấp nhận nhỏ: cổng hẹp và điểm này là nơi băng qua, không phải điểm dừng.
+            mVia = new Waypoint(via[0], via[1], "corridor", 1.5f);
+        }
+    }
+
+    // endregion
 
     // endregion
 
@@ -226,6 +404,9 @@ public class Navigator {
         mGuidedTarget = null;
         mMode = NavMode.MISSION;
         mPaused = false;
+        // The plan's first leg starts at home — the drone launches from there.
+        // Chặng đầu của kế hoạch bắt đầu từ home — drone cất cánh từ đó.
+        armLeg(mMission.getHomeLatitude(), mMission.getHomeLongitude(), mMission.getWaypoint(0));
         return true;
     }
 
@@ -236,6 +417,7 @@ public class Navigator {
                 latitude, longitude, "", Waypoint.DEFAULT_ACCEPTANCE_RADIUS_M);
         mMode = NavMode.GUIDED;
         mPaused = false;
+        armLeg(legOriginLat(), legOriginLon(), mGuidedTarget);
         return true;
     }
 
@@ -252,7 +434,18 @@ public class Navigator {
                 Waypoint.DEFAULT_ACCEPTANCE_RADIUS_M);
         mMode = NavMode.RTL;
         mPaused = false;
+        armLeg(legOriginLat(), legOriginLon(), mGuidedTarget);
         return true;
+    }
+
+    /** Where a new leg starts: the drone's last known position, else the launch position. */
+    /** Nơi một chặng mới bắt đầu: vị trí đã biết gần nhất của drone, nếu không thì vị trí cất cánh. */
+    private double legOriginLat() {
+        return Double.isNaN(mDroneLat) ? mMission.getHomeLatitude() : mDroneLat;
+    }
+
+    private double legOriginLon() {
+        return Double.isNaN(mDroneLon) ? mMission.getHomeLongitude() : mDroneLon;
     }
 
     /**
@@ -270,6 +463,14 @@ public class Navigator {
 
     public void resume() {
         mPaused = false;
+        if (mZoneHold) {
+            // Pilot authority: they saw the keep-out hold and chose to fly on. Cleared when the
+            // drone leaves the zone, so the next entry holds again.
+            // Quyền của người lái: họ thấy cảnh báo giữ trong vùng cấm bay và chọn bay tiếp. Được
+            // xoá khi drone rời vùng, nên lần vào sau sẽ giữ lại.
+            mZoneOverride = true;
+            mZoneHold = false;
+        }
     }
 
     /** Disarms navigation and returns the drone to idle/hold. */
@@ -279,6 +480,10 @@ public class Navigator {
         mPaused = false;
         mGuidedTarget = null;
         mActiveIndex = 0;
+        mVia = null;
+        mZoneHold = false;
+        mZoneOverride = false;
+        mArrivalConfirmTicks = 0;
     }
 
     // endregion
@@ -324,6 +529,34 @@ public class Navigator {
                     "no target"));
         }
 
+        // Where the drone is on the map, so the annotations can judge it (PROTOCOL.md section 10).
+        // Drone đang ở đâu trên bản đồ, để các chú thích có thể đánh giá nó (PROTOCOL.md mục 10).
+        double[] droneLatLon = GeoMath.launchFrameToLatLon(
+                posX, posY, mLaunchHeadingDeg,
+                mMission.getHomeLatitude(), mMission.getHomeLongitude());
+        mDroneLat = droneLatLon[0];
+        mDroneLon = droneLatLon[1];
+
+        // Keep-out zones make the runner behave differently where they are: a drone that drifts
+        // into one is held there, not chased onward through it. RTL is exempt — safety outranks
+        // the hint — and Resume is the pilot's override.
+        // Vùng cấm bay khiến bộ chạy cư xử khác đi tại chỗ chúng: drone lạc vào trong sẽ bị giữ
+        // ở đó, không bị đuổi tiếp xuyên qua. RTL được miễn — an toàn quan trọng hơn gợi ý — và
+        // nút Tiếp tục là quyền ghi đè của người lái.
+        MapAnnotation keepOut = annotationAt(MapAnnotation.Type.KEEPOUT, mDroneLat, mDroneLon);
+        if (keepOut == null) {
+            // Left the zone: the next entry holds again.
+            // Đã rời vùng: lần vào sau sẽ giữ lại.
+            mZoneOverride = false;
+            mZoneHold = false;
+        } else if (mMode != NavMode.RTL && !mZoneOverride) {
+            mZoneHold = true;
+            return record(status(mMode, Float.NaN, Float.NaN, Float.NaN, mActiveIndex, false,
+                    "keep-out zone entered - holding"));
+        } else {
+            mZoneHold = false;
+        }
+
         float[] targetXY = target.toLaunchFrame(
                 mMission.getHomeLatitude(), mMission.getHomeLongitude(), mLaunchHeadingDeg);
         float dx = targetXY[0] - posX;
@@ -347,21 +580,50 @@ public class Navigator {
         int reachedIndex = mActiveIndex;
 
         if (distance <= target.getAcceptanceRadiusMeters()) {
-            onArrived();
+            // Wind zones demand a settled fix before the runner advances (PROTOCOL.md section 10):
+            // the fix bounces in unsteady air, so an arrival there must hold for consecutive ticks.
+            // Vùng gió đòi hỏi vị trí ổn định trước khi bộ chạy chuyển tiếp (PROTOCOL.md mục 10):
+            // vị trí GPS nhảy trong khí không ổn định, nên việc tới nơi ở đó phải giữ qua các nhịp
+            // liên tiếp.
+            if (annotationAt(MapAnnotation.Type.WIND, target.getLatitude(), target.getLongitude()) != null
+                    || annotationAt(MapAnnotation.Type.WIND, mDroneLat, mDroneLon) != null) {
+                mArrivalConfirmTicks++;
+                if (mArrivalConfirmTicks < ARRIVAL_CONFIRM_TICKS) {
+                    return record(status(mMode, distance, bearing, turnError, reachedIndex, false,
+                            "wind zone - confirm arrival"));
+                }
+            }
+            mArrivalConfirmTicks = 0;
+
+            if (target == mVia) {
+                // The corridor is a gate, not a stop: cross it and keep going.
+                // Hành lang là cổng, không phải điểm dừng: bay xuyên qua rồi tiếp tục.
+                mVia = null;
+                return record(status(mMode, distance, bearing, turnError, reachedIndex, false,
+                        "corridor crossed - continuing"));
+            }
+
+            onArrived(target);
             return record(status(mMode, distance, bearing, turnError, reachedIndex, true,
                     "waypoint reached"));
         }
+        mArrivalConfirmTicks = 0;
 
         return record(status(mMode, distance, bearing, turnError, reachedIndex, false, ""));
     }
 
-    private void onArrived() {
+    private void onArrived(Waypoint reached) {
         if (mMode == NavMode.MISSION) {
             mActiveIndex++;
             if (mActiveIndex >= mMission.size()) {
                 // Last waypoint: mission complete, back to idle.
                 // Điểm hành trình cuối: sứ mệnh hoàn tất, quay về idle.
                 stop();
+            } else {
+                // The next leg starts here — arm it so a corridor gate gets picked up.
+                // Chặng tiếp theo bắt đầu ở đây — gắn nó để cổng hành lang được nhận ra.
+                armLeg(reached.getLatitude(), reached.getLongitude(),
+                        mMission.getWaypoint(mActiveIndex));
             }
         } else {
             // GUIDED and RTL are one-shot: arriving disarms them.

@@ -64,7 +64,11 @@ final class ViewController: UIViewController {
     private var shownPrimaryArmed: Bool?
     private var shownConnectTitle: String?
     private var shownCutConnected: Bool?
-    
+
+    /// The connect screen stays landscape-only; only Mission and Tune are portrait.
+    /// Màn hình kết nối vẫn chỉ nằm ngang; chỉ Mission và Tune là dọc.
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscapeRight }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -131,6 +135,16 @@ final class ViewController: UIViewController {
         guard let session = viewModel?.session else { return }
         let vc = GpsNavViewController(client: session.crazyFlie.crtp,
                                       telemetry: session.telemetry)
+        vc.onSwitchSection = { [weak self] section in self?.openSection(section) }
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
+    }
+
+    @objc private func openIndoor() {
+        guard let session = viewModel?.session else { return }
+        let vc = IndoorMapViewController(client: session.crazyFlie.crtp,
+                                         telemetry: session.telemetry)
         vc.onSwitchSection = { [weak self] section in self?.openSection(section) }
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .fullScreen
@@ -287,7 +301,7 @@ final class ViewController: UIViewController {
         tabs.layoutMargins = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
         tabs.backgroundColor = Fly.track
         tabs.layer.cornerRadius = 10
-        for (index, title) in ["Fly", "Mission", "Tune", "Setup"].enumerated() {
+        for (index, title) in ["Fly", "Mission", "Indoor", "Tune", "Setup"].enumerated() {
             let b = UIButton(type: .system)
             var config = UIButton.Configuration.plain()
             config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)
@@ -414,9 +428,12 @@ final class ViewController: UIViewController {
         switch section {
         case .fly: break
         case .mission: openNav()
+        case .indoor: openIndoor()
         case .tune: openTune()
         case .setup:
-            let anchor: UIView = sectionButtons.count > 3 ? sectionButtons[3] : view
+            // Setup is the fifth chip now (Fly / Mission / Indoor / Tune / Setup).
+            // Setup giờ là chip thứ năm (Fly / Mission / Indoor / Tune / Setup).
+            let anchor: UIView = sectionButtons.count > 4 ? sectionButtons[4] : view
             openSetup(from: anchor)
         }
     }

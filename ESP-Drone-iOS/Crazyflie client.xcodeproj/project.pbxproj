@@ -51,6 +51,7 @@
 		AB12CD340000000000000072 /* TiltControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34000000000000000E /* TiltControl.swift */; };
 		AB12CD340000000000000073 /* GpsNavCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34000000000000000F /* GpsNavCore.swift */; };
 		AB12CD340000000000000074 /* GpsNavViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD340000000000000010 /* GpsNavViewController.swift */; };
+		AB12CD340000000000000079 /* IndoorMapViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD340000000000000078 /* IndoorMapViewController.swift */; };
 		AB12CD340000000000000075 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD340000000000000011 /* SceneDelegate.swift */; };
 		AB12CD340000000000000076 /* MlpEnsemble.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD340000000000000012 /* MlpEnsemble.swift */; };
 		AB12CD340000000000000077 /* ModelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD340000000000000013 /* ModelView.swift */; };
@@ -124,6 +125,7 @@
 		AB12CD34000000000000000E /* TiltControl.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TiltControl.swift; sourceTree = "<group>"; };
 		AB12CD34000000000000000F /* GpsNavCore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GpsNavCore.swift; sourceTree = "<group>"; };
 		AB12CD340000000000000010 /* GpsNavViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GpsNavViewController.swift; sourceTree = "<group>"; };
+		AB12CD340000000000000078 /* IndoorMapViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IndoorMapViewController.swift; sourceTree = "<group>"; };
 		AB12CD340000000000000011 /* SceneDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		AB12CD340000000000000012 /* MlpEnsemble.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MlpEnsemble.swift; sourceTree = "<group>"; };
 		AB12CD340000000000000013 /* ModelView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ModelView.swift; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 				AB12CD34000000000000000E /* TiltControl.swift */,
 				AB12CD34000000000000000F /* GpsNavCore.swift */,
 				AB12CD340000000000000010 /* GpsNavViewController.swift */,
+				AB12CD340000000000000078 /* IndoorMapViewController.swift */,
 			);
 			path = "Crazyflie client";
 			sourceTree = "<group>";
@@ -454,6 +457,7 @@
 				AB12CD340000000000000072 /* TiltControl.swift in Sources */,
 				AB12CD340000000000000073 /* GpsNavCore.swift in Sources */,
 				AB12CD340000000000000074 /* GpsNavViewController.swift in Sources */,
+				AB12CD340000000000000079 /* IndoorMapViewController.swift in Sources */,
 				AB12CD340000000000000075 /* SceneDelegate.swift in Sources */,
 				58B89C931E539F4500750790 /* SettingsViewModel.swift in Sources */,
 			);

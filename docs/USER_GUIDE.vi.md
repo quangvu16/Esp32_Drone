@@ -31,11 +31,13 @@ Mới bắt đầu? Hãy cài firmware và ứng dụng trước — xem
 6. [Arm và disarm (mở khoá / khoá động cơ)](#s6)
 7. [Những gì drone tự làm](#s7)
 8. [Mission (bay theo GPS)](#s8)
-9. [Tune (chỉnh PID)](#s9)
-10. [Setup (cài đặt)](#s10)
-11. [Danh sách kiểm tra chuyến bay đầu tiên](#s11)
-12. [Xử lý sự cố](#s12)
-13. [Giới hạn đã biết](#s13)
+9. [Indoor Map (bản đồ trong nhà)](#s9)
+10. [Tune (chỉnh PID)](#s10)
+11. [Bàn thử — giao diện bộ chỉnh PID trên Python](#s11)
+12. [Setup (cài đặt)](#s12)
+13. [Danh sách kiểm tra chuyến bay đầu tiên](#s13)
+14. [Xử lý sự cố](#s14)
+15. [Giới hạn đã biết](#s15)
 
 ---
 
@@ -69,7 +71,7 @@ một vài chi tiết nhỏ khác nhau tuỳ nền tảng.*
 
 | Mục trên thanh tiêu đề | Ý nghĩa |
 |---|---|
-| **Fly · Mission · Tune · Setup** | Bốn mục chính. Mục đang mở có nền trắng. |
+| **Fly · Mission · Indoor · Tune · Setup** | Năm mục chính. Mục đang mở có nền trắng. |
 | **Wi-Fi / Link** | Màu xanh lá khi đã kết nối, kèm cường độ tín hiệu. Màu xám = chưa kết nối. |
 | **Pin (vôn)** | Điện áp thật của cell pin. Màu chữ thường = ổn, **hổ phách dưới 3,50 V**, **đỏ dưới 3,30 V**. |
 | **Ô chế độ** | MANUAL, HOLD, AUTO, FOLLOW hoặc RTH — chế độ drone đang báo về. |
@@ -81,8 +83,8 @@ báo cáo trạng thái đầu tiên.
 
 **Chuyển giữa các mục**
 
-- **Fly** là màn hình chính. Mission và Tune được mở từ Fly; đóng chúng (hoặc
-  chạm *Fly*) sẽ quay về Fly.
+- **Fly** là màn hình chính. Mission, Indoor Map và Tune được mở từ Fly; đóng
+  chúng (hoặc chạm *Fly*) sẽ quay về Fly.
 - **Không thể chuyển mục khi đang bay một nhiệm vụ (mission) hoặc khi
   auto-tune đang chạy** — ứng dụng sẽ báo lý do. Hãy hạ cánh, kết thúc nhiệm
   vụ, dừng bộ chỉnh, hoặc dùng CUT MOTORS trước. Điều này giúp bạn không vô
@@ -312,10 +314,67 @@ cất cánh nếu không có tín hiệu GPS hoặc la bàn.
 Nhấn giữ các nút chỉ có biểu tượng (Android) hoặc dùng VoiceOver (iOS) để
 nghe tên của chúng.
 
+**Các vùng cấm bay và hành lang được vẽ trên bản đồ này, nhưng không sửa ở
+đây.** Bản đồ chỉ đọc với chúng để kế hoạch bay không thể đổi giữa chuyến bay;
+trình sửa nằm ở trang [Indoor Map](#s9). Nếu một waypoint bị từ chối ("inside
+keep-out zone") hoặc một lần giữ bắt đầu ("keep-out zone entered - holding"),
+hình màu đỏ bạn thấy chính là lý do.
+
 ---
 
 <a id="s9"></a>
-## 9. Tune (chỉnh PID)
+## 9. Indoor Map (bản đồ trong nhà)
+
+![Màn hình Indoor Map](android-app.svg)
+
+*Màn hình Indoor Map, dạng sơ đồ. Ứng dụng iOS
+([ios-app.svg](ios-app.svg)) có các công cụ tương tự theo bố cục riêng.*
+
+Mục **Indoor** là trình sửa chú thích bản đồ — nơi bạn cho drone biết những
+thứ bản đồ không tự biết: chỗ nào không được bay, chỗ nào được đi xuyên qua
+vùng cấm bay, và chỗ nào không khí không ổn định. Mọi thứ bạn vẽ ở đây được
+chia sẻ với trang [Mission](#s8): các vùng sửa ở đây chính là các vùng mà trình
+chạy nhiệm vụ tuân theo.
+
+### Các chế độ
+
+Mỗi lúc chỉ một chế độ được bật (chế độ hiện tại có nền tô):
+
+| Chế độ | Cách vẽ | Tạo ra |
+|---|---|---|
+| **Select** (chọn) | Chạm vào hình để chọn; kéo các tay cầm hoặc thân hình | Sửa những gì đã có trên bản đồ |
+| **Keep-out** (cấm bay) | Kéo trên bản đồ để vẽ hình chữ nhật | Vùng màu đỏ drone sẽ không bay vào |
+| **Wind** (gió) | Kéo trên bản đồ để vẽ hình chữ nhật | Vùng cần xem xét kỹ khi đến (không khí không ổn định) |
+| **Corridor** (hành lang) | Chạm một đầu, rồi chạm đầu kia | Cổng màu xanh lá drone được đi xuyên qua |
+| **Go to** (đi đến) | Chạm một điểm | Mục tiêu cho chế độ GUIDED — khởi chạy từ trang Mission |
+
+Chế độ vẽ là chỉ-vẽ: khi một chế độ vẽ đang bật, chạm vào bản đồ sẽ vẽ (hoặc
+không làm gì) — không chọn hình và không thả waypoint. Hai ngón vẫn thu phóng.
+Khi đặt xong, hình được làm gọn theo **góc 5° và số mét nguyên**.
+
+### Sửa một hình
+
+Chuyển sang **Select**, rồi chạm vào hình. Hình sẽ mang các tay cầm sửa:
+
+| Tay cầm | Ở đâu | Làm gì |
+|---|---|---|
+| ✕ đỏ | góc đầu tiên | xoá hình (chạm, không kéo) |
+| ✛ / ↻ | góc thứ hai | di chuyển đầu hành lang / xoay vùng |
+| ↖↘ | góc thứ ba | phóng to / thu nhỏ vùng |
+| thân hình | bất kỳ đâu trên hình | kéo cả hình đi |
+
+**Delete selected** (xoá đang chọn), **Clear all** (xoá hết) và **Center**
+(căn giữa) nằm phía trên hàng ô; hàng ô liệt kê mọi hình ("Keep-out 1",
+"Corridor 1", …) và mọi waypoint ("WP 1", …) — chạm một ô để chọn và căn bản
+đồ vào đó.
+
+Sơ đồ màn hình của hai ứng dụng: [android-app.svg](android-app.svg) ·
+[ios-app.svg](ios-app.svg).
+
+---
+
+<a id="s10"></a>
+## 10. Tune (chỉnh PID)
 
 Dùng để chỉnh bộ ổn định khi thử trên bàn. **Auto-tune làm cánh quạt quay.
 Buộc drone vào giá đỡ hoặc giữ bằng dây.**
@@ -332,8 +391,39 @@ Buộc drone vào giá đỡ hoặc giữ bằng dây.**
 
 ---
 
-<a id="s10"></a>
-## 10. Setup (cài đặt)
+<a id="s11"></a>
+## 11. Bàn thử — giao diện bộ chỉnh PID trên Python
+
+![Giao diện bộ chỉnh PID Python](pid-tune-gui.svg)
+
+*Cửa sổ trên laptop (`tools/pid-tune/tuner_gui.py`), dạng sơ đồ.*
+
+Cùng các công cụ chỉnh PID, cộng thêm các bài thử trên bàn, chạy trên laptop
+kết nối vào mạng của drone. Xem
+[tools/pid-tune/README.md](../tools/pid-tune/README.md) để biết cách khởi chạy.
+
+### Thử động cơ
+
+Chạy từng động cơ một để kiểm tra dây nối và cánh quạt sau khi sửa chữa.
+**Chỉ khi chưa arm, tránh xa cánh quạt** — cánh quạt đang quay có thể cắt
+thương.
+
+| Thành phần | Chức năng |
+|---|---|
+| **Speed** (tốc độ) | Dùng chung cho cả bốn động cơ. 1000 là chế độ chờ (idle); 1200 là quay nhẹ. |
+| **Run** (chạy, từng động cơ) | Chạy **động cơ đó thôi** ở tốc độ đã đặt; các động cơ còn lại ở chế độ chờ. |
+| **Stop** (dừng, từng động cơ) | Dừng động cơ đó; các động cơ khác giữ nguyên trạng thái. |
+| **STOP ALL** | Kết thúc toàn bộ bài thử ngay lập tức. |
+
+Giao diện gửi lại lệnh mỗi 150 ms khi có động cơ đang chạy — firmware tự dừng
+bài thử sau 300 ms im lặng, và đóng cửa sổ cũng gửi lệnh tắt. EMERGENCY cũng
+kết thúc nó. Nếu trạng thái báo bài thử không được xác nhận, drone đang arm —
+hãy disarm trước.
+
+---
+
+<a id="s12"></a>
+## 12. Setup (cài đặt)
 
 | | Android | iOS |
 |---|---|---|
@@ -345,8 +435,8 @@ drone**, dùng cổng serial (`link <n>`) — xem
 
 ---
 
-<a id="s11"></a>
-## 11. Danh sách kiểm tra chuyến bay đầu tiên
+<a id="s13"></a>
+## 13. Danh sách kiểm tra chuyến bay đầu tiên
 
 Làm đủ mọi bước. Làm bước 1–6 **khi đã tháo cánh quạt.**
 
@@ -377,8 +467,8 @@ mượt, và chỉ thử Follow / Return home sau khi đã treo ổn định.
 
 ---
 
-<a id="s12"></a>
-## 12. Xử lý sự cố
+<a id="s14"></a>
+## 14. Xử lý sự cố
 
 | Hiện tượng | Nguyên nhân có thể và cách xử lý |
 |---|---|
@@ -399,8 +489,8 @@ mượt, và chỉ thử Follow / Return home sau khi đã treo ổn định.
 
 ---
 
-<a id="s13"></a>
-## 13. Giới hạn đã biết
+<a id="s15"></a>
+## 15. Giới hạn đã biết
 
 - **Không có độ cao, không có vị trí.** Chỉ có cảm biến chuyển động. Xem khung
   ở đầu trang.

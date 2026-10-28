@@ -200,6 +200,19 @@ for a retransmission.
 | 27 | pid | yaw_p | FLOAT | 4 |
 | 28 | pid | yaw_i | FLOAT | 4 |
 | 29 | pid | yaw_d | FLOAT | 4 |
+| 30 | gyro | roll | FLOAT | 4 |
+| 31 | gyro | pitch | FLOAT | 4 |
+| 32 | gyro | yaw | FLOAT | 4 |
+| 33 | acc | x | FLOAT | 4 |
+| 34 | acc | y | FLOAT | 4 |
+| 35 | acc | z | FLOAT | 4 |
+| 36 | acc | roll | FLOAT | 4 |
+| 37 | acc | pitch | FLOAT | 4 |
+
+`gyro.*` are body rates in deg/s; `acc.x/y/z` are in g; `acc.roll/pitch` are
+the accelerometer-derived tilt angles in deg, i.e. the raw input to the
+complementary filter **before** it is blended with the gyro — a vibration
+spike shows up here long before it moves `stabilizer.roll`.
 
 Budget: `<header><id><ts24><values...>` must fit in 30 CRTP bytes, so a data
 packet holds at most **25 bytes of values**. Example: 5 FLOAT (20) + 2 UINT16
@@ -215,6 +228,8 @@ Suggested blocks:
 - **Tune yaw**: `pid.yaw_p/i/d`, `stabilizer.yaw`, `controller.yaw`
 - **Nav**: `nav.pos_x/pos_y`, `nav.tgt_x/tgt_y`, `flight.heading`, `flight.mode`
   → 4+4+4+4+4+1 = 21 B
+- **Bench IMU** (24 B): `gyro.roll`, `gyro.pitch`, `gyro.yaw`, `acc.x`,
+  `acc.y`, `acc.z` → 6×4 = 24 B — for spotting motor vibration on the ground
 
 ---
 
@@ -238,9 +253,29 @@ reply   : <0x70><cmd><status uint8>      status: 0 = OK, 1 = bad request
 | 0x09 | SAVE | — | persist gains + flight config to NVS |
 | 0x0A | DEFAULTS | — | restore default gains (not saved) |
 | 0x0B | LOAD | — | reload gains + flight config from NVS |
+| 0x0C | MOTOR_TEST | `uint8 enable` + `uint16 m1..m4` | bench motor test — see below |
 | 0x10 | LINK | `uint8 mode` | store transport profile, reboot in ~1.5 s |
 
 `uint16` args are little-endian. `float` args are IEEE-754 little-endian.
+
+### Bench motor test (MOTOR_TEST, 0x0C)
+
+Drives m1..m4 directly with the PID loop bypassed — for checking motor
+direction, vibration and prop balance on the bench. Payload:
+
+```
+<cmd=0x0C><enable uint8><m1 uint16><m2 uint16><m3 uint16><m4 uint16>
+```
+
+Thrust values are µs, clamped to 1000..2000. The client must re-send the full
+packet at least every **300 ms** while the test runs: the firmware treats the
+gap as link loss and stops the motors. The test also stops immediately on
+`enable=0`, EMERGENCY, DISARM, or if the drone arms. Status 1 is returned for
+a payload shorter than the `enable` byte, for `enable=1` with a payload
+shorter than the four thrusts, or while armed.
+
+Safety: props off or restrained; this path never goes through the mixer or
+the arming checks beyond "must be disarmed".
 
 ### Modes
 
@@ -555,6 +590,158 @@ active waypoint, and live distance/bearing to it. `MissionMapView.java`
 (osmdroid 6.1.20) and `MapTileSources.java` are a working reference. Label the
 drone marker **estimated** — it is dead reckoning, not GPS, and it drifts
 metres per minute.
+
+### Map annotations (Valetudo port)
+
+Ported from `hypfer/valetudo` 2026.07.0's map annotations (`ValetudoMapAnnotation`):
+*things on the map the robot needs to be aware of that might not be reliably
+auto-determined*. Valetudo makes its **firmware** behave differently at those
+locations; this project has no smart firmware, so the slot is played by the
+**phone-side mission runner** above — same idea, same placement, different
+executor.
+
+```
+MapAnnotation(type, points[])     at least 2 points (Valetudo's rule, kept)
+  type 0 KEEPOUT   4-point quad — area the drone must not fly over
+  type 1 CORRIDOR  2-point line — the sanctioned gate/gap crossing
+  type 2 WIND      4-point quad — unsteady air, arrival needs confirmation
+```
+
+Quads are placed axis-aligned from two taps and carry the 4 corners in Valetudo's
+ramp order (`p0` NW → `p1` SW → `p2` SE → `p3` NE, so `p0→p1` is the width edge
+and `p0→p3` the height edge) — the on-map rotate handle can turn them, and the
+containment tests are polygon-based so rotated quads work.
+
+**Runner behavior** (all messages shown verbatim in the apps):
+
+- A waypoint inside a keep-out zone is refused: "inside keep-out zone - move
+  the waypoint". A leg that crosses a keep-out with no corridor across it is
+  refused too: "leg crosses a keep-out zone with no fly-through corridor".
+  `checkMission()` applies both to the whole plan before a mission starts.
+- A leg crossing a corridor is routed through the crossing point first (via
+  waypoint, 1.5 m acceptance, name "corridor"); on arrival: "corridor crossed
+  - continuing", then the leg resumes.
+- Entering a keep-out zone mid-flight self-holds ("keep-out zone entered -
+  holding") exactly like pause — no more `TARGET` packets. **RTL is exempt**:
+  safety to get home outranks the hint. **Resume doubles as pilot override**
+  (`zoneOverride`, cleared as soon as the drone leaves the zone so the next
+  entry re-holds).
+- Arrival with the target or the drone inside a wind zone needs **2 consecutive**
+  in-radius ticks ("wind zone - confirm arrival") before it counts.
+
+**WPL codec** — annotations ride along in the `.waypoints` file as `QGC WPL
+110` extension rows with command id `31000` (`CMD_MAP_ANNOTATION`), one row per
+vertex:
+
+| column | meaning |
+|---|---|
+| `p1` | annotation type (wire value 0/1/2) |
+| `p2` | ordinal within that type, renumbered 0..n-1 on save |
+| `p3` | vertex index (rects 0-3, lines 0-1) |
+| `x`, `y` | vertex lat/lon |
+
+Annotation rows **must not** count toward the rowIndex 0 = home rule — an
+annotation-only file must not invent a home. Desktop planners skip them
+(non-navigation commands are already ignored), so the interchange stays
+compatible.
+
+**UX** — the editing UI lives on its own screen, the **Indoor Map** page
+(see below); the Mission page draws the zones **read-only**, so the runner's
+refusals and holds stay explicable without letting the pilot mutate the plan
+while flying. Placement is a drag or two taps depending on the type (the mobile
+adaptation of Valetudo's drop-at-viewport-centre), and a new shape is **selected
+immediately** (Valetudo's add→active) so its editing handles appear at once.
+Placement is persisted with the mission, not separately.
+
+**Editing handles** are Valetudo's `LineClientStructure` / `RampClientStructure`
+interaction model, 1:1. The active shape wears the `*_zone.svg` icons, each
+rotated to the shape's own angle (`drawRotatedIcon`):
+
+| handle | line (CORRIDOR) | quad (KEEPOUT / WIND) |
+|---|---|---|
+| ✕ delete | at `p0` — tap deletes | at `p0` — tap deletes |
+| ✛ move | at `p1` — drags that endpoint | — |
+| ↻ rotate | — | at `p1` — rotates all 4 points about the centroid |
+| ↖↘ scale | — | at `p2` — projects the pointer onto the `p0→p1` / `p0→p3` axes, clamped to ≥2 m |
+
+Dragging the **body** translates every point. Handle hitboxes swallow taps (only
+the ✕ acts on tap); a drag is never confused with a map pan — Android consumes
+the touch before `MapEventsOverlay`, iOS lets its editing `UIPanGestureRecognizer`
+begin only on a handle/body.
+
+**Snap (Valetudo's `postProcess`)** runs when the drag ends: `p0` (and a quad's
+centre) to whole metres, the `p0→p1` angle to 5°, sizes to whole metres, floors
+of 1 m (line) / 2 m (quad edge). Both apps snap identically —
+`MapAnnotation.snap()` (Android) and `MapAnnotation.snapped()` (iOS).
+
+**Visuals** are ported from Valetudo's map client structures:
+
+- **Corridor** — `ThresholdClientStructure`: thin bar (half-width 4 dp/pt),
+  fill `rgba(16,185,129,0.6)`, border `rgb(16,185,129)` 1 dp/pt, and **8 grooves
+  parallel to the line** (`moveTo(0,yOffset) → lineTo(length,yOffset)`, step =
+  width/9) in `rgba(16,185,129,0.9)`.
+- **Keep-out** — `NoGoAreaClientStructure` red `rgb(239,68,68)`.
+- **Wind** — `RampClientStructure` chrome: fill 0.15 active / 0.10 inactive,
+  black halo `rgba(0,0,0,0.6)` at 7 dp/pt under a 5 dp/pt border that is
+  `rgb(6,182,212)` **dashed [8,6] while active** and 0.7-alpha solid otherwise,
+  carrying `CurtainClientStructure`'s sine waves (wavelength 24 dp/pt, amplitude
+  4, step 2) with **per-end fade over 0.35× the wavelength**
+  (`fadeFactor = distToEdge/fadeLength`, smoothstep), black halo under cyan,
+  clipped to the quad.
+
+Identical on both apps: `MissionMapView.AnnotationOverlay` +
+`AnnotationHandles` (Android) and `MapAnnotationShape`/`MapAnnotationRenderer` +
+`ValetudoHandles` (iOS). Ramp chevrons (`RampClientStructure`'s arrow) are
+**not** drawn: this project has no ramp type — the equivalent hint is already
+encoded semantically as corridor via-routing above.
+
+The iOS side reads the SVG path data verbatim through a small path reader
+(`SvgPathReader`: M/L/H/V/C/S/Q/T/A/Z, relative + implicit repeats, arc→cubic);
+Android ships the same path strings in `ic_annotation_*.xml` vector drawables
+and `AnnotationHandles`.
+
+### Indoor Map page (vacuum-map-card port)
+
+The annotation editor has its own screen — **Indoor Map**, a peer of Mission and
+Tune (tab "Indoor") — laid out from
+`piotrmachowski/lovelace-xiaomi-vacuum-map-card`'s `render()` order: map with
+its selection overlay → **modes bar** (icon + name, one active) → **icons row**
+(actions) → **tiles row** (the current selections). This project draws on a real
+GPS map, so the card's `calibration_source` is *identity* (lat/lon direct —
+`CoordinatesConverter` is never needed) and its coordinate rounding
+(`coordinates_rounding: true`, whole metres) is Valetudo's `postProcess` snap.
+
+Each chip is one card `MapMode` with its `selection_type`:
+
+| chip | SelectionType | interaction |
+|---|---|---|
+| **Select** (default) | — (editing) | tap a shape to select it → Valetudo handles; body-drag translates; map pans elsewhere |
+| **Keep-out** | `MANUAL_RECTANGLE` | one-finger drag draws a rubber-band rect (`rgba(16,185,129)` 0.15 fill / 0.9 stroke) → snapped `KEEPOUT` quad on release; pinch still zooms |
+| **Wind** | `MANUAL_RECTANGLE` | same drag-rect → `WIND` quad |
+| **Corridor** | `MANUAL_PATH` | tap endpoint 1 → tap endpoint 2 → snapped `CORRIDOR` line |
+| **Go to** | `MANUAL_POINT` | tap sets the guided target (keep-out vetoes it) + marker; "start GUIDED from the Mission page" |
+
+Placement modes are placement-only: no selection, no waypoint drops. A tap in a
+rect mode does nothing; a second finger cancels the rubber band and hands the
+gesture back to the map.
+
+The **icons row** (the card's `icons-wrapper`) is Delete selected / Clear all /
+Center (drone when known, else the first object). The **tiles row** (the card's
+`tiles-wrapper` / `predefined_selections`) is one tile per annotation — "Keep-out
+1", "Corridor 1", "Wind 1" per type ordinal, carrying the type's `CustomIcons.tsx`
+glyph — plus one per waypoint ("WP 1"); a tile selects and centres (label + icon,
+like the card's `label`/`icon` blocks). Empty state: "Draw a zone — pick a mode
+above".
+
+The plan is **shared** between the two screens through a small store —
+`NavStore.java` / `NavStore` in `GpsNavCore.swift` — holding one `Navigator` and
+the pending "Go to" target, so zones drawn on the Indoor Map are the zones the
+Mission page flies and vetoes with. The Mission page keeps waypoint long-press
+add, tap-for-GUIDED, load/save/clear of the `.waypoints` file and the runner
+controls; only its annotation **editing** moved out.
+
+Identical on both apps: `IndoorMapActivity` +
+`activity_indoor_map.xml` (Android) and `IndoorMapViewController` (iOS).
 
 ---
 

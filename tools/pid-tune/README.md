@@ -58,6 +58,17 @@ the search box never leaves those bounds either.
 **Drone** — ARM / DISARM / EMERGENCY, the telemetry rate (20 Hz by default),
 how many seconds the plots show, Pause, and Record CSV.
 
+**Motor test** — bench testing of single motors with the PID loop bypassed
+(`MOTOR_TEST`, `0x0C`, PROTOCOL.md §5). A shared **Speed** spinbox (1000–1500 in
+steps of 50; 1000 = stopped) plus a **Run** / **Stop** pair for each motor
+M1–M4 and a **STOP ALL** button. `Run` spins only that motor at the chosen
+speed and returns the other three to 1000; `Stop` returns its motor to 1000
+keeping the others' state; **STOP ALL** sends `enable=0`, which ends the test
+at once. While any motor is spinning the GUI re-sends the packet every 150 ms,
+because the firmware stops the test after 300 ms of silence. Disarmed bench
+use only — the firmware refuses the test while armed, and a failed ack is
+reported on the status line ("motor test not acked — drone must be disarmed").
+
 **Auto-tune** — method dropdown, which of the three gains to include (uncheck
 one to hold it fixed), "learn from past trials", and Trials / Trial s / Range x.
 `Start` runs it in a worker thread; `Model` opens the cost-vs-gain window.
@@ -143,6 +154,9 @@ past trials alongside the current run so you can see what the model already know
 
 - The tuner writes one axis's gains and spins **m1 only**. Props off or the
   drone secured to a stand.
+- The **Motor test** panel is for disarmed bench use only: it never arms the
+  drone, `STOP ALL` / `Stop` end the run, and the firmware also stops on
+  DISARM, EMERGENCY, on arming, or after 300 ms without a packet.
 - `EMERGENCY` in the Drone panel is always available and stops the motors.
 - Auto-tune runs in a worker thread; `Start` becomes `Stop`, and closing the
   window sets the stop flag, stops both log blocks and closes the socket.

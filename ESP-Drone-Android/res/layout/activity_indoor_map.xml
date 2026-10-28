@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Indoor Map screen (portrait): the Vacuum Map Card page for Valetudo map annotations, kept
+     out of the Mission page. Strings are hardcoded on purpose: strings.xml is owned by the stock
+     app and must not grow entries for this screen. -->
+<!-- Màn Indoor Map (dọc): trang Vacuum Map Card cho các chú thích bản đồ kiểu Valetudo, tách
+     khỏi trang Mission. Chuỗi được gõ cứng là cố ý: strings.xml thuộc ứng dụng gốc và không được
+     thêm mục cho màn hình này. -->
+<!-- Top to bottom this ports the card's render() order: title bar, map, mode chips, action
+     icons, object tiles, status. -->
+<!-- Từ trên xuống dưới, trang này chuyển thể đúng thứ tự render() của thẻ: thanh tiêu đề, bản
+     đồ, chip chế độ, biểu tượng hành động, ô đối tượng, trạng thái. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Title bar: the shared screen header (sections, link, battery, CUT MOTORS). -->
+    <!-- Thanh tiêu đề: header màn hình dùng chung (các mục, link, pin, CUT MOTORS). -->
+    <include
+        android:id="@+id/indoor_header"
+        layout="@layout/view_fly_header" />
+
+    <!-- The map is the primary surface: it takes whatever height the controls leave. -->
+    <!-- Bản đồ là bề mặt chính: nó lấy phần chiều cao mà các điều khiển để lại. -->
+    <se.bitcraze.crazyfliecontrol2.gpsnav.MissionMapView
+        android:id="@+id/indoor_map"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Modes (the card's map_modes): icon + name chips, active state set in code. -->
+    <!-- Các chế độ (map_modes của thẻ): chip biểu tượng + tên, trạng thái active đặt trong code. -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/indoor_mode_bar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_fly_track"
+            android:orientation="horizontal"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:padding="2dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/indoor_mode_select"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Select"
+                app:icon="@drawable/ic_annotation_select" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/indoor_mode_keepout"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Keep-out"
+                app:icon="@drawable/ic_annotation_keepout" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/indoor_mode_corridor"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Corridor"
+                app:icon="@drawable/ic_annotation_corridor" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/indoor_mode_wind"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Wind"
+                app:icon="@drawable/ic_annotation_wind" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/indoor_mode_goto"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Go to"
+                app:icon="@drawable/ic_btn_goto" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Action icons (the card's icons-wrapper): delete selected, clear all, center. -->
+    <!-- Biểu tượng hành động (icons-wrapper của thẻ): xoá mục chọn, xoá hết, căn giữa. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <ImageButton
+            android:id="@+id/indoor_delete"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:contentDescription="Delete selected"
+            android:src="@drawable/ic_btn_delete"
+            android:tooltipText="Delete selected" />
+
+        <ImageButton
+            android:id="@+id/indoor_clear"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:contentDescription="Clear all annotations"
+            android:src="@drawable/ic_btn_clear"
+            android:tooltipText="Clear all annotations" />
+
+        <ImageButton
+            android:id="@+id/indoor_center"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:contentDescription="Center map"
+            android:src="@drawable/ic_annotation_center"
+            android:tooltipText="Center map on the selected object" />
+    </LinearLayout>
+
+    <!-- Object tiles (the card's tiles-wrapper): one tile per annotation and waypoint. -->
+    <!-- Ô đối tượng (tiles-wrapper của thẻ): mỗi chú thích và mỗi điểm hành trình một ô. -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+
+            <TextView
+                android:id="@+id/indoor_tiles_empty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="10dp"
+                android:text="Draw a zone - pick a mode above"
+                android:textColor="@color/fly_muted"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:id="@+id/indoor_tiles"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- One line of status at the bottom, like the Mission screen's status line. -->
+    <!-- Một dòng trạng thái ở dưới cùng, như dòng trạng thái của màn Mission. -->
+    <TextView
+        android:id="@+id/indoor_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:text="Select mode - tap a zone to edit it"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+</LinearLayout>

@@ -51,6 +51,20 @@ final class PidTuneViewController: UIViewController {
     private let tuneStatusLabel = UILabel()
     private let safetyLabel = UILabel()
 
+    // Bench motor test (PROTOCOL.md §5, FC_CMD_MOTOR_TEST 0x0C).
+    // The firmware only holds the test while the GUI re-sends within 300 ms, so a dropped
+    // link or a dismissed screen stops the motors by itself. Disarmed only — the firmware
+    // refuses it while armed.
+    // Thử động cơ trên bàn (PROTOCOL.md §5, FC_CMD_MOTOR_TEST 0x0C).
+    // Firmware chỉ giữ thử trong khi GUI gửi lại trong 300 ms, nên mất liên kết hay đóng
+    // màn hình là động cơ tự dừng. Chỉ khi chưa armed — firmware từ chối khi đang armed.
+    private let motorStartButton = UIButton(type: .system)
+    private let motorStatusLabel = UILabel()
+    private var motorSliders: [UISlider] = []
+    private var motorValueLabels: [UILabel] = []
+    private var motorTimer: Timer?
+    private var motorRunning = false
+
     private var tuner: AutoTuner?
     private var tunerHoldStart: Date?
     private var listener: ((LogSample) -> Void)?
@@ -120,6 +134,10 @@ final class PidTuneViewController: UIViewController {
 
     // MARK: - View
 
+    /// Tune is a portrait screen (the phone is held upright while nudging gains).
+    /// Tune là màn hình dọc (điện thoại cầm thẳng đứng khi chỉnh hệ số).
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
@@ -186,14 +204,18 @@ final class PidTuneViewController: UIViewController {
         stack.addArrangedSubview(chartBlock(title: "PID terms (P / I / D)", chart: termsChart))
 
         // The auto-tune model (ModelView.kt): trial costs + the model's
-        // predicted cost over the tuned gains. Sized 1.15x wide, as on Android.
+        // predicted cost over the tuned gains. Sized 1.15x wide, as on Android,
+        // but capped so one block cannot take half a portrait phone's screen.
         // Mô hình auto-tune (ModelView.kt): chi phí các lần thử + chi phí mô
         // hình dự đoán trên các gain đang tinh chỉnh. Kích thước rộng 1,15 lần,
-        // như trên Android.
+        // như trên Android, nhưng có trần để một khối không chiếm nửa màn hình dọc.
         let modelLabel = UILabel()
         modelLabel.text = "Auto-tune model"
         modelLabel.font = .systemFont(ofSize: 13, weight: .semibold)
-        modelView.heightAnchor.constraint(equalTo: modelView.widthAnchor, multiplier: 1.15).isActive = true
+        let modelRatio = modelView.heightAnchor.constraint(equalTo: modelView.widthAnchor, multiplier: 1.15)
+        modelRatio.priority = .defaultHigh
+        modelRatio.isActive = true
+        modelView.heightAnchor.constraint(lessThanOrEqualToConstant: 320).isActive = true
         let modelBlock = UIStackView(arrangedSubviews: [modelLabel, modelView])
         modelBlock.axis = .vertical
         modelBlock.spacing = 4
@@ -214,9 +236,11 @@ final class PidTuneViewController: UIViewController {
         // These write to / read from the drone's flash, not a phone file, so they keep text.
         // Các nút này ghi vào / đọc từ flash của drone, không phải tệp trên
         // điện thoại, nên giữ nguyên dạng chữ.
-        saveButton.applyLabel("Save gains", symbol: "tray.and.arrow.down", font: .systemFont(ofSize: 15))
-        loadButton.applyLabel("Load gains", symbol: "tray.and.arrow.up", font: .systemFont(ofSize: 15))
-        defaultsButton.applyLabel("Restore defaults", symbol: nil, font: .systemFont(ofSize: 15))
+        // 13 pt keeps "Restore defaults" whole in a third of a portrait phone's width.
+        // 13 pt để "Restore defaults" còn nguyên trong một phần ba chiều ngang máy dọc.
+        saveButton.applyLabel("Save gains", symbol: "tray.and.arrow.down", font: .systemFont(ofSize: 13))
+        loadButton.applyLabel("Load gains", symbol: "tray.and.arrow.up", font: .systemFont(ofSize: 13))
+        defaultsButton.applyLabel("Restore defaults", symbol: nil, font: .systemFont(ofSize: 13))
         saveButton.addTarget(self, action: #selector(saveGains), for: .touchUpInside)
         loadButton.addTarget(self, action: #selector(loadGains), for: .touchUpInside)
         defaultsButton.addTarget(self, action: #selector(restoreDefaults), for: .touchUpInside)
@@ -224,6 +248,8 @@ final class PidTuneViewController: UIViewController {
         persistRow.axis = .horizontal
         persistRow.distribution = .fillEqually
         stack.addArrangedSubview(persistRow)
+
+        buildMotorTestPanel(in: stack)
 
         // Auto-tune
         let tuneHeader = UILabel()
@@ -435,7 +461,17 @@ final class PidTuneViewController: UIViewController {
 
     @objc private func close() {
         tuner?.stop()
+        // Never leave a bench test re-sending after the screen is gone — the firmware
+        // watchdog would catch it in 300 ms, but stop it cleanly right here.
+        // Không bao giờ để thử trên bàn tiếp tục gửi lại sau khi đóng màn hình — watchdog
+        // 300 ms của firmware sẽ bắt, nhưng dừng ngay cho sạch.
+        stopMotorTest("Stopped (screen closed).")
         dismiss(animated: true)
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        stopMotorTest("Stopped (screen closed).")
     }
 
     @objc private func axisChanged() {
@@ -484,6 +520,125 @@ final class PidTuneViewController: UIViewController {
 
     private func flash(_ text: String) {
         tuneStatusLabel.text = text
+    }
+
+    // MARK: - Bench motor test
+
+    /// Four thrust sliders (1000..2000 µs), a guarded start button and a live status line.
+    /// Bốn thanh trượt lực đẩy (1000..2000 µs), nút bắt đầu có kiểm tra và dòng trạng thái.
+    private func buildMotorTestPanel(in stack: UIStackView) {
+        let header = UILabel()
+        header.text = "Bench motor test"
+        header.font = .systemFont(ofSize: 17, weight: .semibold)
+        stack.addArrangedSubview(header)
+
+        let note = UILabel()
+        note.numberOfLines = 0
+        note.font = .systemFont(ofSize: 12)
+        note.textColor = .secondaryLabel
+        note.text = "Props off or restrained. Drives m1..m4 directly with the PID bypassed, "
+            + "disarmed only. The link re-sends every 200 ms — dismissing this screen or "
+            + "losing the link stops the motors."
+        stack.addArrangedSubview(note)
+
+        let names = ["M1", "M2", "M3", "M4"]
+        for i in 0..<4 {
+            let name = UILabel()
+            name.text = names[i]
+            name.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+            name.widthAnchor.constraint(equalToConstant: 30).isActive = true
+
+            let slider = UISlider()
+            slider.minimumValue = 1000
+            slider.maximumValue = 2000
+            slider.value = 1000
+            slider.addTarget(self, action: #selector(motorSliderChanged(_:)), for: .valueChanged)
+            motorSliders.append(slider)
+
+            let value = UILabel()
+            value.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+            value.textAlignment = .right
+            value.widthAnchor.constraint(equalToConstant: 70).isActive = true
+            value.text = "1000 µs"
+            motorValueLabels.append(value)
+
+            let row = UIStackView(arrangedSubviews: [name, slider, value])
+            row.axis = .horizontal
+            row.spacing = 8
+            stack.addArrangedSubview(row)
+        }
+
+        motorStartButton.setTitle("Start test", for: .normal)
+        motorStartButton.backgroundColor = .systemOrange
+        motorStartButton.setTitleColor(.white, for: .normal)
+        motorStartButton.layer.cornerRadius = 10
+        motorStartButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        motorStartButton.addTarget(self, action: #selector(toggleMotorTest), for: .touchUpInside)
+        stack.addArrangedSubview(motorStartButton)
+
+        motorStatusLabel.numberOfLines = 0
+        motorStatusLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        motorStatusLabel.textColor = .secondaryLabel
+        motorStatusLabel.text = "Idle."
+        stack.addArrangedSubview(motorStatusLabel)
+    }
+
+    @objc private func motorSliderChanged(_ slider: UISlider) {
+        // Snap to whole microseconds so the label matches the wire value exactly.
+        // Làm tròn tới số µs nguyên để nhãn khớp đúng giá trị trên dây.
+        slider.value = slider.value.rounded()
+        if let i = motorSliders.firstIndex(where: { $0 === slider }) {
+            motorValueLabels[i].text = "\(Int(slider.value)) µs"
+        }
+    }
+
+    @objc private func toggleMotorTest() {
+        if motorRunning {
+            stopMotorTest("Stopped.")
+        } else {
+            startMotorTest()
+        }
+    }
+
+    /// Start the test (refused while armed) and arm the 200 ms re-send timer.
+    /// Bắt đầu thử (từ chối khi đang armed) và bật timer gửi lại 200 ms.
+    private func startMotorTest() {
+        let armed = (telemetry.value("flight.armed") ?? 0) > 0.5
+        if armed {
+            motorStatusLabel.text = "Refused — disarm first."
+            return
+        }
+        motorRunning = true
+        motorStartButton.setTitle("Stop test", for: .normal)
+        motorStartButton.backgroundColor = .systemRed
+        motorStatusLabel.text = "Running — re-sending every 200 ms."
+        fireMotorTest()
+        motorTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            self?.fireMotorTest()
+        }
+    }
+
+    /// One enable=1 packet with the current slider values.
+    /// Một gói enable=1 với các giá trị thanh trượt hiện tại.
+    private func fireMotorTest() {
+        let t = motorSliders.map { Int($0.value.rounded()) }
+        client.motorTest(enable: true, m1: UInt16(t[0]), m2: UInt16(t[1]),
+                         m3: UInt16(t[2]), m4: UInt16(t[3]))
+    }
+
+    /// Stop the re-send timer and tell the firmware to stop (enable=0).
+    /// Dừng timer gửi lại và báo firmware dừng (enable=0).
+    private func stopMotorTest(_ reason: String) {
+        let wasRunning = motorRunning
+        motorRunning = false
+        motorTimer?.invalidate()
+        motorTimer = nil
+        if wasRunning {
+            client.motorTestStop()
+        }
+        motorStartButton.setTitle("Start test", for: .normal)
+        motorStartButton.backgroundColor = .systemOrange
+        motorStatusLabel.text = reason
     }
 
     // MARK: Log block for the active axis
@@ -545,6 +700,16 @@ final class PidTuneViewController: UIViewController {
     private func confirmStart() {
         tunerHoldStart = nil
         setStartTuneLabel("Hold to confirm — start auto-tune")
+
+        // A running bench motor test holds the outputs with the PID bypassed; arming
+        // mid-test would cut it and hand control to the flight loop, so stop it first.
+        // Một thử động cơ đang chạy đang giữ output với PID bị bỏ qua; armed giữa chừng sẽ
+        // cắt thử và chuyển quyền cho vòng bay, nên dừng trước.
+        if motorRunning {
+            stopMotorTest("Stopped — auto-tune needs the outputs.")
+            motorStatusLabel.text = "Stop the bench motor test before auto-tuning."
+            return
+        }
 
         // Never start while disarmed without asking.
         // Không bao giờ khởi động khi drone chưa kích hoạt mà không hỏi trước.
@@ -621,6 +786,11 @@ final class PidTuneViewController: UIViewController {
         // DỪNG tuner VÀ cắt động cơ. Đây là đường xử lý khẩn cấp.
         tuner?.stop()
         client.emergency()
+        // CUT MOTORS also ends a running bench motor test (emergency() already cuts the
+        // props firmware-side; this just stops our re-send loop and resets the UI).
+        // CUT MOTORS cũng kết thúc thử động cơ đang chạy (emergency() đã cắt cánh quạt ở
+        // firmware; ở đây chỉ dừng vòng gửi lại và đặt lại giao diện).
+        stopMotorTest("Stopped by CUT MOTORS.")
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.error)
         startTuneButton.isEnabled = true

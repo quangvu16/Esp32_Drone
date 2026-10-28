@@ -401,6 +401,7 @@ final class CrtpClient {
         case save = 0x09
         case setDefaults = 0x0A
         case load = 0x0B
+        case motorTest = 0x0C
         case link = 0x10
     }
 
@@ -416,11 +417,35 @@ final class CrtpClient {
         var payload = Data([command.rawValue])
         payload.append(args)
         let packet = CrtpPacket(port: .generic, channel: 0, payload: payload)
+        // The firmware replies [cmd][status] (PROTOCOL.md §5), so the command is at
+        // payload[0] and the status at payload[1] — the same indices handleGeneric reads.
+        // Firmware trả lời [cmd][status] (PROTOCOL.md §5), nên lệnh ở payload[0] và status
+        // ở payload[1] — đúng các chỉ số mà handleGeneric đọc.
         sendReliable(packet,
                      matches: { p in
                          p.port == .generic && p.channel == 0 &&
-                         p.payload.count >= 2 && p.payload[p.payload.index(p.payload.startIndex, offsetBy: 1)] == command.rawValue
+                         !p.payload.isEmpty && p.payload[payload.startIndex] == command.rawValue
                      })
+    }
+
+    /// Bench motor test (§5): fire-and-forget, so the caller must drive it from a
+    /// timer at ≤300 ms to hold the firmware watchdog. `sendReliable` retransmits at
+    /// 500 ms — too slow — so this deliberately does not use it.
+    /// Thử động cơ trên bàn (§5): gửi không chờ, nên người gọi phải chạy từ một timer
+    /// ở ≤300 ms để giữ watchdog của firmware. `sendReliable` gửi lại ở 500 ms — quá chậm —
+    /// nên lệnh này chủ động không dùng nó.
+    func motorTest(enable: Bool, m1: UInt16, m2: UInt16, m3: UInt16, m4: UInt16) {
+        var payload = Data([FlightCommand.motorTest.rawValue, enable ? 1 : 0])
+        for thrust in [m1, m2, m3, m4] {
+            withUnsafeBytes(of: thrust.littleEndian) { payload.append(contentsOf: $0) }
+        }
+        send(CrtpPacket(port: .generic, channel: 0, payload: payload))
+    }
+
+    /// Stops a running bench motor test (enable=0). Send once on stop/disappear.
+    /// Dừng thử động cơ đang chạy (enable=0). Gửi một lần khi dừng/ra khỏi màn hình.
+    func motorTestStop() {
+        motorTest(enable: false, m1: 1000, m2: 1000, m3: 1000, m4: 1000)
     }
 
     func setFlightMode(_ mode: FlightMode) {

@@ -58,6 +58,10 @@ final class FlightViewController: UIViewController {
         fatalError("init(coder:) is not supported")
     }
 
+    /// The Fly screen stays landscape-only (sticks on both sides, like Android's).
+    /// Màn hình Bay vẫn chỉ nằm ngang (cần hai bên, như bên Android).
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscapeRight }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
@@ -307,10 +311,10 @@ extension UIButton {
 
 // MARK: - Shared screen header (redesign stage 3)
 
-/// The four sections every screen's header offers.
-/// Bốn khu mà header của mọi màn hình đều có.
+/// The five sections every screen's header offers.
+/// Năm khu mà header của mọi màn hình đều có.
 enum AppSection: Int {
-    case fly = 0, mission, tune, setup
+    case fly = 0, mission, indoor, tune, setup
 }
 
 /// Puts the shared header into a pop-up screen's navigation bar: status on the left
@@ -341,7 +345,7 @@ final class SectionHeader: NSObject {
     /// Được gọi sau khi màn hình này đã đóng, kèm khu cần mở.
     var onSwitch: ((AppSection) -> Void)?
 
-    private let sections = UISegmentedControl(items: ["Fly", "Mission", "Tune", "Setup"])
+    private let sections = UISegmentedControl(items: ["Fly", "Mission", "Indoor", "Tune", "Setup"])
     private let statusLabel = UILabel()
     private let cutButton = UIButton(type: .system)
     private var cutPrimed = false

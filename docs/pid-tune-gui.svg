@@ -1,0 +1,194 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 880" width="1280" height="880" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">ESP-Drone Python tuner GUI</title>
+  <desc id="desc">Screen map of the bench tuner window: link and axis picker, gains, drone safety buttons, the motor test panel with a Run and Stop pair per motor, live charts, and the auto-tune panel.</desc>
+
+  <defs>
+    <style>
+      .bg      { fill: #f6f8fa; }
+      .h1      { font: 700 26px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .h2      { font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .sub     { font: 400 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lbl     { font: 500 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .lblm    { font: 400 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lblw    { font: 600 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #ffffff; }
+      .mono    { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .chip    { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #0969da; }
+      .win     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .winbar  { fill: #eaeef2; stroke: #8c959f; stroke-width: 1.5; }
+      .panel   { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .card    { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn-pri { fill: #1a7f37; stroke: #1a7f37; stroke-width: 1.5; }
+      .btn-dan { fill: #cf222e; stroke: #cf222e; stroke-width: 1.5; }
+      .btn-warn{ fill: #bc4c00; stroke: #bc4c00; stroke-width: 1.5; }
+      .field   { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+      .rule    { stroke: #d0d7de; stroke-width: 1; }
+      .tag     { font: 600 11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #bc4c00; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="880"/>
+
+  <!-- ============================ header ============================ -->
+  <text class="h1" x="40" y="44">Python tuner GUI — ESP-Drone</text>
+  <text class="sub" x="40" y="70">Bench tool · tools/pid-tune/tuner_gui.py · tkinter + matplotlib · run it from a laptop on the drone's network</text>
+  <line class="rule" x1="40" y1="88" x2="1240" y2="88"/>
+
+  <!-- ============================ window ============================ -->
+  <text class="h2" x="40" y="118">Drone Tuner — roll</text>
+  <text class="lblm" x="230" y="118">tuner_gui.py · one window, one axis at a time</text>
+
+  <rect class="win" x="40" y="132" width="820" height="700" rx="10"/>
+  <rect class="winbar" x="40" y="132" width="820" height="30" rx="10"/>
+  <text class="lbl" x="56" y="152">Drone Tuner — roll</text>
+  <circle cx="820" cy="147" r="5" fill="#8c959f"/>
+  <circle cx="838" cy="147" r="5" fill="#8c959f"/>
+  <circle cx="856" cy="147" r="5" fill="#8c959f"/>
+
+  <!-- link -->
+  <rect class="panel" x="56" y="176" width="300" height="92" rx="6"/>
+  <text class="lbl" x="68" y="196">Link</text>
+  <text class="chip" x="68" y="216">192.168.43.42</text>
+  <text class="lblm" x="68" y="236">Axis</text>
+  <rect class="btn-pri" x="112" y="222" width="56" height="22" rx="6"/>
+  <text class="lblw" x="140" y="237" text-anchor="middle">roll</text>
+  <rect class="btn" x="172" y="222" width="56" height="22" rx="6"/>
+  <text class="lbl" x="200" y="237" text-anchor="middle">pitch</text>
+  <rect class="btn" x="232" y="222" width="48" height="22" rx="6"/>
+  <text class="lbl" x="256" y="237" text-anchor="middle">yaw</text>
+  <rect class="btn" x="68" y="248" width="88" height="22" rx="6"/>
+  <text class="lbl" x="112" y="263" text-anchor="middle">Reconnect</text>
+
+  <!-- gains -->
+  <rect class="panel" x="56" y="282" width="300" height="132" rx="6"/>
+  <text class="lbl" x="68" y="302">Gains</text>
+  <text class="lblm" x="68" y="324">Kp</text>
+  <text class="mono" x="112" y="324">1.30</text>
+  <rect class="btn" x="168" y="310" width="24" height="20" rx="4"/><text class="lbl" x="180" y="325" text-anchor="middle">−</text>
+  <rect class="btn" x="196" y="310" width="24" height="20" rx="4"/><text class="lbl" x="208" y="325" text-anchor="middle">+</text>
+  <rect class="btn" x="224" y="310" width="36" height="20" rx="4"/><text class="lbl" x="242" y="325" text-anchor="middle">Set</text>
+  <text class="lblm" x="68" y="352">Ki</text>
+  <text class="mono" x="112" y="352">0.040</text>
+  <rect class="btn" x="168" y="338" width="24" height="20" rx="4"/><text class="lbl" x="180" y="353" text-anchor="middle">−</text>
+  <rect class="btn" x="196" y="338" width="24" height="20" rx="4"/><text class="lbl" x="208" y="353" text-anchor="middle">+</text>
+  <rect class="btn" x="224" y="338" width="36" height="20" rx="4"/><text class="lbl" x="242" y="353" text-anchor="middle">Set</text>
+  <text class="lblm" x="68" y="380">Kd</text>
+  <text class="mono" x="112" y="380">18.0</text>
+  <rect class="btn" x="168" y="366" width="24" height="20" rx="4"/><text class="lbl" x="180" y="381" text-anchor="middle">−</text>
+  <rect class="btn" x="196" y="366" width="24" height="20" rx="4"/><text class="lbl" x="208" y="381" text-anchor="middle">+</text>
+  <rect class="btn" x="224" y="366" width="36" height="20" rx="4"/><text class="lbl" x="242" y="381" text-anchor="middle">Set</text>
+  <rect class="btn" x="68" y="390" width="44" height="18" rx="4"/><text class="lblm" x="90" y="403" text-anchor="middle">Save</text>
+  <rect class="btn" x="116" y="390" width="44" height="18" rx="4"/><text class="lblm" x="138" y="403" text-anchor="middle">Load</text>
+  <rect class="btn" x="164" y="390" width="64" height="18" rx="4"/><text class="lblm" x="196" y="403" text-anchor="middle">Defaults</text>
+
+  <!-- drone -->
+  <rect class="panel" x="56" y="428" width="300" height="112" rx="6"/>
+  <text class="lbl" x="68" y="448">Drone</text>
+  <rect class="btn-pri" x="68" y="458" width="64" height="24" rx="6"/>
+  <text class="lblw" x="100" y="475" text-anchor="middle">ARM</text>
+  <rect class="btn" x="138" y="458" width="72" height="24" rx="6"/>
+  <text class="lbl" x="174" y="475" text-anchor="middle">DISARM</text>
+  <rect class="btn-dan" x="216" y="458" width="94" height="24" rx="6"/>
+  <text class="lblw" x="263" y="475" text-anchor="middle">EMERGENCY</text>
+  <text class="lblm" x="68" y="502">Log Hz</text>
+  <rect class="field" x="122" y="488" width="40" height="20" rx="4"/><text class="mono" x="142" y="503" text-anchor="middle">20</text>
+  <text class="lblm" x="68" y="526">Window s</text>
+  <rect class="field" x="122" y="512" width="40" height="20" rx="4"/><text class="mono" x="142" y="527" text-anchor="middle">10</text>
+  <rect class="btn" x="180" y="488" width="56" height="20" rx="4"/><text class="lblm" x="208" y="503" text-anchor="middle">Pause</text>
+  <rect class="btn" x="180" y="512" width="88" height="20" rx="4"/><text class="lblm" x="224" y="527" text-anchor="middle">Record CSV</text>
+
+  <!-- motor test -->
+  <rect class="panel" x="56" y="554" width="300" height="186" rx="6"/>
+  <text class="tag" x="68" y="574">MOTOR TEST</text>
+  <text class="lblm" x="150" y="574">disarmed only — props clear</text>
+  <text class="lblm" x="68" y="598">Speed</text>
+  <rect class="field" x="122" y="584" width="52" height="20" rx="4"/><text class="mono" x="148" y="599" text-anchor="middle">1200</text>
+  <text class="lblm" x="182" y="599">1000…1500 step 50</text>
+
+  <text class="lbl" x="68" y="628">M1</text>
+  <rect class="btn-pri" x="112" y="614" width="56" height="22" rx="6"/><text class="lblw" x="140" y="629" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="614" width="56" height="22" rx="6"/><text class="lbl" x="202" y="629" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="654">M2</text>
+  <rect class="btn-pri" x="112" y="640" width="56" height="22" rx="6"/><text class="lblw" x="140" y="655" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="640" width="56" height="22" rx="6"/><text class="lbl" x="202" y="655" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="680">M3</text>
+  <rect class="btn-pri" x="112" y="666" width="56" height="22" rx="6"/><text class="lblw" x="140" y="681" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="666" width="56" height="22" rx="6"/><text class="lbl" x="202" y="681" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="706">M4</text>
+  <rect class="btn-pri" x="112" y="692" width="56" height="22" rx="6"/><text class="lblw" x="140" y="707" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="692" width="56" height="22" rx="6"/><text class="lbl" x="202" y="707" text-anchor="middle">Stop</text>
+  <rect class="btn-dan" x="68" y="718" width="110" height="22" rx="6"/>
+  <text class="lblw" x="123" y="733" text-anchor="middle">STOP ALL</text>
+  <text class="lblm" x="188" y="733">150 ms keepalive</text>
+
+  <!-- charts -->
+  <rect class="panel" x="376" y="176" width="468" height="300" rx="6"/>
+  <text class="lblm" x="388" y="196">angle vs. setpoint · live 20 Hz</text>
+  <rect x="560" y="186" width="9" height="9" fill="#0969da"/>
+  <text class="chip" x="573" y="194">angle</text>
+  <rect x="620" y="186" width="9" height="9" fill="#1a7f37"/>
+  <text class="chip" x="633" y="194">setpoint</text>
+  <polyline points="392,380 430,360 468,368 506,330 544,346 582,300 620,318 658,280 696,300 734,262 772,278 810,250"
+            fill="none" stroke="#0969da" stroke-width="2"/>
+  <polyline points="392,384 430,364 468,364 506,334 544,334 582,304 620,304 658,284 696,284 734,264 772,264 810,254"
+            fill="none" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="5 4"/>
+
+  <rect class="panel" x="376" y="490" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="510">controller output · P / I / D terms</text>
+  <polyline points="392,600 430,560 468,584 506,540 544,556 582,520 620,536 658,508 696,520 734,496 772,508 810,488"
+            fill="none" stroke="#bc4c00" stroke-width="2"/>
+  <polyline points="392,612 430,604 468,608 506,596 544,600 582,588 620,592 658,582 696,586 734,576 772,580 810,572"
+            fill="none" stroke="#8250df" stroke-width="1.5"/>
+
+  <rect class="panel" x="376" y="654" width="468" height="82" rx="6"/>
+  <text class="lblm" x="388" y="674">statistics of the visible window</text>
+  <text class="mono" x="388" y="700">rms 0.42°   p95 1.10°   rate 3.1 °/s</text>
+  <text class="lblm" x="388" y="722">Pause and Record CSV live next to the Drone panel</text>
+
+  <!-- auto-tune -->
+  <rect class="panel" x="56" y="754" width="788" height="62" rx="6"/>
+  <text class="lbl" x="68" y="774">Auto-tune</text>
+  <rect class="field" x="136" y="760" width="150" height="20" rx="4"/>
+  <text class="mono" x="211" y="775" text-anchor="middle">twiddle (offline)</text>
+  <text class="lblm" x="300" y="775">Trials 20   Trial s 6.0   Range x 2.0   learn from past trials</text>
+  <rect class="btn-warn" x="68" y="786" width="120" height="22" rx="6"/>
+  <text class="lblw" x="128" y="801" text-anchor="middle">Start auto-tune</text>
+  <rect class="btn" x="196" y="786" width="64" height="22" rx="6"/>
+  <text class="lbl" x="228" y="801" text-anchor="middle">Model</text>
+  <text class="lblm" x="276" y="801">props spin — strap the drone down</text>
+
+  <!-- ============================ right column ============================ -->
+  <rect class="card" x="890" y="132" width="350" height="240" rx="10"/>
+  <text class="h2" x="908" y="158">Motor test panel</text>
+  <line class="rule" x1="908" y1="168" x2="1222" y2="168"/>
+  <text class="lbl" x="908" y="192">Run / Stop per motor</text>
+  <text class="lblm" x="908" y="210">only that motor runs; the others idle</text>
+  <text class="lbl" x="908" y="234">Speed</text>
+  <text class="lblm" x="908" y="252">shared by all four · 1000 = idle</text>
+  <text class="lbl" x="908" y="276">STOP ALL</text>
+  <text class="lblm" x="908" y="294">sends motor_test off at once</text>
+  <text class="lbl" x="908" y="318">Keepalive</text>
+  <text class="lblm" x="908" y="336">re-sent every 150 ms while any motor runs</text>
+  <text class="lblm" x="908" y="360">firmware stops the test after 300 ms of silence</text>
+
+  <rect class="card" x="890" y="388" width="350" height="214" rx="10"/>
+  <text class="h2" x="908" y="414">Safety</text>
+  <line class="rule" x1="908" y1="424" x2="1222" y2="424"/>
+  <text class="lbl" x="908" y="448">Disarmed only</text>
+  <text class="lblm" x="908" y="466">the firmware refuses the test while armed</text>
+  <text class="lbl" x="908" y="490">Props clear</text>
+  <text class="lblm" x="908" y="508">a stalled or loaded prop can cut skin</text>
+  <text class="lbl" x="908" y="532">Closes cleanly</text>
+  <text class="lblm" x="908" y="550">closing the window sends motor_test off</text>
+  <text class="lbl" x="908" y="574">EMERGENCY</text>
+  <text class="lblm" x="908" y="592">also ends the test and disarms</text>
+
+  <rect class="card" x="890" y="618" width="350" height="198" rx="10"/>
+  <text class="h2" x="908" y="644">Files</text>
+  <line class="rule" x1="908" y1="654" x2="1222" y2="654"/>
+  <text class="lblm" x="908" y="678">tools/pid-tune/tuner_gui.py</text>
+  <text class="lblm" x="908" y="702">tools/pid-tune/drone.py</text>
+  <text class="lblm" x="908" y="726">tools/pid-tune/selftest.py</text>
+  <text class="lbl" x="908" y="754">python3 -m tools.pid-tune.tuner_gui</text>
+  <text class="lblm" x="908" y="778">see tools/pid-tune/README.md</text>
+</svg>

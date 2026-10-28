@@ -74,14 +74,20 @@
         </activity>
         <activity
             android:name="se.bitcraze.crazyfliecontrol2.tune.TuneActivity"
-            android:screenOrientation="landscape"
+            android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:parentActivityName="se.bitcraze.crazyfliecontrol2.MainActivity"
             android:exported="false" />
         <activity
             android:name="se.bitcraze.crazyfliecontrol2.gpsnav.GpsNavActivity"
             android:label="GPS Navigation"
-            android:screenOrientation="landscape"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false" />
+        <activity
+            android:name="se.bitcraze.crazyfliecontrol2.gpsnav.IndoorMapActivity"
+            android:label="Indoor Map"
+            android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false" />
     </application>

@@ -57,7 +57,13 @@ public class FlightControlPacket extends CrtpPacket {
     public static final int CMD_SAVE = 0x09;
     public static final int CMD_DEFAULTS = 0x0A;
     public static final int CMD_LOAD = 0x0B;
+    public static final int CMD_MOTOR_TEST = 0x0C;
     public static final int CMD_LINK = 0x10;
+
+    /** Bench motor test thrust bounds, matching the firmware's 1000..2000 µs clamp. */
+    /** Giới hạn lực đẩy khi thử động cơ trên bàn, khớp clamp 1000..2000 µs của firmware. */
+    public static final int MOTOR_THRUST_MIN = 1000;
+    public static final int MOTOR_THRUST_MAX = 2000;
 
     public static final int MODE_MANUAL = 0;
     public static final int MODE_HOLD = 1;
@@ -134,6 +140,36 @@ public class FlightControlPacket extends CrtpPacket {
     /** Chọn hồ sơ truyền của drone; bo mạch khởi động lại sau khoảng 1.5 giây. */
     public static FlightControlPacket link(int mode) {
         return new FlightControlPacket(CMD_LINK, new byte[] {(byte) mode});
+    }
+
+    /**
+     * Bench motor test (PROTOCOL.md §5): drive m1..m4 with the PID bypassed, disarmed only.
+     * Each thrust is µs (clamped 1000..2000 by the firmware). The sender must re-send at least
+     * every 300 ms while the test runs, or the firmware's watchdog stops the motors; enable=0
+     * (or EMERGENCY/DISARM/arm/link loss) stops immediately.
+     * Thử động cơ trên bàn (PROTOCOL.md §5): lái m1..m4 bỏ qua PID, chỉ khi chưa armed.
+     * Mỗi lực đẩy là µs (firmware clamp 1000..2000). Người gửi phải gửi lại trong ít nhất
+     * mỗi 300 ms trong lúc chạy, không thì watchdog của firmware sẽ dừng động cơ; enable=0
+     * (hoặc EMERGENCY/DISARM/arm/mất liên kết) dừng ngay.
+     */
+    public static FlightControlPacket motorTest(boolean enable, int m1, int m2, int m3, int m4) {
+        ByteBuffer buffer = ByteBuffer.allocate(9).order(BYTE_ORDER);
+        buffer.put((byte) (enable ? 1 : 0));
+        buffer.putShort((short) clampThrust(m1));
+        buffer.putShort((short) clampThrust(m2));
+        buffer.putShort((short) clampThrust(m3));
+        buffer.putShort((short) clampThrust(m4));
+        return new FlightControlPacket(CMD_MOTOR_TEST, buffer.array());
+    }
+
+    /** The packet that turns a running motor test off; send on stop/pause/destroy. */
+    /** Gói tắt thử động cơ đang chạy; gửi khi dừng/tạm dừng/hủy. */
+    public static FlightControlPacket motorTestStop() {
+        return new FlightControlPacket(CMD_MOTOR_TEST, new byte[] {0});
+    }
+
+    private static int clampThrust(int value) {
+        return Math.max(MOTOR_THRUST_MIN, Math.min(MOTOR_THRUST_MAX, value));
     }
 
     private static byte[] uint16(int value) {

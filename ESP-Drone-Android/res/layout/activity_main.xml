@@ -48,6 +48,15 @@
                 android:layout_height="44dp"
                 android:text="Mission" />
 
+            <!-- Indoor Map: the Valetudo map-annotation page (Vacuum Map Card layout). -->
+            <!-- Indoor Map: trang chú thích bản đồ kiểu Valetudo (bố trí theo Vacuum Map Card). -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tab_indoor"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Indoor" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/tab_tune"
                 style="@style/Fly.Button.Segment"

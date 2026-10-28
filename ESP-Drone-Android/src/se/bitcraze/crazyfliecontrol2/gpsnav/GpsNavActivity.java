@@ -144,14 +144,15 @@ public class GpsNavActivity extends AppCompatActivity
     private volatile double mLaunchLon = Double.NaN;
     private volatile double mAlphaDeg = Double.NaN;
 
-    // Navigation state
-    private final Navigator mNavigator = new Navigator();
+    // Navigation state. The plan and the GUIDED target live in NavStore so the Indoor Map
+    // screen edits the same mission this screen flies.
+    // Trạng thái điều hướng. Kế hoạch và mục tiêu GUIDED nằm trong NavStore để màn Indoor Map
+    // sửa cùng sứ mệnh mà màn hình này bay.
+    private final Navigator mNavigator = NavStore.navigator();
     private volatile boolean mEngaged;
     private boolean mLanding;
     private se.bitcraze.crazyfliecontrol2.FlyHeader mHeader;
     private boolean mTapAddsWaypoint = true;
-    private double mGuidedLat = Double.NaN;
-    private double mGuidedLon = Double.NaN;
     private int mSelectedWaypoint = -1;
     private int mFlightMode = -1;
 
@@ -203,17 +204,32 @@ public class GpsNavActivity extends AppCompatActivity
             }
         });
 
+        // Map annotations are drawn read-only here (PROTOCOL.md section 10): the Indoor Map
+        // screen owns the zones' editing, this screen only shows them so the runner's refusals
+        // and holds stay explicable.
+        // Chú thích bản đồ chỉ được vẽ để xem ở đây (PROTOCOL.md mục 10): màn Indoor Map nắm việc
+        // sửa các vùng, màn hình này chỉ hiện chúng để các lời từ chối và việc giữ của trình chạy
+        // luôn giải thích được.
+        mMapView.setAnnotationsEditable(false);
         mMapView.setOnMapTapListener(new MissionMapView.OnMapTapListener() {
             @Override
             public void onMapTap(double latitude, double longitude) {
                 if (mTapAddsWaypoint) {
                     synchronized (mNavigator) {
+                        // Keep-out zones veto the placement outright (PROTOCOL.md section 10).
+                        // Vùng cấm bay phủ quyết việc đặt điểm ngay (PROTOCOL.md mục 10).
+                        String refusal = mNavigator.checkWaypoint(latitude, longitude);
+                        if (refusal != null) {
+                            toast("Cannot place waypoint: " + refusal);
+                            return;
+                        }
                         mNavigator.getMission().addWaypoint(new Waypoint(latitude, longitude));
                     }
                     refreshMissionUi();
                 } else {
-                    mGuidedLat = latitude;
-                    mGuidedLon = longitude;
+                    // The GUIDED target is shared with the Indoor Map screen (NavStore).
+                    // Mục tiêu GUIDED dùng chung với màn Indoor Map (NavStore).
+                    NavStore.setGuidedTarget(new Waypoint(latitude, longitude));
                     mMapView.setGuidedTarget(latitude, longitude);
                     updateStatusUi(null);
                 }
@@ -326,6 +342,13 @@ public class GpsNavActivity extends AppCompatActivity
 
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
+        // A GUIDED target set on the Indoor Map screen shows here too — one target, both screens.
+        // Mục tiêu GUIDED đặt ở màn Indoor Map cũng hiện ở đây — một mục tiêu, cả hai màn.
+        Waypoint guided = NavStore.getGuidedTarget();
+        if (guided != null) {
+            mMapView.setGuidedTarget(guided.getLatitude(), guided.getLongitude());
+        }
 
         requestLocationPermission();
         refreshMissionUi();
@@ -524,14 +547,18 @@ public class GpsNavActivity extends AppCompatActivity
 
         Navigator.NavMode mode;
         boolean paused;
+        boolean zoneHold;
         Waypoint target;
         synchronized (mNavigator) {
             mode = mNavigator.getMode();
             paused = mNavigator.isPaused();
+            // A keep-out hold suppresses TARGET the same way a pause does (PROTOCOL.md §10).
+            // Việc giữ trong vùng cấm bay ngưng TARGET giống như khi tạm dừng (PROTOCOL.md §10).
+            zoneHold = mNavigator.isZoneHold();
             target = mNavigator.currentTarget();
         }
 
-        if (mode != Navigator.NavMode.IDLE && !paused && target != null) {
+        if (mode != Navigator.NavMode.IDLE && !paused && !zoneHold && target != null) {
             float[] northEast = target.toNorthEast(mLaunchLat, mLaunchLon);
             crazyflie.sendPacket(NavPacket.target(northEast[0], northEast[1]));
             // MISSION and GUIDED chase the target in FOLLOW; RTL hands over to RTH mode
@@ -646,6 +673,13 @@ public class GpsNavActivity extends AppCompatActivity
         }
         boolean started;
         synchronized (mNavigator) {
+            // The annotations veto the plan before it flies (PROTOCOL.md section 10).
+            // Các chú thích phủ quyết kế hoạch trước khi bay (PROTOCOL.md mục 10).
+            String refusal = mNavigator.checkMission();
+            if (refusal != null) {
+                toast("Cannot start mission: " + refusal);
+                return;
+            }
             started = mNavigator.startMission();
         }
         if (!started) {
@@ -661,12 +695,20 @@ public class GpsNavActivity extends AppCompatActivity
         if (!requireLaunched()) {
             return;
         }
-        if (Double.isNaN(mGuidedLat) || Double.isNaN(mGuidedLon)) {
+        // The target may have been set here or on the Indoor Map screen (NavStore).
+        // Mục tiêu có thể được đặt ở đây hoặc ở màn Indoor Map (NavStore).
+        Waypoint guided = NavStore.getGuidedTarget();
+        if (guided == null) {
             toast("Tap the map first (tap mode: go-to)");
             return;
         }
         synchronized (mNavigator) {
-            mNavigator.startGuided(mGuidedLat, mGuidedLon);
+            String refusal = mNavigator.checkWaypoint(guided.getLatitude(), guided.getLongitude());
+            if (refusal != null) {
+                toast("Cannot go there: " + refusal);
+                return;
+            }
+            mNavigator.startGuided(guided.getLatitude(), guided.getLongitude());
         }
         mLanding = false;
         engage();
@@ -690,7 +732,9 @@ public class GpsNavActivity extends AppCompatActivity
 
     private void onPauseResume() {
         synchronized (mNavigator) {
-            if (mNavigator.isPaused()) {
+            if (mNavigator.isPaused() || mNavigator.isZoneHold()) {
+                // Resume doubles as the pilot's keep-out override.
+                // Nút Tiếp tục đồng thời là quyền ghi đè vùng cấm bay của người lái.
                 mNavigator.resume();
             } else {
                 mNavigator.pause();
@@ -810,7 +854,19 @@ public class GpsNavActivity extends AppCompatActivity
                     }
                 }
                 refreshMissionUi();
-                toast("Mission loaded");
+                // A loaded plan can violate the annotations; warn but keep it loaded.
+                // Kế hoạch nạp vào có thể vi phạm các chú thích; cảnh báo nhưng vẫn giữ nó.
+                String problem = null;
+                synchronized (mNavigator) {
+                    if (!mNavigator.getMission().isEmpty()) {
+                        problem = mNavigator.checkMission();
+                    }
+                }
+                if (problem != null) {
+                    toast("Mission loaded - warning: " + problem);
+                } else {
+                    toast("Mission loaded");
+                }
             } catch (IOException e) {
                 toast("Load failed: " + e.getMessage());
             }
@@ -861,7 +917,8 @@ public class GpsNavActivity extends AppCompatActivity
     private void refreshMissionUi() {
         int activeIndex = -1;
         synchronized (mNavigator) {
-            List<Waypoint> waypoints = mNavigator.getMission().getWaypoints();
+            Mission mission = mNavigator.getMission();
+            List<Waypoint> waypoints = mission.getWaypoints();
             mWaypointAdapter.clear();
             for (int i = 0; i < waypoints.size(); i++) {
                 Waypoint wp = waypoints.get(i);
@@ -873,6 +930,10 @@ public class GpsNavActivity extends AppCompatActivity
                 activeIndex = mNavigator.getActiveIndex();
             }
             mMapView.setWaypoints(new ArrayList<Waypoint>(waypoints), activeIndex);
+            // -1: read-only zones, no selection and no handles on this screen.
+            // -1: các vùng chỉ xem, không chọn và không có tay nắm trên màn hình này.
+            mMapView.setAnnotations(
+                    new ArrayList<MapAnnotation>(mission.getAnnotations()), -1);
         }
     }
 
@@ -1097,9 +1158,11 @@ public class GpsNavActivity extends AppCompatActivity
         }
     }
 
+    /** For the Pause/Resume button: a keep-out hold reads as "Resume" too. */
+    /** Cho nút Tạm dừng/Tiếp tục: trạng thái giữ trong vùng cấm bay cũng hiển thị "Resume". */
     private boolean isPaused() {
         synchronized (mNavigator) {
-            return mNavigator.isPaused();
+            return mNavigator.isPaused() || mNavigator.isZoneHold();
         }
     }
 

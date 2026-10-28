@@ -37,12 +37,19 @@ CMD_TOC_ELEMENT, CMD_TOC_INFO = 0, 1
 
 LOG_CREATE, LOG_APPEND, LOG_DELETE, LOG_START, LOG_STOP, LOG_RESET = 0, 1, 2, 3, 4, 5
 
-# flight-control extension (port 7, ch 0), payload led by this magic
-# phần mở rộng điều khiển bay (port 7, ch 0), payload mở đầu bởi magic này
-FC_MAGIC = 0x70
+# flight-control extension (port 7, ch 0). send() already writes the CRTP header
+# byte (0x70 = port 7 | ch 0), so the payload is just <cmd><args...> — do NOT lead
+# it with 0x70 again: the firmware reads cmd = p[1] (the first payload byte) and a
+# second 0x70 would be parsed as an unknown command and dropped.
+# phần mở rộng điều khiển bay (port 7, ch 0). send() đã ghi byte header CRTP
+# (0x70 = cổng 7 | kênh 0), nên phần dữ liệu chỉ là <cmd><args...> — KHÔNG được
+# mở đầu bằng 0x70 lần nữa: firmware đọc cmd = p[1] (byte dữ liệu đầu tiên) và
+# một 0x70 nữa sẽ bị coi là lệnh lạ rồi bỏ.
+FC_MAGIC = 0x70                         # the CRTP header send() emits — wire only
+                                       # header CRTP mà send() phát — chỉ trên dây
 FC_SET_MODE, FC_TAKEOFF, FC_LAND, FC_SET_HOVER = 0x01, 0x02, 0x03, 0x04
 FC_EMERGENCY, FC_SET_HEADING, FC_ARM, FC_DISARM = 0x05, 0x06, 0x07, 0x08
-FC_SAVE, FC_DEFAULTS, FC_LOAD = 0x09, 0x0A, 0x0B
+FC_SAVE, FC_DEFAULTS, FC_LOAD, FC_MOTOR_TEST = 0x09, 0x0A, 0x0B, 0x0C
 
 # parameter type codes (port 2) — note these differ from the log ones
 # mã kiểu tham số (port 2) — lưu ý chúng khác với mã kiểu log
@@ -379,8 +386,21 @@ class Drone:
     # --- flight-control extension ---
 
     def _fc(self, cmd, args=b""):
-        return self.request(PORT_FLIGHT, 0, bytes([FC_MAGIC, cmd]) + args,
-                            want=lambda p: len(p) >= 2 and p[0] == FC_MAGIC and p[1] == cmd)
+        # Payload is <cmd><args>; the reply payload is <cmd><status> (see
+        # crtpHandleFlightControl), so match on p[0] == cmd and read status at p[-1].
+        # Phần dữ liệu là <cmd><args>; phần trả lời là <cmd><status> (xem
+        # crtpHandleFlightControl), nên khớp p[0] == cmd và đọc status ở p[-1].
+        return self.request(PORT_FLIGHT, 0, bytes([cmd]) + args,
+                            want=lambda p: len(p) >= 2 and p[0] == cmd)
+
+    def motor_test(self, enable, m1=1000, m2=1000, m3=1000, m4=1000):
+        """Bench motor test (§5): drive m1..m4 with the PID bypassed, disarmed only.
+        The caller must re-send within 300 ms to hold it; enable=0 stops.
+        Thử động cơ trên bàn (§5): lái m1..m4 bỏ qua PID, chỉ khi chưa armed.
+        Người gọi phải gửi lại trong 300 ms để giữ; enable=0 để dừng."""
+        thrust = lambda v: bytes([int(v) & 0xFF, (int(v) >> 8) & 0xFF])
+        args = bytes([1 if enable else 0]) + thrust(m1) + thrust(m2) + thrust(m3) + thrust(m4)
+        return self._fc(FC_MOTOR_TEST, args)[-1] == 0
 
     def arm(self):
         return self._fc(FC_ARM)[-1] == 0

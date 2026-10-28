@@ -22,7 +22,11 @@ final class SettingsViewController: UIViewController {
     @IBOutlet weak var rightXLabel: UILabel!
     @IBOutlet weak var rightYLabel: UILabel!
     @IBOutlet weak var closeButton: UIButton!
-    
+
+    /// Landscape-only, matching the connect screen that presents it.
+    /// Chỉ nằm ngang, theo màn hình kết nối mở nó ra.
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscapeRight }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         

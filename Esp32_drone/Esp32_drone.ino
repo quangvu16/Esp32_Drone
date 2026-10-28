@@ -419,6 +419,12 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define FC_CMD_DEFAULTS      0x0A
 #define FC_CMD_LOAD          0x0B
 #define FC_CMD_LINK          0x10
+// Bench motor test: drive m1..m4 individually, PID bypassed. Disarmed-only,
+// watchdog-held — see the motor_test_* state and the loop() hook.
+// Thử động cơ trên bàn: lái m1..m4 riêng lẻ, bỏ qua PID. Chỉ khi chưa armed,
+// giữ bằng watchdog — xem trạng thái motor_test_* và hook trong loop().
+#define FC_CMD_MOTOR_TEST    0x0C
+#define MOTOR_TEST_TIMEOUT_MS 300     // no GUI update for this long -> motors stop
 
 // Flight modes and auto sequence states, as reported in the log TOC.
 // Các chế độ bay và trạng thái chuỗi tự động, được báo trong log TOC.
@@ -585,6 +591,8 @@ float    gyro_pitch, gyro_roll, gyro_yaw;       // body rates, deg/s (for PID)
 float    angle_pitch_acc, angle_roll_acc;       // raw accel tilt, deg (filter input)
 float    angle_pitch_deg = 0.0f;                // filtered attitude angles, deg
 float    angle_roll_deg  = 0.0f;
+float    acc_x_g, acc_y_g, acc_z_g;             // accelerometer, g (for the IMU log)
+                                                  // gia tốc kế, g (cho khối log IMU)
 bool     gyro_angles_set = false;
 
 // --- receiver ---
@@ -613,6 +621,20 @@ float    pid_p_pitch, pid_i_pitch, pid_d_pitch;
 float    pid_p_yaw,   pid_i_yaw,   pid_d_yaw;
 
 int16_t  motor_rf, motor_rr, motor_lr, motor_lf;  // 1000..2000 µs convention
+
+// --- motor test (bench only, CRTP FC_CMD_MOTOR_TEST) ---
+// Individual motor thrusts for bench testing (motor direction, vibration, prop
+// balance) with the PID loop bypassed. Only honoured while DISARMED, and held
+// only while the GUI re-sends within MOTOR_TEST_TIMEOUT_MS — a dropped link or
+// a closed window stops the motors by itself.
+// Gần các biến motor:
+// Lực đẩy từng động cơ riêng lẻ để thử trên bàn (hướng động cơ, rung, cân bằng
+// cánh quạt) với vòng PID bị bỏ qua. Chỉ có hiệu lực khi CHƯA armed, và chỉ giữ
+// trong khi GUI gửi lại trong MOTOR_TEST_TIMEOUT_MS — mất liên kết hay đóng cửa
+// sổ là động cơ tự dừng.
+bool     motor_test_active = false;
+uint32_t motor_test_last_ms = 0;
+uint16_t motor_test_m[4] = { 1000, 1000, 1000, 1000 };  // m1..m4, µs
 
 // --- status ---
 bool     armed = false;
@@ -1447,6 +1469,7 @@ void crtpHandleFlightControl(const uint8_t *p, size_t len) {
 
     case FC_CMD_DISARM:
       armed = false;
+      motor_test_active = false;   // never leave a bench test running // không bao giờ để thử bàn chạy tiếp
       motorStop();
       pidReset();
       break;
@@ -1473,6 +1496,32 @@ void crtpHandleFlightControl(const uint8_t *p, size_t len) {
       nvs.putUChar("link", p[2]);
       pending_link_mode = p[2];
       reboot_at_ms = millis() + 1500;   // time for the reply to get out first
+      break;
+
+    case FC_CMD_MOTOR_TEST:
+      // Bench motor test — drive m1..m4 directly, PID bypassed. Refused while
+      // armed; held only while the GUI keeps re-sending within the watchdog
+      // window; p[2]==0 (or EMERGENCY/DISARM/link loss) stops everything.
+      // Payload: [2]=enable, [3..4]=m1, [5..6]=m2, [7..8]=m3, [9..10]=m4, µs.
+      // Thử động cơ trên bàn — lái m1..m4 trực tiếp, bỏ qua PID. Từ chối khi đang
+      // armed; chỉ giữ trong khi GUI tiếp tục gửi lại trong cửa sổ watchdog;
+      // p[2]==0 (hoặc EMERGENCY/DISARM/mất liên kết) dừng tất cả.
+      // Phần dữ liệu: [2]=enable, [3..4]=m1, [5..6]=m2, [7..8]=m3, [9..10]=m4, µs.
+      if (len < 3) { status = 1; break; }
+      if (!p[2]) {                     // explicit stop // lệnh dừng rõ ràng
+        motor_test_active = false;
+        motorStop();
+        break;
+      }
+      if (armed) { status = 1; break; }  // bench only, never while armed
+      if (len < 11) { status = 1; break; }
+      for (int i = 0; i < 4; i++) {
+        uint16_t t = 0;
+        memcpy(&t, p + 3 + i * 2, 2);
+        motor_test_m[i] = constrain((int)t, 1000, 2000);
+      }
+      motor_test_active = true;
+      motor_test_last_ms = millis();
       break;
 
     default:
@@ -1689,6 +1738,23 @@ static const TocEntry LOG_TOC[] = {
   { "pid", "yaw_p",   LT_FLOAT, 4, TOC_ACCESS_RO, &pid_p_yaw   },
   { "pid", "yaw_i",   LT_FLOAT, 4, TOC_ACCESS_RO, &pid_i_yaw   },
   { "pid", "yaw_d",   LT_FLOAT, 4, TOC_ACCESS_RO, &pid_d_yaw   },
+
+  // Raw IMU, for bench work: gyro body rates (deg/s), accel in g, and the
+  // accel-derived tilt angles (deg) before the complementary filter blends
+  // them with the gyro. A vibration spike shows up here first, long before
+  // it shows up as a wobble in stabilizer.roll.
+  // IMU thô, cho việc thử trên bàn: tốc độ góc body theo deg/s, gia tốc theo g,
+  // và các góc nghiêng suy ra từ gia tốc (độ) trước khi bộ lọc bổ sung trộn
+  // chúng với gyro. Gai rung hiện ra ở đây trước tiên, lâu trước khi hiện
+  // thành rung lắc trong stabilizer.roll.
+  { "gyro", "roll",  LT_FLOAT, 4, TOC_ACCESS_RO, &gyro_roll     },
+  { "gyro", "pitch", LT_FLOAT, 4, TOC_ACCESS_RO, &gyro_pitch    },
+  { "gyro", "yaw",   LT_FLOAT, 4, TOC_ACCESS_RO, &gyro_yaw      },
+  { "acc",  "x",     LT_FLOAT, 4, TOC_ACCESS_RO, &acc_x_g       },
+  { "acc",  "y",     LT_FLOAT, 4, TOC_ACCESS_RO, &acc_y_g       },
+  { "acc",  "z",     LT_FLOAT, 4, TOC_ACCESS_RO, &acc_z_g       },
+  { "acc",  "roll",  LT_FLOAT, 4, TOC_ACCESS_RO, &angle_roll_acc  },
+  { "acc",  "pitch", LT_FLOAT, 4, TOC_ACCESS_RO, &angle_pitch_acc },
 };
 #define LOG_TOC_COUNT ((uint8_t)(sizeof(LOG_TOC) / sizeof(LOG_TOC[0])))
 
@@ -2275,6 +2341,15 @@ void attitudeUpdate() {
   const float ax = raw_ax * (float)ACC_X_SIGN;
   const float ay = raw_ay * (float)ACC_Y_SIGN;
   const float az = raw_az;
+
+  // g-scaled accel, for the IMU log. NAV_ACC_LSB_PER_G matches the MPU6500
+  // ±8 g config; it must stay in step with MPU_REG_ACCEL_CFG.
+  // Gia tốc kế theo g, cho khối log IMU. NAV_ACC_LSB_PER_G khớp cấu hình ±8 g
+  // của MPU6500; phải luôn khớp với MPU_REG_ACCEL_CFG.
+  acc_x_g = ax / NAV_ACC_LSB_PER_G;
+  acc_y_g = ay / NAV_ACC_LSB_PER_G;
+  acc_z_g = az / NAV_ACC_LSB_PER_G;
+
   float acc_total = sqrtf(ax * ax + ay * ay + az * az);
   if (acc_total < 1.0f) acc_total = 1.0f;
 
@@ -2546,6 +2621,8 @@ void flightLand() {
 // Luôn được thực hiện, bất kể chế độ nào: tắt cánh quạt ngay lập tức.
 void flightEmergency() {
   armed = false;
+  motor_test_active = false;   // EMERGENCY cuts a bench test too
+                               // EMERGENCY cũng cắt cả thử bàn
   motorStop();
   pidReset();
   flight_mode = MODE_MANUAL;
@@ -3043,6 +3120,26 @@ void loop() {
   } else {
     motor_rf = motor_rr = motor_lr = motor_lf = 1000;
     if (!armed) pidReset();
+  }
+
+  // ---- bench motor-test override ----
+  // When a motor test is active it owns the four outputs, bypassing the mixer
+  // entirely. Two ways it ends by itself: someone arms (the flight loop takes
+  // over), or the GUI stops re-sending and the watchdog trips.
+  // ---- phần ghi đè thử động cơ trên bàn ----
+  // Khi một thử động cơ đang hoạt động, nó làm chủ bốn output, bỏ qua hoàn toàn
+  // bộ trộn. Hai cách tự kết thúc: có người armed (vòng bay tiếp quản), hoặc
+  // GUI ngừng gửi lại và watchdog kích hoạt.
+  if (motor_test_active) {
+    if (armed || (int32_t)(now - motor_test_last_ms) > MOTOR_TEST_TIMEOUT_MS) {
+      motor_test_active = false;
+      motorStop();
+    } else {
+      motor_rf = (int16_t)motor_test_m[0];
+      motor_rr = (int16_t)motor_test_m[1];
+      motor_lr = (int16_t)motor_test_m[2];
+      motor_lf = (int16_t)motor_test_m[3];
+    }
   }
   motorWrite(motor_rf, motor_rr, motor_lr, motor_lf);
 

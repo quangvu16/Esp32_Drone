@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.TreeMap;
 
 /**
  * An ordered GPS mission: a home position plus a list of waypoints to visit.
@@ -32,6 +33,21 @@ public class Mission {
     public static final int CMD_NAV_WAYPOINT = 16;
 
     /**
+     * Extension row carrying one map-annotation vertex (PROTOCOL.md section 10). Not a MAVLink
+     * command — anything a desktop planner writes under this id is ours by contract, and every
+     * other planner ignores it the way it ignores any unknown command. Columns: {@code p1} =
+     * annotation type wire value, {@code p2} = ordinal of the annotation within its type,
+     * {@code p3} = vertex index, {@code x}/{@code y} = latitude/longitude.
+     *
+     * <p>Dòng mở rộng mang một đỉnh của chú thích bản đồ (PROTOCOL.md mục 10). Không phải lệnh
+     * MAVLink — bất cứ thứ gì trình lập kế hoạch trên máy tính ghi với id này theo hợp đồng là của
+     * ta, và mọi trình lập kế hoạch khác bỏ qua nó như bỏ qua bất kỳ lệnh lạ nào. Cột: {@code p1} =
+     * giá trị truyền kiểu chú thích, {@code p2} = thứ tự của chú thích trong kiểu đó,
+     * {@code p3} = chỉ số đỉnh, {@code x}/{@code y} = vĩ độ/kinh độ.
+     */
+    public static final int CMD_MAP_ANNOTATION = 31000;
+
+    /**
      * Home / launch position. {@code Double.NaN} until set — the navigator must not invent one,
      * because RTL aims at it and every target offset is measured from it.
      * Vị trí home (điểm cất cánh). {@code Double.NaN} cho đến khi được đặt — bộ điều hướng không
@@ -42,6 +58,17 @@ public class Mission {
     private double mHomeLongitude = Double.NaN;
 
     private final List<Waypoint> mWaypoints = new ArrayList<Waypoint>();
+
+    /**
+     * Map annotations (ported from Valetudo's {@code setMapAnnotations} replace-all semantics):
+     * everything the runner must respect but the map cannot show. Mission files persist the whole
+     * set — there is no partial write.
+     *
+     * <p>Các chú thích bản đồ (chuyển thể từ ngữ nghĩa thay-toàn-bộ {@code setMapAnnotations} của
+     * Valetudo): mọi thứ bộ chạy phải tôn trọng nhưng bản đồ không hiển thị được. Tệp sứ mệnh lưu
+     * toàn bộ tập — không có ghi một phần.
+     */
+    private final List<MapAnnotation> mAnnotations = new ArrayList<MapAnnotation>();
 
     /** Removes every waypoint but keeps the home position. */
     /** Xóa mọi điểm hành trình nhưng giữ nguyên vị trí home. */
@@ -104,6 +131,48 @@ public class Mission {
         return mWaypoints.isEmpty();
     }
 
+    // region map annotations
+
+    public List<MapAnnotation> getAnnotations() {
+        return Collections.unmodifiableList(mAnnotations);
+    }
+
+    public MapAnnotation getAnnotation(int index) {
+        return (index < 0 || index >= mAnnotations.size()) ? null : mAnnotations.get(index);
+    }
+
+    public void addAnnotation(MapAnnotation annotation) {
+        if (annotation != null) {
+            mAnnotations.add(annotation);
+        }
+    }
+
+    public boolean removeAnnotation(int index) {
+        if (index >= 0 && index < mAnnotations.size()) {
+            mAnnotations.remove(index);
+            return true;
+        }
+        return false;
+    }
+
+    public void clearAnnotations() {
+        mAnnotations.clear();
+    }
+
+    /** Live count for the grouped Add menu ("Keep-out zone (2)"). */
+    /** Số lượng trực tiếp cho menu Thêm gộp nhóm ("Keep-out zone (2)"). */
+    public int annotationCount(MapAnnotation.Type type) {
+        int count = 0;
+        for (MapAnnotation annotation : mAnnotations) {
+            if (annotation.getType() == type) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // endregion
+
     public boolean hasHome() {
         return !Double.isNaN(mHomeLatitude) && !Double.isNaN(mHomeLongitude);
     }
@@ -152,23 +221,39 @@ public class Mission {
      *
      * <p>Index 0 is the home position ({@code current} flag 1), matching what Mission Planner
      * writes. When no home has been recorded yet the first waypoint is used so the file stays
-     * valid.
+     * valid. Map annotations ride after the waypoints as {@link #CMD_MAP_ANNOTATION} extension
+     * rows — one row per vertex (PROTOCOL.md section 10).
      * <p>Chỉ số 0 là vị trí home (cờ {@code current} bằng 1), khớp với những gì Mission Planner
      * ghi. Khi chưa có vị trí home nào được lưu, điểm hành trình đầu tiên sẽ được dùng để tệp
-     * vẫn hợp lệ.
+     * vẫn hợp lệ. Các chú thích bản đồ đi sau các điểm hành trình dưới dạng dòng mở rộng
+     * {@link #CMD_MAP_ANNOTATION} — mỗi dòng một đỉnh (PROTOCOL.md mục 10).
      */
     public String toWaypointsFile() {
         StringBuilder builder = new StringBuilder();
         builder.append(WPL_HEADER).append('\n');
 
+        int rowIndex = 0;
         if (hasHome() || !mWaypoints.isEmpty()) {
             double lat = hasHome() ? mHomeLatitude : mWaypoints.get(0).getLatitude();
             double lon = hasHome() ? mHomeLongitude : mWaypoints.get(0).getLongitude();
-            builder.append(formatWplLine(0, 1, lat, lon));
+            builder.append(formatWplLine(rowIndex++, 1, lat, lon));
         }
         for (int i = 0; i < mWaypoints.size(); i++) {
             Waypoint waypoint = mWaypoints.get(i);
-            builder.append(formatWplLine(i + 1, 0, waypoint.getLatitude(), waypoint.getLongitude()));
+            builder.append(formatWplLine(rowIndex++, 0, waypoint.getLatitude(), waypoint.getLongitude()));
+        }
+        // Annotations come last, in insertion order; p2 renumbers per type 0..n-1 like
+        // Valetudo's replace-all setMapAnnotations write.
+        // Chú thích đi cuối, theo thứ tự chèn; p2 đánh số lại theo từng kiểu 0..n-1 như cách
+        // Valetudo ghi setMapAnnotations thay-toàn-bộ.
+        for (MapAnnotation annotation : mAnnotations) {
+            int ordinal = annotationOrdinal(mAnnotations, annotation);
+            for (int vertex = 0; vertex < annotation.size(); vertex++) {
+                double[] point = annotation.getPoint(vertex);
+                builder.append(formatAnnotationLine(
+                        rowIndex++, annotation.getType().wireValue, ordinal, vertex,
+                        point[0], point[1]));
+            }
         }
         return builder.toString();
     }
@@ -185,16 +270,52 @@ public class Mission {
                 lon);
     }
 
+    /** One annotation vertex: p1 = type, p2 = ordinal within type, p3 = vertex index. */
+    /** Một đỉnh của chú thích: p1 = kiểu, p2 = thứ tự trong kiểu, p3 = chỉ số đỉnh. */
+    private static String formatAnnotationLine(
+            int index, int typeWire, int ordinal, int vertex, double lat, double lon) {
+        return String.format(
+                Locale.US,
+                "%d\t%d\t3\t%d\t%d\t%d\t%d\t0\t%.8f\t%.8f\t0\t1\n",
+                index,
+                0,
+                CMD_MAP_ANNOTATION,
+                typeWire,
+                ordinal,
+                vertex,
+                lat,
+                lon);
+    }
+
+    /** Ordinal of this annotation within its type (identity-based, insertion order). */
+    /** Thứ tự của chú thích này trong kiểu của nó (theo đối tượng, thứ tự chèn). */
+    private static int annotationOrdinal(List<MapAnnotation> all, MapAnnotation target) {
+        int ordinal = 0;
+        for (MapAnnotation annotation : all) {
+            if (annotation == target) {
+                return ordinal;
+            }
+            if (annotation.getType() == target.getType()) {
+                ordinal++;
+            }
+        }
+        return ordinal;
+    }
+
     /**
      * Parses a Mission Planner / QGroundControl waypoint file.
      * Phân tích cú pháp một tệp điểm hành trình của Mission Planner / QGroundControl.
      *
      * <p>Row 0 is treated as the home position; every subsequent {@code NAV_WAYPOINT} row becomes a
      * mission waypoint. Non-navigation commands are skipped rather than rejected, so files planned
-     * with extra {@code DO_} commands still load their waypoints.
+     * with extra {@code DO_} commands still load their waypoints. {@link #CMD_MAP_ANNOTATION} rows
+     * assemble back into map annotations and never count as row 0 — an annotations-only file must
+     * not invent a home.
      * <p>Dòng 0 được coi là vị trí home; mỗi dòng {@code NAV_WAYPOINT} tiếp theo trở thành một điểm
      * hành trình của sứ mệnh. Các lệnh không phải điều hướng bị bỏ qua thay vì từ chối, nên tệp được
-     * lên kế hoạch với các lệnh {@code DO_} thêm vào vẫn tải được các điểm hành trình.
+     * lên kế hoạch với các lệnh {@code DO_} thêm vào vẫn tải được các điểm hành trình. Các dòng
+     * {@link #CMD_MAP_ANNOTATION} được lắp ráp lại thành chú thích bản đồ và không bao giờ được tính
+     * là dòng 0 — tệp chỉ-có-chú-thích không được bịa ra một vị trí home.
      */
     public static Mission parseWaypointsFile(String contents) throws IOException {
         Mission mission = new Mission();
@@ -212,6 +333,7 @@ public class Mission {
             }
 
             int rowIndex = 0;
+            List<StagedAnnotation> staged = new ArrayList<StagedAnnotation>();
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.isEmpty()) {
@@ -238,6 +360,27 @@ public class Mission {
                     throw new IOException("Malformed waypoint row: " + line, e);
                 }
 
+                if (command == CMD_MAP_ANNOTATION) {
+                    // p1 = type wire value, p2 = ordinal within type, p3 = vertex index.
+                    // p1 = giá trị truyền kiểu, p2 = thứ tự trong kiểu, p3 = chỉ số đỉnh.
+                    int typeWire;
+                    int ordinal;
+                    int vertex;
+                    try {
+                        typeWire = Integer.parseInt(fields[4].trim());
+                        ordinal = Integer.parseInt(fields[5].trim());
+                        vertex = Integer.parseInt(fields[6].trim());
+                    } catch (NumberFormatException e) {
+                        throw new IOException("Malformed map annotation row: " + line, e);
+                    }
+                    MapAnnotation.Type type = MapAnnotation.Type.fromWire(typeWire);
+                    if (type == null) {
+                        throw new IOException("Unknown map annotation type: " + line);
+                    }
+                    stageAnnotationVertex(staged, type, ordinal, vertex, lat, lon);
+                    continue;
+                }
+
                 if (rowIndex == 0) {
                     mission.setHome(lat, lon);
                 } else if (command == CMD_NAV_WAYPOINT) {
@@ -245,8 +388,47 @@ public class Mission {
                 }
                 rowIndex++;
             }
+
+            for (StagedAnnotation annotation : staged) {
+                if (annotation.vertices.size() < 2) {
+                    throw new IOException("Map annotation with fewer than 2 points in file");
+                }
+                mission.addAnnotation(annotation.toAnnotation());
+            }
         }
         return mission;
+    }
+
+    /** One map annotation while its vertex rows are being collected out of the file. */
+    /** Một chú thích bản đồ trong khi các dòng đỉnh của nó được gom từ tệp. */
+    private static final class StagedAnnotation {
+        final MapAnnotation.Type type;
+        final int ordinal;
+        final TreeMap<Integer, double[]> vertices = new TreeMap<Integer, double[]>();
+
+        StagedAnnotation(MapAnnotation.Type type, int ordinal) {
+            this.type = type;
+            this.ordinal = ordinal;
+        }
+
+        MapAnnotation toAnnotation() {
+            // Vertex rows arrive sorted by the p3 column, so the points rebuild in order.
+            // Các dòng đỉnh được sắp theo cột p3, nên các điểm được dựng lại đúng thứ tự.
+            return new MapAnnotation(type, new ArrayList<double[]>(vertices.values()));
+        }
+    }
+
+    private static void stageAnnotationVertex(List<StagedAnnotation> staged, MapAnnotation.Type type,
+            int ordinal, int vertex, double lat, double lon) {
+        for (StagedAnnotation candidate : staged) {
+            if (candidate.type == type && candidate.ordinal == ordinal) {
+                candidate.vertices.put(vertex, new double[] {lat, lon});
+                return;
+            }
+        }
+        StagedAnnotation created = new StagedAnnotation(type, ordinal);
+        created.vertices.put(vertex, new double[] {lat, lon});
+        staged.add(created);
     }
 
     // endregion

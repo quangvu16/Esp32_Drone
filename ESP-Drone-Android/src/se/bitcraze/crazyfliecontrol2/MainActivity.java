@@ -251,6 +251,13 @@ public class MainActivity extends EspActivity {
                         se.bitcraze.crazyfliecontrol2.gpsnav.GpsNavActivity.class));
             }
         });
+        findViewById(R.id.tab_indoor).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                launchChild(new Intent(MainActivity.this,
+                        se.bitcraze.crazyfliecontrol2.gpsnav.IndoorMapActivity.class));
+            }
+        });
         findViewById(R.id.tab_tune).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

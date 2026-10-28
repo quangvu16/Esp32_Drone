@@ -27,11 +27,13 @@ New here? Install the firmware and an app first — see
 6. [Arming and disarming](#6-arming-and-disarming)
 7. [What the drone does on its own](#7-what-the-drone-does-on-its-own)
 8. [Mission (GPS)](#8-mission-gps)
-9. [Tune (PID)](#9-tune-pid)
-10. [Setup](#10-setup)
-11. [First-flight checklist](#11-first-flight-checklist)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Known limits](#13-known-limits)
+9. [Indoor Map](#9-indoor-map)
+10. [Tune (PID)](#10-tune-pid)
+11. [Bench — the Python tuner GUI](#11-bench--the-python-tuner-gui)
+12. [Setup](#12-setup)
+13. [First-flight checklist](#13-first-flight-checklist)
+14. [Troubleshooting](#14-troubleshooting)
+15. [Known limits](#15-known-limits)
 
 ---
 
@@ -61,7 +63,7 @@ layout; small details differ by platform.*
 
 | Header item | What it tells you |
 |---|---|
-| **Fly · Mission · Tune · Setup** | The four sections. The current one is white. |
+| **Fly · Mission · Indoor · Tune · Setup** | The five sections. The current one is white. |
 | **Wi-Fi / Link** | Green when connected, with signal strength. Grey = not connected. |
 | **Battery (volts)** | The real cell voltage. Ink = OK, **amber below 3.50 V**, **red below 3.30 V**. |
 | **Mode chip** | MANUAL, HOLD, AUTO, FOLLOW or RTH — what the drone reports. |
@@ -73,8 +75,8 @@ drone's first status report arrives.
 
 **Moving between sections**
 
-- **Fly** is home. Mission and Tune open from it; closing them (or tapping
-  *Fly*) returns there.
+- **Fly** is home. Mission, Indoor Map and Tune open from it; closing them (or
+  tapping *Fly*) returns there.
 - **Switching sections is blocked while a mission is flying or auto-tune is
   running** — the app tells you why. Land, end the mission, stop the tuner, or
   use CUT MOTORS first. This stops you from accidentally closing the screen
@@ -292,9 +294,64 @@ without a fix or a compass reading.
 Long-press the icon-only buttons (Android) or use VoiceOver (iOS) to hear their
 names.
 
+**Keep-out zones and corridors are drawn on this map, but not edited here.** The
+map is read-only for those so the plan cannot change mid-flight; the editor is
+the [Indoor Map](#9-indoor-map) page. If a waypoint is refused ("inside keep-out
+zone") or a hold starts ("keep-out zone entered - holding"), the red shape you
+see is the reason.
+
 ---
 
-## 9. Tune (PID)
+## 9. Indoor Map
+
+![Indoor Map screen](android-app.svg)
+
+*The Indoor Map editor, as a screen map. The iOS app
+([ios-app.svg](ios-app.svg)) has the same tools in its own layout.*
+
+The **Indoor** tab is the map-annotation editor — the place to tell the drone
+about things the map cannot know on its own: where it must not fly, where it may
+cross a keep-out zone, and where the air is unsteady. Everything you draw here
+is shared with the [Mission](#8-mission-gps) page: the zones edited here are the
+zones the mission runner obeys.
+
+### The modes
+
+One mode is active at a time (the current one is filled):
+
+| Mode | How you draw | What it makes |
+|---|---|---|
+| **Select** | Tap a shape to pick it; drag its handles or body | Edits what is already on the map |
+| **Keep-out** | Drag on the map to draw a rectangle | A red zone the drone will not fly into |
+| **Wind** | Drag on the map to draw a rectangle | A zone where arrival needs a second look (unsteady air) |
+| **Corridor** | Tap one endpoint, then the other | A green gate the drone may cross through |
+| **Go to** | Tap a point | A target for GUIDED mode — start it from the Mission page |
+
+Placement is placement-only: while a drawing mode is active, touching the map
+draws (or does nothing) — it does not select shapes or drop waypoints. A pinch
+still zooms. When a shape is placed it snaps to **5° angles and whole metres**.
+
+### Editing a shape
+
+Switch to **Select**, then tap the shape. It wears the editing handles:
+
+| Handle | Where | Does |
+|---|---|---|
+| ✕ red | first corner | deletes the shape (tap, no drag) |
+| ✛ / ↻ | second corner | moves a corridor endpoint / rotates a zone |
+| ↖↘ | third corner | scales a zone |
+| body | anywhere on the shape | drags the whole thing |
+
+**Delete selected**, **Clear all** and **Center** sit above the tiles; the tiles
+row lists every shape ("Keep-out 1", "Corridor 1", …) and every waypoint
+("WP 1", …) — tap a tile to select and centre the map on it.
+
+The screen maps of both apps: [android-app.svg](android-app.svg) ·
+[ios-app.svg](ios-app.svg).
+
+---
+
+## 10. Tune (PID)
 
 For tuning the stabiliser on the bench. **Auto-tune spins the props. Strap the
 drone to a stand or hold it tethered.**
@@ -311,7 +368,36 @@ drone to a stand or hold it tethered.**
 
 ---
 
-## 10. Setup
+## 11. Bench — the Python tuner GUI
+
+![Python tuner GUI](pid-tune-gui.svg)
+
+*The bench window (`tools/pid-tune/tuner_gui.py`), as a screen map.*
+
+The same tuning tools, plus bench tests, on a laptop connected to the drone's
+network. See [tools/pid-tune/README.md](../tools/pid-tune/README.md) for how to
+start it.
+
+### Motor test
+
+Run one motor at a time to check wiring and props after a repair. **Disarmed
+only, props clear** — a spinning prop cuts.
+
+| Part | What it does |
+|---|---|
+| **Speed** | Shared by all four motors. 1000 is idle; 1200 is a gentle spin. |
+| **Run** (per motor) | Runs **that motor only** at the speed; the others idle. |
+| **Stop** (per motor) | Stops that motor; the others keep whatever they were doing. |
+| **STOP ALL** | Ends the whole test at once. |
+
+The GUI re-sends the command every 150 ms while anything is running — the
+firmware stops the test on its own after 300 ms of silence, and closing the
+window sends it off. EMERGENCY ends it too. If the status says the test was not
+acked, the drone is armed — disarm first.
+
+---
+
+## 12. Setup
 
 | | Android | iOS |
 |---|---|---|
@@ -323,7 +409,7 @@ link, use the serial console (`link <n>`) — see
 
 ---
 
-## 11. First-flight checklist
+## 13. First-flight checklist
 
 Do every step. Do steps 1–6 **with the props off.**
 
@@ -353,7 +439,7 @@ test Follow / Return home only after a stable hover.
 
 ---
 
-## 12. Troubleshooting
+## 14. Troubleshooting
 
 | Symptom | Likely cause and fix |
 |---|---|
@@ -374,7 +460,7 @@ test Follow / Return home only after a stable hover.
 
 ---
 
-## 13. Known limits
+## 15. Known limits
 
 - **No height, no position.** Only a motion sensor. See the box at the top.
 - **CUT MOTORS confirms differently** on Fly (two taps) and Mission / Tune (one

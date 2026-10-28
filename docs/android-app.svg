@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 880" width="1280" height="880" role="img" aria-labelledby="ttl desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1180" width="1280" height="1180" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone Android app</title>
-  <desc id="desc">Screen map of the ESP-Drone Android client: the landscape flight screen with twin joysticks and the flight-mode panel, the PID tuning screen and the GPS navigation screen.</desc>
+  <desc id="desc">Screen map of the ESP-Drone Android client: the landscape flight screen with twin joysticks and the flight-mode panel, the GPS mission screen with read-only zones, the Indoor Map annotation editor and the PID tuning screen.</desc>
 
   <defs>
     <style>
@@ -28,7 +28,7 @@
     </style>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1280" height="880"/>
+  <rect class="bg" x="0" y="0" width="1280" height="1180"/>
 
   <!-- ============================ header ============================ -->
   <text class="h1" x="40" y="44">Android app — ESP-Drone</text>
@@ -49,12 +49,16 @@
   <text class="chip" x="186" y="168">UDP 192.168.43.42</text>
   <text class="lbl" x="340" y="168">3.98 V</text>
   <text class="lbl" x="412" y="168">Link 98%</text>
-  <rect class="btn" x="556" y="152" width="88" height="24" rx="6"/>
-  <text class="lbl" x="600" y="168" text-anchor="middle">PID Tune</text>
-  <rect class="btn" x="652" y="152" width="88" height="24" rx="6"/>
-  <text class="lbl" x="696" y="168" text-anchor="middle">GPS Nav</text>
-  <rect class="btn" x="748" y="152" width="84" height="24" rx="6"/>
-  <text class="lbl" x="790" y="168" text-anchor="middle">Settings</text>
+  <rect class="btn" x="520" y="152" width="42" height="24" rx="6"/>
+  <text class="lbl" x="541" y="168" text-anchor="middle">Fly</text>
+  <rect class="btn" x="566" y="152" width="64" height="24" rx="6"/>
+  <text class="lbl" x="598" y="168" text-anchor="middle">Mission</text>
+  <rect class="btn" x="634" y="152" width="58" height="24" rx="6"/>
+  <text class="lbl" x="663" y="168" text-anchor="middle">Indoor</text>
+  <rect class="btn" x="696" y="152" width="50" height="24" rx="6"/>
+  <text class="lbl" x="721" y="168" text-anchor="middle">Tune</text>
+  <rect class="btn" x="750" y="152" width="54" height="24" rx="6"/>
+  <text class="lbl" x="777" y="168" text-anchor="middle">Setup</text>
 
   <!-- body 184–436 -->
   <!-- left joystick -->
@@ -178,8 +182,8 @@
   <text class="lblm" x="500" y="804">props spin</text>
 
   <!-- ============================ gps screen ============================ -->
-  <text class="h2" x="660" y="582">GPS navigation screen</text>
-  <text class="lblm" x="850" y="582">gpsnav/GpsNavActivity</text>
+  <text class="h2" x="660" y="582">Mission screen (GPS)</text>
+  <text class="lblm" x="830" y="582">gpsnav/GpsNavActivity · zones read-only</text>
 
   <rect class="bezel" x="660" y="596" width="580" height="250" rx="14"/>
   <rect class="screen" x="670" y="606" width="560" height="230" rx="6"/>
@@ -188,6 +192,10 @@
   <rect x="694" y="630" width="284" height="180" rx="4" fill="#e6f2e6" stroke="#d0d7de"/>
   <path d="M 700 780 C 760 750 800 720 860 700 S 950 660 968 640" fill="none" stroke="#8c959f" stroke-width="3"/>
   <path d="M 716 640 C 776 680 816 700 876 740 S 950 780 964 800" fill="none" stroke="#a8c8e8" stroke-width="8" stroke-linecap="round"/>
+  <rect x="812" y="638" width="64" height="46" fill="#ef4444" fill-opacity="0.55" stroke="#cf222e" stroke-width="1.5"/>
+  <text class="chip" x="844" y="665" text-anchor="middle" fill="#cf222e">keep-out</text>
+  <rect x="886" y="722" width="70" height="12" fill="#10b981" fill-opacity="0.6" stroke="#10b981" stroke-width="1.5"/>
+  <text class="chip" x="921" y="716" text-anchor="middle" fill="#0a7a55">corridor</text>
   <circle cx="742" cy="760" r="7" fill="#1a7f37"/>
   <text class="chip" x="754" y="764" fill="#1a7f37">launch</text>
   <circle cx="830" cy="712" r="7" fill="#0969da"/>
@@ -219,5 +227,79 @@
   <rect class="btn" x="1134" y="788" width="56" height="26" rx="6"/>
   <text class="lbl" x="1162" y="805" text-anchor="middle">Land</text>
 
-  <text class="lblm" x="686" y="832">Load / Save Mission Planner .waypoints files · map type · tap mode</text>
+  <text class="lblm" x="686" y="832">Load / Save Mission Planner .waypoints files · long-press adds a waypoint · tap sets a go-to target</text>
+
+  <!-- ============================ indoor map screen ============================ -->
+  <text class="h2" x="40" y="896">Indoor Map screen</text>
+  <text class="lblm" x="210" y="896">gpsnav/IndoorMapActivity · the Valetudo annotation editor</text>
+
+  <rect class="bezel" x="40" y="910" width="820" height="246" rx="18"/>
+  <rect class="screen" x="52" y="922" width="796" height="222" rx="8"/>
+
+  <!-- header -->
+  <rect class="panel" x="52" y="922" width="796" height="32" rx="8"/>
+  <text class="lbl" x="68" y="943">Indoor Map</text>
+  <rect class="btn" x="520" y="928" width="42" height="20" rx="5"/><text class="lblm" x="541" y="942" text-anchor="middle">Fly</text>
+  <rect class="btn" x="566" y="928" width="58" height="20" rx="5"/><text class="lblm" x="595" y="942" text-anchor="middle">Mission</text>
+  <rect class="btn-pri" x="628" y="928" width="54" height="20" rx="5"/><text class="lblw" x="655" y="942" text-anchor="middle">Indoor</text>
+  <rect class="btn" x="686" y="928" width="46" height="20" rx="5"/><text class="lblm" x="709" y="942" text-anchor="middle">Tune</text>
+  <rect class="btn" x="736" y="928" width="50" height="20" rx="5"/><text class="lblm" x="761" y="942" text-anchor="middle">Setup</text>
+
+  <!-- map -->
+  <rect class="panel" x="64" y="962" width="470" height="172" rx="6"/>
+  <rect x="72" y="970" width="454" height="156" rx="4" fill="#e6f2e6" stroke="#d0d7de"/>
+  <rect x="168" y="998" width="120" height="78" fill="#ef4444" fill-opacity="0.55" stroke="#cf222e" stroke-width="2"/>
+  <!-- handles on the selected keep-out -->
+  <circle cx="168" cy="998" r="11" fill="#ef4444"/><text class="lblw" x="168" y="1003" text-anchor="middle" font-size="12">✕</text>
+  <circle cx="288" cy="998" r="11" fill="#8c959f"/><text class="lblw" x="288" y="1003" text-anchor="middle" font-size="12">↻</text>
+  <circle cx="288" cy="1076" r="11" fill="#8c959f"/><text class="lblw" x="288" y="1081" text-anchor="middle" font-size="12">↗</text>
+  <text class="chip" x="228" y="1042" text-anchor="middle" fill="#cf222e">keep-out</text>
+  <!-- rubber band being drawn -->
+  <rect x="340" y="1020" width="96" height="52" fill="#10b981" fill-opacity="0.15" stroke="#10b981" stroke-width="2"/>
+  <text class="chip" x="388" y="1050" text-anchor="middle" fill="#0a7a55">drawing</text>
+  <!-- corridor -->
+  <rect x="100" y="1096" width="150" height="10" fill="#10b981" fill-opacity="0.6" stroke="#10b981" stroke-width="1.5"/>
+  <text class="chip" x="175" y="1090" text-anchor="middle" fill="#0a7a55">corridor</text>
+
+  <!-- mode chips -->
+  <rect class="panel" x="548" y="962" width="286" height="54" rx="6"/>
+  <text class="tag" x="558" y="978">MODES</text>
+  <rect class="btn-pri" x="558" y="986" width="56" height="22" rx="6"/><text class="lblw" x="586" y="1001" text-anchor="middle">Select</text>
+  <rect class="btn" x="618" y="986" width="62" height="22" rx="6"/><text class="lbl" x="649" y="1001" text-anchor="middle">Keep-out</text>
+  <rect class="btn" x="684" y="986" width="48" height="22" rx="6"/><text class="lbl" x="708" y="1001" text-anchor="middle">Wind</text>
+  <rect class="btn" x="736" y="986" width="64" height="22" rx="6"/><text class="lbl" x="768" y="1001" text-anchor="middle">Corridor</text>
+  <rect class="btn" x="736" y="1012" width="64" height="20" rx="6"/><text class="lblm" x="768" y="1026" text-anchor="middle">Go to</text>
+
+  <!-- icons + tiles -->
+  <rect class="panel" x="548" y="1024" width="286" height="110" rx="6"/>
+  <text class="tag" x="558" y="1042">ICONS</text>
+  <rect class="btn" x="610" y="1030" width="28" height="18" rx="4"/><text class="lblm" x="624" y="1043" text-anchor="middle">🗑</text>
+  <rect class="btn" x="642" y="1030" width="28" height="18" rx="4"/><text class="lblm" x="656" y="1043" text-anchor="middle">⌫</text>
+  <rect class="btn" x="674" y="1030" width="28" height="18" rx="4"/><text class="lblm" x="688" y="1043" text-anchor="middle">⌖</text>
+  <text class="lblm" x="712" y="1043">delete · clear · center</text>
+  <text class="tag" x="558" y="1068">TILES</text>
+  <rect class="btn" x="558" y="1076" width="72" height="22" rx="6"/><text class="lblm" x="594" y="1091" text-anchor="middle">Keep-out 1</text>
+  <rect class="btn" x="634" y="1076" width="68" height="22" rx="6"/><text class="lblm" x="668" y="1091" text-anchor="middle">Corridor 1</text>
+  <rect class="btn" x="706" y="1076" width="58" height="22" rx="6"/><text class="lblm" x="735" y="1091" text-anchor="middle">Wind 1</text>
+  <rect class="btn" x="558" y="1102" width="48" height="22" rx="6"/><text class="lblm" x="582" y="1117" text-anchor="middle">WP 1</text>
+  <rect class="btn" x="610" y="1102" width="48" height="22" rx="6"/><text class="lblm" x="634" y="1117" text-anchor="middle">WP 2</text>
+  <text class="lblm" x="666" y="1117">tap = select + center</text>
+
+  <!-- right notes -->
+  <rect class="card" x="890" y="890" width="350" height="266" rx="10"/>
+  <text class="h2" x="908" y="916">Modes → SelectionType</text>
+  <line class="rule" x1="908" y1="926" x2="1222" y2="926"/>
+  <text class="lblm" x="908" y="950">Select</text>
+  <text class="lbl" x="1004" y="950">tap to edit · handles · body drag</text>
+  <text class="lblm" x="908" y="976">Keep-out</text>
+  <text class="lbl" x="1004" y="976">MANUAL_RECTANGLE drag</text>
+  <text class="lblm" x="908" y="1002">Wind</text>
+  <text class="lbl" x="1004" y="1002">MANUAL_RECTANGLE drag</text>
+  <text class="lblm" x="908" y="1028">Corridor</text>
+  <text class="lbl" x="1004" y="1028">MANUAL_PATH — two taps</text>
+  <text class="lblm" x="908" y="1054">Go to</text>
+  <text class="lbl" x="1004" y="1054">MANUAL_POINT — one tap</text>
+  <text class="lblm" x="908" y="1088">Shapes snap to 5° and whole metres on release.</text>
+  <text class="lblm" x="908" y="1112">The plan is shared with the Mission screen (NavStore),</text>
+  <text class="lblm" x="908" y="1132">so the zones edited here are the zones the runner flies.</text>
 </svg>

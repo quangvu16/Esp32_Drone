@@ -266,9 +266,12 @@ class FakeFirmware:
             self._send(D.PORT_LOG, D.LOG_CH_DATA, bytes([bid, 0, 0, 0]) + vals)
 
     def flight_ctrl(self, p):
-        if len(p) >= 2 and p[1] == D.FC_MAGIC:
-            cmd = p[2] if len(p) > 2 else 0
-            self._send(D.PORT_FLIGHT, 0, bytes([D.FC_MAGIC, cmd, 0]))
+        # p is the full packet: p[0]=header 0x70, p[1]=cmd, p[2..]=args. The firmware
+        # reads cmd=p[1] and replies <cmd><status>. Mirror that exactly — an extra
+        # FC_MAGIC here once hid a real framing bug from the drone side.
+        if len(p) >= 2:
+            cmd = p[1]
+            self._send(D.PORT_FLIGHT, 0, bytes([cmd, 0]))
 
 
 # ============================================================ wire tests
@@ -347,6 +350,12 @@ def test_link():
             check("different CREATE is refused (err 17)", False)
         except RuntimeError as e:
             check("different CREATE is refused (err 17)", "17" in str(e))
+
+        print("\n--- flight control (payload <cmd>, reply <cmd><status>) ---")
+        check("arm acked", d.arm())
+        check("motor test acked", d.motor_test(1, 1200, 1000, 1000, 1000))
+        check("motor test stop acked", d.motor_test(0))
+        check("disarm acked", d.disarm())
 
         print("\n--- telemetry decode ---")
         check("level starts neutral", d.level == {"roll": 0.0, "pitch": 0.0})
