@@ -14,9 +14,10 @@ in **[../PROTOCOL.md](../PROTOCOL.md)**.
 | **Board** | XW_Z1_V2.0 欣薇_无人机 — ESP32 Dev Module + MPU6500 (SPI) + SBUS + 4× AO3416 |
 | **Motors** | 8520 coreless, direct MOSFET PWM (no ESCs) |
 | **Phone** | Android 5.0+ (API 21), or iOS 15+ |
+| **Mac** | macOS 12+ — the iOS app also builds as a Mac app (Mac Catalyst) |
 | **Firmware toolchain** | Arduino IDE 2.x **or** `arduino-cli`, plus the ESP32 board package |
 | **Android toolchain** | Android Studio, or a JDK 17 + Android SDK 34 |
-| **iOS toolchain** | Xcode 15+, CocoaPods |
+| **iOS / Mac toolchain** | Xcode 15+, CocoaPods |
 | **Battery** | 1S LiPo. VBAT sense expects 1 cell |
 
 > The board has **only an MPU6500** — no barometer, no GPS, no magnetometer.
@@ -122,6 +123,22 @@ full-screen from the Fly screen; the header sits in their navigation bar.
 > opened from this app. Use WiFi or BLE GATT instead. The app says this on
 > screen rather than failing silently.
 
+### Run it on macOS
+
+The same project builds a **Mac app** (Mac Catalyst) — the same screens and
+the same links (WiFi UDP, BLE GATT), driven by mouse and keyboard:
+
+- In Xcode pick **My Mac (Mac Catalyst)** as the destination and Run, or build
+  from the command line:
+  `xcodebuild -workspace "Crazyflie client.xcworkspace" -scheme "Crazyflie client" -destination 'platform=macOS,variant=Mac Catalyst' -configuration Release build`.
+  The app is `ESP-Drone.app`, the product name of the same target.
+- **Tilt-to-fly is not available on a Mac** — there are no motion sensors, so
+  the tilt button has nothing to read. Fly with the on-screen sticks (drag with
+  the mouse), exactly as the fly screen works on the phone.
+- The slider and switch on the fly screen's More panel keep the Mac's default
+  colours: UIKit's Mac idiom refuses the iPad track tints, so the app skips
+  those two cosmetic lines there.
+
 ---
 
 ## 4. Connect
@@ -145,15 +162,18 @@ The drone speaks CRTP over every transport. Pick whichever suits you.
 ### Bluetooth Classic SPP (Android only)
 
 1. Set the drone to link 2 (`link 2`) and reboot.
-2. Pair with the ESP32 from the phone's Bluetooth settings.
-3. Connect in the app via Bluetooth Classic.
+2. Pair with **`ESP32_Done`** from the phone's Bluetooth settings.
+3. Connect in the app via Bluetooth Classic — it lists the paired devices and
+   you tap the drone to connect to it directly.
 
 WiFi is off in this mode — ESP32 WiFi and Bluetooth Classic share the radio.
 
 ### BLE GATT (both)
 
 1. Set the drone to link 3 (or 4 / 5 to keep WiFi as well).
-2. Connect in the app via Bluetooth LE.
+2. Connect in the app via Bluetooth LE — it scans and lists the advertisers
+   (the drone shows up as **`ESP32_Done`**), and you tap the drone to connect
+   to that exact device.
 
 Uses the Bitcraze service `00000201-1C7F-4F9E-947B-43B7C00A9A08`. Segmentation
 and the 20-byte MTU rules are in [PROTOCOL.md §8](../PROTOCOL.md).

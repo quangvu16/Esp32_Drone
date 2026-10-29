@@ -67,17 +67,24 @@ formats, so if it passes, the program and the firmware agree on every byte.
 
 1. Power the drone and wait for the gyro calibration (keep it flat and still
    for about 6 seconds).
-2. Join its Wi-Fi from the computer: **ESP-Drone**, password **12345678**.
+2. Join its Wi-Fi from the computer: **ESP-Drone**, password **12345678** — or
+   use Bluetooth instead (the drone needs link profile 2/3/6, see
+   [PROTOCOL.md](../PROTOCOL.md) §8).
 3. Start the tuner:
 
    ```sh
    python3 tuner_gui.py                       # roll axis, drone at 192.168.43.42
    python3 tuner_gui.py --axis pitch          # another axis
    python3 tuner_gui.py --host esp-drone.local   # drone in station mode
+   python3 tuner_gui.py --link ble            # Bluetooth LE, drone ESP32_Done
    ```
 
-If it stops with `no reply from 192.168.43.42`, the computer is not on the
-drone's network yet. Nothing else is wrong — join **ESP-Drone** and run it again.
+If the first contact fails the window still opens — the status line says what
+to fix ("join the drone's WiFi first" for UDP), and **Reconnect** retries.
+Over Bluetooth, press **Devices…** in the Link box: it lists the BLE
+advertisers (or, for SPP, the paired devices) with signal strength, and
+connecting to a picked row goes to that exact device by address — no typing,
+and two drones with the same name stay apart.
 
 ---
 
@@ -90,7 +97,7 @@ with made-up motion, so the curves are an illustration.*
 
 | # | Part | What you do there |
 |---|---|---|
-| 1 | **Link** | Pick the axis (Roll / Pitch / Yaw). Reconnect after a Wi-Fi drop. |
+| 1 | **Link** | Pick the link (UDP / BLE / SPP) and the axis (Roll / Pitch / Yaw). **Devices…** lists Bluetooth devices to pick and connect to directly. Reconnect after a drop. |
 | 2 | **Gains** | Kp, Ki, Kd for that axis. Type a value and press **Set** (or Enter), or use **−** / **+** for 10 % steps. **Get** reads the drone, **Save** keeps the gains after power-off, **Load** / **Defaults** reload. |
 | 3 | **Drone** | **Thrust %** and **Spin up / Stop motors**; **EMERGENCY**; telemetry rate; plot length; Pause; Record CSV. |
 | 4 | **Auto-tune** | Method, which gains to search, number of trials, seconds per trial, search range. **Start**, **Model**. |
@@ -176,7 +183,10 @@ the trials, which averages out the noise.
 
 | You see | Cause | Fix |
 |---|---|---|
-| `no reply from 192.168.43.42` at start | Computer not on the drone's Wi-Fi | Join **ESP-Drone** / 12345678 |
+| `no reply from 192.168.43.42` in the status line | Computer not on the drone's Wi-Fi | Join **ESP-Drone** / 12345678, then **Reconnect** |
+| `BLE link lost` in the status line | The Bluetooth link dropped mid-session (range, battery, drone rebooted) | Press **Reconnect** — it rebuilds the link, even to the same device |
+| **Devices…** finds nothing | Link box is on UDP, or the drone is not on a Bluetooth profile | Switch the Link box to BLE or SPP; set the drone's `LINK` to 2/3/6 |
+| BLE connects but nothing replies | The drone was reached by a stale name match | Press **Devices…** and pick the drone row (connects by address) |
 | `arm: refused by the drone` | Not in MANUAL, or battery below 3.3 V | Use **Spin up** (it arms by itself); charge the battery |
 | Motors stop after a moment | The setpoint stream stopped (Wi-Fi drop, Stop, EMERGENCY) | Check the link, then Spin up again |
 | `save: refused by the drone` | Drone still armed | **Stop motors**, then Save |

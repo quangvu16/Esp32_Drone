@@ -1,13 +1,13 @@
-# App guide — every screen of the three clients
+# App guide — every screen of the four clients
 
 *Tiếng Việt: [APP_GUIDE.vi.md](APP_GUIDE.vi.md)*
 
-A screen-by-screen reference for the **Android app**, the **iOS app** and the
-**Python tuner app**: what every control does, what every setting means, and
-which file formats each screen reads and writes. The screenshots are SVG screen
-maps. Flying procedure, safety and the first-flight checklist are in the
-**[pilot's guide](USER_GUIDE.md)**; installing is in
-**[INSTALL.md](INSTALL.md)**; the wire format is in
+A screen-by-screen reference for the **Android app**, the **iOS app**, the
+**Python tuner app** and the drone's **web page**: what every control does,
+what every setting means, and which file formats each screen reads and writes.
+The screenshots are SVG screen maps. Flying procedure, safety and the
+first-flight checklist are in the **[pilot's guide](USER_GUIDE.md)**;
+installing is in **[INSTALL.md](INSTALL.md)**; the wire format is in
 **[../PROTOCOL.md](../PROTOCOL.md)**.
 
 ## Contents
@@ -15,14 +15,17 @@ maps. Flying procedure, safety and the first-flight checklist are in the
 1. [Android app](#1-android-app)
 2. [iOS app](#2-ios-app)
 3. [Python tuner app](#3-python-tuner-app)
-4. [Shared: files, zones and the mission wire](#4-shared-files-zones-and-the-mission-wire)
+4. [Web page](#4-web-page)
+5. [Shared: files, zones and the mission wire](#5-shared-files-zones-and-the-mission-wire)
 
 ---
 
 # 1. Android app
 
 `se.bitcraze.crazyfliecontrol2`, minSdk 21, landscape only. Transports: WiFi
-SoftAP, WiFi Station, Bluetooth Classic SPP and BLE GATT.
+SoftAP, WiFi Station, Bluetooth Classic SPP and BLE GATT — each alone or in the
+drone's coexistence profiles (SoftAP+BLE, Station+BLE, SPP+BLE). Android 12+
+asks for the Bluetooth runtime permissions when a Bluetooth method is used.
 
 ## 1.1 Screens and navigation
 
@@ -61,7 +64,7 @@ The header, everywhere: tab group · link status (`Not connected` / `Connected` 
 | **Takeoff** / **Land** | one button that swaps with the armed state: Takeoff arms, climbs to the hover thrust and holds; Land ramps the thrust down and disarms |
 | **ROLL / PITCH / SEQUENCE / FLIGHT** | live cells: the two angles, the auto-sequence state (`idle` `takeoff` `hold` `land`) and the time since arming |
 | **More** | opens the More panel |
-| **Connect** (not connected) | connects using Setup's connection method; the card also lists the steps for the current link type |
+| **Connect** (not connected) | connects using Setup's connection method. For Bluetooth it first shows the **device list** — BLE advertisers (4 s scan) or the phone's paired devices (SPP), drone names first then strongest signal — and tapping a row connects to that exact device by address. The card also lists the steps for the current link type |
 | **CUT MOTORS** (header) | **tap twice within 3 s** — the button turns orange and reads `TAP AGAIN: CUT`. Disabled when not connected |
 
 Both sticks dim to 45 % whenever the flight mode is not **Manual** — only
@@ -161,7 +164,7 @@ P/I/D) and a statistics block (n, min, max, mean, σ, RMS).
 | | start button | **press and hold 2 s** ("Hold 2 s to start - props spinning; secure the drone on a stand or hold it tethered") |
 | | Stop tuner | stops after the current trial |
 | **Gains row** | Save / Load / Defaults | the drone's flash (NVS) — **not** phone files |
-| **Bench motor test** | M1–M4 sliders + Start/Stop test | spins single motors with the PID bypassed, **disarmed only**; the link re-sends every 200 ms and the firmware stops the motors after 300 ms of silence — leaving the screen or losing the link stops them |
+| **Bench motor test** | M1–M4 sliders + Speed / **Run all** + Start/Stop test | spins motors with the PID bypassed — one per slider, or all four at once at the Speed value (Run all), **disarmed only**; the link re-sends every 150 ms and the firmware stops the motors after 300 ms of silence — leaving the screen or losing the link stops them |
 | **Parameters** | 13 rows | `pid.roll/pitch/yaw _kp/_ki/_kd`, hover thrust, takeoff ramp, land ramp, nav Kp — field plus −10 %/+10 %; written live unless the tuner owns the gains |
 
 Auto-tune refuses while a bench motor test runs ("Stop the bench motor test
@@ -176,9 +179,11 @@ text after each trial.
 
 | Group | Setting | Default |
 |---|---|---|
-| **Drone link** | Connection method: WiFi SoftAP / WiFi Station / Bluetooth Classic (SPP) / Bluetooth LE (GATT) | WiFi SoftAP |
+| **Drone link** | Connection method: WiFi SoftAP / WiFi Station / Bluetooth Classic (SPP) / Bluetooth LE (GATT) / WiFi SoftAP + BLE / WiFi Station + BLE / Bluetooth SPP + BLE — mirrors the drone's `LINK` 0–6 profiles | WiFi SoftAP |
 | | UDP host | `192.168.43.42` (Station: `esp-drone.local`) |
 | | UDP port (phone to drone) / (drone to phone) | 2390 / 2399 |
+| | Bluetooth device list | shown when **Connect** runs with a Bluetooth method: every device found (BLE scan or paired SPP), drone names (`ESP32_Done`, `ESP-Drone`, `Crazyflie`) first then strongest signal — tap one to connect to that exact device |
+| | **Switch drone to this profile** | sends `FC_CMD_LINK` over the live connection after a confirmation dialog; the drone stores the profile and reboots in ~1.5 s (refused while armed). Not connected yet: "Connect to the drone first" |
 | **Flight control** | Mode 1–4 (which stick does what) | Mode 2 — left: thrust & yaw, right: pitch & roll |
 | | Deadzone / Roll trim / Pitch trim | 0.2 / 0.0 / 0.0 |
 | | Advanced flight control ("Crazy mode") | on |
@@ -200,9 +205,16 @@ text after each trial.
 # 2. iOS app
 
 `Crazyflie client`, iOS 15+, Fly landscape and Mission / Indoor / Tune
-portrait. Transports: WiFi SoftAP, WiFi Station and BLE GATT. **Bluetooth
+portrait. Transports: WiFi SoftAP, WiFi Station and BLE GATT, including the
+coexistence profiles (the app uses the WiFi side of SoftAP+BLE / Station+BLE
+and the BLE side of SPP+BLE). **Bluetooth
 Classic SPP is not available on iOS** — it is listed in the link picker but
 says so on screen ("Not available on iOS") rather than failing.
+
+The same app also runs on **macOS 12+** (Mac Catalyst): the same screens and
+links, driven by mouse — and **tilt-to-fly is not available there** (a Mac has
+no motion sensors), so the sticks fly. Everything else in this section is the
+Mac app too.
 
 ## 2.1 Screens and navigation
 
@@ -229,7 +241,7 @@ the voltage + armed status on the left and **CUT MOTORS** on the right.
 
 | Control | What it does |
 |---|---|
-| **Connect / Cancel** (not connected) | connects with a 0–100 % progress bar; the card lists the three steps for the current link type ("Link: WiFi SoftAP · change it in Setup") |
+| **Connect / Cancel** (not connected) | connects with a 0–100 % progress bar; on BLE it goes straight to the device picked in Setup's list (or the first name match). The card lists the three steps for the current link type ("Link: WiFi SoftAP · change it in Setup") |
 | **Flight mode** | `Manual` \| `Hold` \| `Auto` segments. `FOLLOW` and `RTH` live on the Mission screen |
 | **Takeoff / Land** | one button that swaps with the armed state: Takeoff arms, climbs to hover thrust 30000 and holds; Land ramps down and disarms |
 | **ROLL / PITCH / SEQUENCE / FLIGHT** | live cells: angles, auto-sequence state, time since arming |
@@ -303,7 +315,7 @@ The Go-to target is shared with the Mission screen.
 | **Auto-tune model** | `ModelView` | trial costs (log axis) and the predicted cost vs the gains (band = 2 std, or a dark-better map for two gains) |
 | **Parameters** | 13 rows | `pid.roll_kp … pid.yaw_kd`, `flight.hover_thrust`, `flight.takeoff_ms`, `flight.land_ms`, `nav.kp` — field + −10 %/+10 % + a one-line hint; written live |
 | | Save gains / Load gains / Restore defaults | the **drone's flash**, not phone files ("Saved to flash.", "Loaded from flash.", "Restored firmware defaults.") |
-| **Bench motor test** | M1–M4 sliders (1000–2000 µs) + Start/Stop test | disarmed only ("Refused — disarm first."); re-sends every 200 ms, firmware watchdog stops it after 300 ms of silence |
+| **Bench motor test** | M1–M4 sliders (1000–2000 µs) + Speed / **Run all** + Start/Stop test | one tap runs all four motors at once at the Speed value, or each slider drives its motor live; disarmed only ("Refused — disarm first."); re-sends every 150 ms, firmware watchdog stops it after 300 ms of silence (also stops when the app leaves the foreground) |
 | **Auto-tune** | method segments | ML (Bayesian) is the default ("Gaussian process + expected improvement. Fewest trials; the default."); also Neural, RL, CMA-ES, Differential evolution, PSO, Genetic, Nelder-Mead, SPSA, Twiddle, Random |
 | | **Hold to confirm — start auto-tune** | press and **hold 1.5 s** ("KEEP HOLDING…"), then confirm — or "Arm and start" if the drone is disarmed |
 | | **CUT MOTORS — stop tuner** | one tap: motors off **and** tuner halted |
@@ -322,10 +334,12 @@ The Setup chip opens an action sheet with two entries.
 
 | Control | Notes |
 |---|---|
-| Link type segments | WiFi SoftAP · WiFi Station · Bluetooth Classic (SPP) · Bluetooth LE (GATT), with a detail caption per type |
-| Host / ports | `192.168.43.42` or `esp-drone.local`; drone 2390 / phone 2399 (UDP types only) |
-| SPP | listed but blocked on iOS ("iOS only exposes Bluetooth Classic serial to MFi accessories"); Apply reports "Not available on iOS" |
-| BLE | "Scanning for drones advertising the Bitcraze service… first match is used" |
+| Link type segments | WiFi SoftAP · WiFi Station · Bluetooth Classic (SPP) · Bluetooth LE (GATT) · WiFi SoftAP + BLE · WiFi Station + BLE · Bluetooth SPP + BLE — mirrors the drone's `LINK` 0–6 profiles, with a detail caption per type |
+| Host / ports | `192.168.43.42` or `esp-drone.local`; drone 2390 / phone 2399 (UDP types and the WiFi side of the coexistence profiles) |
+| SPP | greyed out on iOS ("iOS only exposes Bluetooth Classic serial to MFi accessories") — it cannot be selected |
+| BLE name | a name field for the drone to scan for (blank = first advertisement; the drone advertises as `ESP32_Done`); shown for the BLE profiles |
+| Device list | a live table of every BLE advertiser (name, signal, identifier), drone names first then strongest signal. **Tap a row** to choose it (checkmark, name fills the field), **Connect to selected device** connects to that exact peripheral — the identifier it carries is what the link uses, so two drones with the same name stay apart and reconnects skip the scan. Typing a name by hand clears the picked device |
+| **Switch drone to this profile** | sends `FC_CMD_LINK` over the live connection after a confirmation dialog; the drone stores the profile and reboots in ~1.5 s (refused while armed). Never sent by Apply |
 
 **Sticks and sensitivity** (`SettingsViewController`, landscape, Close saves):
 
@@ -347,11 +361,16 @@ The Setup chip opens an action sheet with two entries.
 # 3. Python tuner app
 
 `tools/pid-tune/tuner_gui.py` — a tkinter + matplotlib bench tool over the
-same CRTP/UDP link as the phones. Install and the eleven search methods are in
+same CRTP link as the phones: UDP, Bluetooth LE or Bluetooth Classic SPP.
+Install and the eleven search methods are in
 **[../tools/pid-tune/README.md](../tools/pid-tune/README.md)**. CLI:
-`python tuner_gui.py --host 192.168.43.42 --axis roll` — flags `--host`
-(192.168.43.42), `--device-port` (2390), `--app-port` (2399), `--axis`
-(roll/pitch/yaw), `--window` (10 s of plots).
+`python tuner_gui.py --host 192.168.43.42 --axis roll` — flags `--link`
+(udp/ble/spp), `--host` (192.168.43.42), `--device-port` (2390), `--app-port`
+(2399), `--ble` (name, MAC or CoreBluetooth UUID), `--spp` (MAC), `--axis`
+(roll/pitch/yaw), `--window` (10 s of plots). BLE needs `pip install bleak`;
+SPP needs the drone paired and a Linux host. A failed first contact no longer
+exits — the window opens, the status line says what to fix, and **Devices…**
+lists the Bluetooth devices to pick from.
 
 ## 3.1 The tuner window
 
@@ -359,14 +378,14 @@ same CRTP/UDP link as the phones. Install and the eleven search methods are in
 
 | Panel | Control | What it does |
 |---|---|---|
-| **Link** | address, axis, Reconnect | changing axis tears down both log blocks and rebuilds them |
+| **Link** | UDP / BLE / SPP radios, address field, live-link label, axis, Reconnect, **Devices…** | switches the transport or address (a mission or motor test stops first); changing axis tears down both log blocks and rebuilds them. Devices… lists the BLE advertisers or paired SPP devices (drone names first, then strongest signal) and Connect on a row links to that exact device by address |
 | **Gains** | P / I / D fields with − + | clamped by the firmware: kp 0–100, ki 0–20, kd 0–200 |
 | | Get / Set / Save / Load / Defaults | read back from the drone, write to it, persist to NVS, reload |
 | **Drone** | ARM / DISARM / EMERGENCY | EMERGENCY is always available and stops the motors |
 | | rate / window / Pause / Record CSV | telemetry rate (20 Hz default), seconds of plot history, freeze, CSV capture |
 | **Motor test** | Speed (1000–1500, 1000 = stopped) | shared speed for all four motors |
 | | Run / Stop × M1–M4 | Run spins **only that** motor and parks the other three at 1000; Stop parks its motor keeping the rest |
-| | STOP ALL | ends the test at once (enable = 0) |
+| | **Run all** / STOP ALL | Run all spins **all four** motors at once at the shared speed; STOP ALL ends the test at once (enable = 0) |
 | **Auto-tune** | method dropdown, gain checkboxes, learn from past trials | the same eleven methods; uncheck a gain to hold it fixed; history seeding from `ml_tune_log.csv` |
 | | Trials / Trial s / Range x | the search budget and the multiplicative search box |
 | | Start / Stop · **Model** | runs in a worker thread; Model opens the model window |
@@ -413,7 +432,60 @@ on the laptop:
 
 ---
 
-# 4. Shared: files, zones and the mission wire
+# 4. Web page
+
+![Web page](screens/web-control.svg)
+
+The firmware serves this page at **`http://192.168.43.42/`** — join the
+drone's WiFi (soft-AP **ESP-Drone** / **12345678**) and open the address in
+any browser: phone, tablet or laptop, nothing to install. The page talks to
+the board over a **WebSocket** on the same port, carrying the same CRTP bytes
+the UDP link carries ([PROTOCOL.md §8](../PROTOCOL.md#8-transports)), so every
+button here means exactly what it means in the apps and the tuner.
+
+## 4.1 Status card
+
+| Item | Meaning |
+| --- | --- |
+| **link pill** | `live` = WebSocket up and telemetry arriving; `no reply` = the socket is open but the drone has been silent for 1.5 s; `lost` = reconnecting every 2 s |
+| **VBAT / MODE / ARMED** | battery volts, flight mode (Manual / Hold / Auto / Follow / Rth) and the armed flag, from the status log block every 200 ms |
+| **ROLL / PITCH / STATE** | level angles in degrees; STATE is the auto sub-state (Idle / Takeoff / Hold / Land) while in Auto |
+| **M1–M4** | the four motor outputs in µs as the firmware writes them — during a bench test this is the test speed |
+
+## 4.2 Flight card
+
+| Control | What it does |
+| --- | --- |
+| **ARM / DISARM** | port-7 ARM / DISARM ([PROTOCOL.md §5](../PROTOCOL.md#5-flight-control-port-7-channel-0--firmware-extension)); ARM is refused unless the drone would start from idle, and anything refused is reported as "refused by the drone" |
+| **EMERGENCY** | one click, no confirmation: motors off + disarm now |
+| **Thrust % + Spin up** | streams 50 Hz level CommanderPackets (§7): 0.5 s at zero thrust, then a 1 s ramp to the chosen % (max 60). Thrust going up arms the drone; **Stop motors** (or hiding the tab) drops thrust to zero, which disarms it |
+| **Stop motors** | ends the stream with zero-thrust packets |
+
+ARM holds only while the setpoint stream is running: in Manual the stream *is*
+the setpoint, and the 500 ms failsafe disarms half a second after it stops.
+
+## 4.3 Motor test card
+
+The bench test of [PROTOCOL.md §5](../PROTOCOL.md#bench-motor-test-motor_test-0x0c),
+the same as the tuner's Motor test panel: a shared **Speed** (1000–2000 µs),
+a **Run** / **Stop** pair per motor M1–M4, **Run all** and **STOP ALL**. Run
+parks the other three; Stop returns one motor to 1000 keeping the others; Run
+all spins all four at the shared speed (one `enable=1` packet carries four
+speeds); STOP ALL sends `enable=0`. While any motor spins the page re-sends
+the packet every 150 ms, because the firmware stops the test after 300 ms of
+silence. Disarmed bench use only — the firmware refuses the test while armed
+and the page never arms the drone for it.
+
+## 4.4 Safety
+
+Hiding or closing the tab sends `enable=0` and zero thrust before the socket
+closes, the firmware's 300 ms motor-test watchdog covers anything that gets
+lost on the way, and the 500 ms link failsafe stops the motors if the WiFi
+dies. Props off or restrained, like every other bench tool.
+
+---
+
+# 5. Shared: files, zones and the mission wire
 
 **Mission files** — all three clients read and write the same Mission Planner
 `.waypoints` files (QGC WPL 110): a `QGC WPL 110` header, then

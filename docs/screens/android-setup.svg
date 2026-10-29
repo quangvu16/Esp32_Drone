@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 852 620" width="852" height="620" role="img" aria-labelledby="ttl desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 672" width="1220" height="672" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone Android app — Setup screen</title>
-  <desc id="desc">The Setup screen (PreferencesActivity): grouped preference rows for the drone link (connection method, UDP host and the two UDP ports), flight control (mode, deadzone, trims, advanced flight control), controller (touch or gamepad with the mapping screen) and app settings, plus the Origin Project license entry.</desc>
+  <desc id="desc">The Setup screen (PreferencesActivity): grouped preference rows for the drone link (connection method across the seven LINK profiles 0-6, UDP host and the two UDP ports, and an explicit confirmed Switch drone to this profile action that sends FC_CMD_LINK), flight control (mode, deadzone, trims, advanced flight control), controller (touch or gamepad with the mapping screen) and app settings, plus the Origin Project license entry. The callout shows the Bluetooth device list that appears when Connect runs with a Bluetooth method: every device found (BLE scan or paired SPP), drone names first then strongest signal, and tapping a row connects to that exact device by address.</desc>
 
   <defs>
     <style>
@@ -21,13 +21,13 @@
     </style>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="852" height="620"/>
+  <rect class="bg" x="0" y="0" width="1220" height="672"/>
 
   <text class="h2" x="28" y="26">Setup screen</text>
   <text class="lblm" x="132" y="26">PreferencesActivity · the stock preference screens</text>
 
-  <rect class="bezel" x="28" y="40" width="796" height="560" rx="18"/>
-  <rect class="screen" x="40" y="52" width="772" height="536" rx="8"/>
+  <rect class="bezel" x="28" y="40" width="796" height="612" rx="18"/>
+  <rect class="screen" x="40" y="52" width="772" height="588" rx="8"/>
 
   <!-- title bar -->
   <text class="lbl" x="56" y="78">Crazyflie Client settings</text>
@@ -37,32 +37,60 @@
   <text class="tag" x="56" y="116">DRONE LINK</text>
   <text class="lbl" x="56" y="142">Connection method</text>
   <rect class="btn" x="560" y="126" width="236" height="24" rx="6"/><text class="lblm" x="678" y="142" text-anchor="middle">WiFi SoftAP (drone hosts ESP-Drone)  ▾</text>
-  <text class="lbl" x="56" y="176">UDP host</text>
-  <rect class="panel" x="560" y="160" width="236" height="24" rx="6"/><text class="mono" x="790" y="177" text-anchor="end">192.168.43.42</text>
-  <text class="lbl" x="56" y="210">UDP port (phone to drone)</text>
-  <rect class="panel" x="560" y="194" width="236" height="24" rx="6"/><text class="mono" x="790" y="211" text-anchor="end">2390</text>
-  <text class="lbl" x="56" y="244">UDP port (drone to phone)</text>
-  <rect class="panel" x="560" y="228" width="236" height="24" rx="6"/><text class="mono" x="790" y="245" text-anchor="end">2399</text>
-  <text class="lblm" x="56" y="270">SoftAP: 192.168.43.42. Station: esp-drone.local</text>
-  <text class="lblm" x="56" y="288">Hold keeps a thrust level, not an altitude: no barometer. AUTO is takeoff-hover-land.</text>
+  <text class="lblm" x="56" y="162">7 entries = the drone's LINK profiles 0–6 (SoftAP · Station · SPP · BLE · SoftAP+BLE · Station+BLE · SPP+BLE)</text>
+  <text class="lbl" x="56" y="188">UDP host</text>
+  <rect class="panel" x="560" y="172" width="236" height="24" rx="6"/><text class="mono" x="790" y="189" text-anchor="end">192.168.43.42</text>
+  <text class="lbl" x="56" y="222">UDP port (phone to drone)</text>
+  <rect class="panel" x="560" y="206" width="236" height="24" rx="6"/><text class="mono" x="790" y="223" text-anchor="end">2390</text>
+  <text class="lbl" x="56" y="256">UDP port (drone to phone)</text>
+  <rect class="panel" x="560" y="240" width="236" height="24" rx="6"/><text class="mono" x="790" y="257" text-anchor="end">2399</text>
+  <text class="lblm" x="56" y="278">SoftAP: 192.168.43.42. Station: esp-drone.local</text>
+  <text class="lbl" x="56" y="308">Switch drone to this profile</text>
+  <rect class="btn-pri" x="560" y="292" width="236" height="24" rx="6"/><text class="lblw" x="678" y="308" text-anchor="middle">FC_CMD_LINK · confirm first</text>
+  <text class="lblm" x="56" y="328">the drone stores the profile and reboots in ~1.5 s · refused while armed · needs a live link</text>
+  <text class="lblm" x="56" y="346">Hold keeps a thrust level, not an altitude: no barometer. AUTO is takeoff-hover-land.</text>
 
   <!-- ============================ flight control ============================ -->
-  <text class="tag" x="56" y="318">FLIGHT CONTROL SETTINGS</text>
-  <text class="lbl" x="56" y="344">Mode</text>
-  <rect class="btn" x="560" y="328" width="236" height="24" rx="6"/><text class="lblm" x="678" y="344" text-anchor="middle">Mode 2 (Left: Thrust &amp; Yaw, Right: Pitch &amp; Roll)  ▾</text>
-  <text class="lbl" x="56" y="378">Deadzone</text>
-  <rect class="panel" x="560" y="362" width="236" height="24" rx="6"/><text class="mono" x="790" y="379" text-anchor="end">0.2</text>
-  <text class="lbl" x="56" y="412">Roll trim · Pitch trim</text>
-  <rect class="panel" x="560" y="396" width="236" height="24" rx="6"/><text class="mono" x="790" y="413" text-anchor="end">0.0 · 0.0</text>
-  <text class="lbl" x="56" y="446">Advanced flight control</text>
-  <rect class="btn-pri" x="726" y="430" width="70" height="24" rx="6"/><text class="lblw" x="761" y="446" text-anchor="middle">☑ on</text>
-  <text class="lblm" x="56" y="472">Advanced: max roll/pitch 15° · max yaw 90° · thrust 25–90 % · X-Mode on · Reset values</text>
+  <text class="tag" x="56" y="376">FLIGHT CONTROL SETTINGS</text>
+  <text class="lbl" x="56" y="402">Mode</text>
+  <rect class="btn" x="560" y="386" width="236" height="24" rx="6"/><text class="lblm" x="678" y="402" text-anchor="middle">Mode 2 (Left: Thrust &amp; Yaw, Right: Pitch &amp; Roll)  ▾</text>
+  <text class="lbl" x="56" y="436">Deadzone</text>
+  <rect class="panel" x="560" y="420" width="236" height="24" rx="6"/><text class="mono" x="790" y="437" text-anchor="end">0.2</text>
+  <text class="lbl" x="56" y="470">Roll trim · Pitch trim</text>
+  <rect class="panel" x="560" y="454" width="236" height="24" rx="6"/><text class="mono" x="790" y="471" text-anchor="end">0.0 · 0.0</text>
+  <text class="lbl" x="56" y="504">Advanced flight control</text>
+  <rect class="btn-pri" x="726" y="488" width="70" height="24" rx="6"/><text class="lblw" x="761" y="504" text-anchor="middle">☑ on</text>
+  <text class="lblm" x="56" y="530">Advanced: max roll/pitch 15° · max yaw 90° · thrust 25–90 % · X-Mode on · Reset values</text>
 
   <!-- ============================ controller ============================ -->
-  <text class="tag" x="56" y="500">CONTROLLER SETTINGS · APP SETTINGS</text>
-  <text class="lbl" x="56" y="526">Controller</text>
-  <rect class="btn" x="560" y="510" width="236" height="24" rx="6"/><text class="lblm" x="678" y="526" text-anchor="middle">Touch  ▾</text>
-  <text class="lbl" x="56" y="558">Gamepad mapping ›</text>
-  <text class="lblm" x="240" y="558">axes + Emergency / trims / Alt 1 / Alt 2 / Hover</text>
-  <text class="lblm" x="56" y="578">Screen rotation lock ☑ · Full screen mode ☑ · Show console ☑ · Origin Project — GPL v2 ›</text>
+  <text class="tag" x="56" y="558">CONTROLLER SETTINGS · APP SETTINGS</text>
+  <text class="lbl" x="56" y="584">Controller</text>
+  <rect class="btn" x="560" y="568" width="236" height="24" rx="6"/><text class="lblm" x="678" y="584" text-anchor="middle">Touch  ▾</text>
+  <text class="lbl" x="56" y="616">Gamepad mapping ›</text>
+  <text class="lblm" x="240" y="616">axes + Emergency / trims / Alt 1 / Alt 2 / Hover</text>
+  <text class="lblm" x="56" y="636">Screen rotation lock ☑ · Full screen mode ☑ · Show console ☑ · Origin Project — GPL v2 ›</text>
+
+  <!-- ============================ connect-time device list (callout) ============================ -->
+  <rect class="panel" x="844" y="40" width="356" height="322" rx="10"/>
+  <text class="h2" x="860" y="68">Bluetooth device list</text>
+  <line class="rule" x1="860" y1="78" x2="1184" y2="78"/>
+  <text class="lblm" x="860" y="98">shown when Connect runs with a Bluetooth</text>
+  <text class="lblm" x="860" y="116">method (BLE or SPP) — tap a row to connect</text>
+  <text class="lblm" x="860" y="134">to that exact device by address</text>
+
+  <rect x="860" y="148" width="324" height="30" rx="4" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="lbl" x="872" y="162">ESP32_Done</text>
+  <text class="mono" x="872" y="174" fill="#57606a">08:B6:1F:9E:EE:F6 · -38 dBm</text>
+  <rect x="860" y="178" width="324" height="30" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="872" y="192">ESP-Drone</text>
+  <text class="mono" x="872" y="204" fill="#8c959f">AA:BB:CC:DD:EE:FF · -62 dBm</text>
+  <rect x="860" y="208" width="324" height="30" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="872" y="222">(no name)</text>
+  <text class="mono" x="872" y="234" fill="#8c959f">C4:7C:8D:12:34:56 · -78 dBm</text>
+
+  <text class="lblm" x="860" y="266">drone names (ESP32_Done · ESP-Drone · Crazyflie)</text>
+  <text class="lblm" x="860" y="284">sort first, then the strongest signal</text>
+  <text class="lblm" x="860" y="308">BLE: 4-second scan of advertisers</text>
+  <text class="lblm" x="860" y="326">SPP: the phone's paired devices</text>
+  <text class="lblm" x="860" y="350">two drones with the same name stay apart</text>
 </svg>

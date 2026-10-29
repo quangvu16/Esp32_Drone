@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1400" width="1280" height="1400" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone Python tuner GUI</title>
-  <desc id="desc">Screen map of the bench tools: the tuner window with link, gains, drone buttons, the motor test panel with a Run and Stop pair per motor, auto-tune and five live charts; and the Plan window with its plan plot, mission grid, row editor and Upload, Download and Start. Notes cover the motor test, safety, files and the mission plan.</desc>
+  <desc id="desc">Screen map of the bench tools: the tuner window with link (including the Devices… Bluetooth device list, shown open over the first chart — pick a row to connect to that exact device), gains, drone buttons, the motor test panel with a Run and Stop pair per motor, auto-tune and five live charts; and the Plan window with its plan plot, mission grid, row editor and Upload, Download and Start. Notes cover the motor test, safety, files and the mission plan.</desc>
 
   <defs>
     <style>
@@ -58,6 +58,8 @@
   <text class="lbl" x="256" y="243" text-anchor="middle">Yaw</text>
   <rect class="btn" x="68" y="252" width="88" height="22" rx="6"/>
   <text class="lbl" x="112" y="267" text-anchor="middle">Reconnect</text>
+  <rect class="btn" x="162" y="252" width="88" height="22" rx="6"/>
+  <text class="lbl" x="206" y="267" text-anchor="middle">Devices…</text>
 
   <!-- gains -->
   <rect class="panel" x="56" y="288" width="300" height="142" rx="6"/>
@@ -197,6 +199,32 @@
   <text class="lblm" x="600" y="953">1010 sat</text>
 
   <text class="lblm" x="376" y="978">live · Log Hz 20 · shared x-axis · Window s 10 · Pause and Record CSV sit in the Drone panel</text>
+
+  <!-- ============================ Devices… dialog (open) ============================ -->
+  <rect class="card" x="452" y="196" width="388" height="192" rx="10"/>
+  <text class="lbl" x="468" y="220">Bluetooth devices</text>
+  <text class="lblm" x="600" y="220">Devices… · BLE scan, or paired Classic for SPP</text>
+  <line class="rule" x1="468" y1="230" x2="824" y2="230"/>
+  <text class="lblm" x="472" y="248">name</text>
+  <text class="lblm" x="610" y="248">address</text>
+  <text class="lblm" x="822" y="248" text-anchor="end">rssi</text>
+  <rect x="462" y="254" width="368" height="22" rx="4" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="lbl" x="472" y="269">ESP32_Done</text>
+  <text class="mono" x="610" y="269">F866BB43-A4C5-…</text>
+  <text class="mono" x="806" y="269" text-anchor="end">-39</text>
+  <text class="lbl" x="822" y="269" text-anchor="middle">✓</text>
+  <rect x="462" y="276" width="368" height="22" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="472" y="291">ESP-Drone</text>
+  <text class="mono" x="610" y="291">08:B6:1F:9E:EE:F6</text>
+  <text class="mono" x="806" y="291" text-anchor="end">-62</text>
+  <rect x="462" y="298" width="368" height="22" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="472" y="313">(no name)</text>
+  <text class="mono" x="610" y="313">C4:7C:8D:12:34:56</text>
+  <text class="mono" x="806" y="313" text-anchor="end">-78</text>
+  <rect class="btn-pri" x="462" y="332" width="110" height="24" rx="6"/>
+  <text class="lblw" x="517" y="348" text-anchor="middle">Connect</text>
+  <text class="lblm" x="584" y="348">tap a row · double-click connects · drone names first</text>
+  <text class="lblm" x="462" y="374">the picked address is what the link uses — two drones with the same name stay apart</text>
 
   <!-- ============================ right column ============================ -->
   <rect class="card" x="890" y="132" width="350" height="250" rx="10"/>

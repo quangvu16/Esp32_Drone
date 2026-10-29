@@ -66,17 +66,24 @@ lời của firmware, nên nếu nó đạt, chương trình và firmware khớp
 ## 4. Kết nối
 
 1. Bật nguồn drone và chờ hiệu chuẩn gyro (để phẳng và yên khoảng 6 giây).
-2. Cho máy tính vào Wi-Fi của drone: **ESP-Drone**, mật khẩu **12345678**.
+2. Cho máy tính vào Wi-Fi của drone: **ESP-Drone**, mật khẩu **12345678** — hoặc
+   dùng Bluetooth (drone cần ở hồ sơ liên kết 2/3/6, xem
+   [PROTOCOL.md](../PROTOCOL.md) §8).
 3. Chạy công cụ:
 
    ```sh
    python3 tuner_gui.py                       # trục roll, drone ở 192.168.43.42
    python3 tuner_gui.py --axis pitch          # trục khác
    python3 tuner_gui.py --host esp-drone.local   # drone ở chế độ station
+   python3 tuner_gui.py --link ble            # Bluetooth LE, drone ESP32_Done
    ```
 
-Nếu nó dừng với `no reply from 192.168.43.42`, máy tính chưa vào mạng của drone.
-Không có lỗi gì khác — vào **ESP-Drone** rồi chạy lại.
+Nếu lần liên lạc đầu tiên thất bại, cửa sổ vẫn mở — dòng trạng thái nói phải sửa
+gì ("vào Wi-Fi của drone trước" với UDP), còn **Reconnect** thì thử lại. Với
+Bluetooth, bấm **Devices…** trong hộp Link: nó liệt kê các thiết bị đang quảng bá
+BLE (hoặc với SPP, các thiết bị đã ghép đôi) kèm cường độ tín hiệu, và chọn một
+hàng rồi kết nối là tới đúng thiết bị đó theo địa chỉ — không cần gõ, hai drone
+trùng tên vẫn phân biệt được.
 
 ---
 
@@ -89,7 +96,7 @@ chuyển động bịa ra, nên các đường cong chỉ là minh họa.*
 
 | # | Phần | Bạn làm gì ở đó |
 |---|---|---|
-| 1 | **Link** | Chọn trục (Roll / Pitch / Yaw). Reconnect sau khi mất Wi-Fi. |
+| 1 | **Link** | Chọn kết nối (UDP / BLE / SPP) và trục (Roll / Pitch / Yaw). **Devices…** liệt kê thiết bị Bluetooth để chọn và kết nối thẳng. Reconnect sau khi mất kết nối. |
 | 2 | **Gains** | Kp, Ki, Kd của trục đó. Gõ giá trị rồi bấm **Set** (hoặc Enter), hoặc dùng **−** / **+** để đổi 10 %. **Get** đọc từ drone, **Save** giữ hệ số sau khi tắt nguồn, **Load** / **Defaults** nạp lại. |
 | 3 | **Drone** | **Thrust %** và **Spin up / Stop motors**; **EMERGENCY**; tốc độ telemetry; độ dài biểu đồ; Pause; Record CSV. |
 | 4 | **Auto-tune** | Phương pháp, hệ số cần tìm, số lần thử, số giây mỗi lần thử, phạm vi tìm. **Start**, **Model**. |
@@ -172,7 +179,10 @@ mọi lần thử, nên nhiễu được lấy trung bình.
 
 | Bạn thấy | Nguyên nhân | Cách sửa |
 |---|---|---|
-| `no reply from 192.168.43.42` khi khởi động | Máy tính chưa vào Wi-Fi của drone | Vào **ESP-Drone** / 12345678 |
+| `no reply from 192.168.43.42` trong dòng trạng thái | Máy tính chưa vào Wi-Fi của drone | Vào **ESP-Drone** / 12345678, rồi **Reconnect** |
+| `BLE link lost` trong dòng trạng thái | Liên kết Bluetooth bị rơi giữa phiên (tầm xa, pin, drone khởi động lại) | Bấm **Reconnect** — nó dựng lại liên kết, kể cả với cùng thiết bị |
+| **Devices…** không thấy gì | Hộp Link đang ở UDP, hoặc drone không ở hồ sơ Bluetooth | Đổi hộp Link sang BLE hoặc SPP; đặt `LINK` của drone thành 2/3/6 |
+| BLE kết nối nhưng không trả lời | Drone được nối qua tên khớp cũ | Bấm **Devices…** và chọn hàng của drone (kết nối theo địa chỉ) |
 | `arm: refused by the drone` | Không ở MANUAL, hoặc pin dưới 3,3 V | Dùng **Spin up** (nó tự arm); sạc pin |
 | Động cơ dừng sau một lúc | Luồng setpoint dừng (mất Wi-Fi, Stop, EMERGENCY) | Kiểm tra kết nối, rồi Spin up lại |
 | `save: refused by the drone` | Drone vẫn đang arm | **Stop motors**, rồi Save |

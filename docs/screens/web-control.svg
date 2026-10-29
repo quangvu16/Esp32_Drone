@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" width="1240" height="800" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">ESP-Drone web page — browser control</title>
+  <desc id="desc">The control page the firmware serves at http://192.168.43.42/: a status card with battery, mode, armed flag, roll, pitch and the four motor values, a flight card with ARM, DISARM, EMERGENCY and a Thrust percent spin-up stream, and a motor test card with a Run and Stop pair per motor, Run all and STOP ALL.</desc>
+
+  <defs>
+    <style>
+      .bg      { fill: #f6f8fa; }
+      .h1      { font: 700 26px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .h2      { font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .sub     { font: 400 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lbl     { font: 500 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .lblm    { font: 400 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lblw    { font: 600 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #ffffff; }
+      .mono    { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .chip    { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #0969da; }
+      .win     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .winbar  { fill: #eaeef2; stroke: #8c959f; stroke-width: 1.5; }
+      .panel   { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .card    { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn-pri { fill: #1a7f37; stroke: #1a7f37; stroke-width: 1.5; }
+      .btn-dan { fill: #cf222e; stroke: #cf222e; stroke-width: 1.5; }
+      .btn-warn{ fill: #bc4c00; stroke: #bc4c00; stroke-width: 1.5; }
+      .field   { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+      .rule    { stroke: #d0d7de; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1240" height="800"/>
+
+  <!-- ============================ header ============================ -->
+  <text class="h1" x="40" y="44">Web page — browser control</text>
+  <text class="sub" x="40" y="70">served by the firmware · join ESP-Drone / 12345678 and open http://192.168.43.42/ · WebSocket on the same port carries the CRTP wire</text>
+  <line class="rule" x1="40" y1="88" x2="1200" y2="88"/>
+
+  <!-- ============================ browser window ============================ -->
+  <rect class="win" x="40" y="108" width="780" height="660" rx="10"/>
+  <rect class="winbar" x="40" y="108" width="780" height="34" rx="10"/>
+  <rect class="field" x="64" y="115" width="480" height="20" rx="10"/>
+  <text class="mono" x="76" y="129">http://192.168.43.42/</text>
+  <rect class="btn-pri" x="680" y="115" width="116" height="20" rx="10"/>
+  <text class="lblw" x="738" y="129" text-anchor="middle">ws · live</text>
+
+  <!-- page heading -->
+  <text class="h2" x="64" y="176">ESP-Drone control</text>
+  <rect class="btn" x="700" y="160" width="96" height="24" rx="6"/>
+  <text class="lbl" x="748" y="176" text-anchor="middle">Reconnect</text>
+
+  <!-- status card -->
+  <rect class="panel" x="64" y="192" width="732" height="104" rx="8"/>
+  <text class="lblm" x="80" y="214">VBAT</text>
+  <text class="lbl" x="80" y="232">3.28 V</text>
+  <text class="lblm" x="196" y="214">MODE</text>
+  <text class="lbl" x="196" y="232">MANUAL</text>
+  <text class="lblm" x="320" y="214">ARMED</text>
+  <text class="lbl" x="320" y="232">no</text>
+  <text class="lblm" x="424" y="214">ROLL</text>
+  <text class="lbl" x="424" y="232">+1.2°</text>
+  <text class="lblm" x="536" y="214">PITCH</text>
+  <text class="lbl" x="536" y="232">−0.6°</text>
+  <text class="lblm" x="648" y="214">STATE</text>
+  <text class="lbl" x="648" y="232">—</text>
+  <line class="rule" x1="80" y1="246" x2="780" y2="246"/>
+  <text class="lblm" x="80" y="266">M1 1000 µs</text>
+  <text class="lblm" x="256" y="266">M2 1000 µs</text>
+  <text class="lblm" x="432" y="266">M3 1000 µs</text>
+  <text class="lblm" x="608" y="266">M4 1000 µs</text>
+  <text class="lblm" x="80" y="286">status log block every 200 ms · pm.vbat · flight.mode · flight.armed · stabilizer.roll/pitch · motor.m1..m4</text>
+
+  <!-- flight card -->
+  <rect class="panel" x="64" y="310" width="732" height="118" rx="8"/>
+  <text class="lblm" x="80" y="332">Flight</text>
+  <rect class="btn-pri" x="80" y="342" width="80" height="26" rx="6"/>
+  <text class="lblw" x="120" y="359" text-anchor="middle">ARM</text>
+  <rect class="btn-warn" x="172" y="342" width="88" height="26" rx="6"/>
+  <text class="lblw" x="216" y="359" text-anchor="middle">DISARM</text>
+  <rect class="btn-dan" x="272" y="342" width="130" height="26" rx="6"/>
+  <text class="lblw" x="337" y="359" text-anchor="middle">EMERGENCY</text>
+  <text class="lbl" x="430" y="359">Thrust %</text>
+  <rect class="field" x="502" y="342" width="56" height="26" rx="6"/>
+  <text class="lbl" x="530" y="359" text-anchor="middle">30</text>
+  <rect class="btn-pri" x="572" y="342" width="90" height="26" rx="6"/>
+  <text class="lblw" x="617" y="359" text-anchor="middle">Spin up</text>
+  <rect class="btn" x="674" y="342" width="106" height="26" rx="6"/>
+  <text class="lbl" x="727" y="359" text-anchor="middle">Stop motors</text>
+  <text class="lblm" x="80" y="392">Spin up streams 50 Hz level setpoints: 0.5 s at zero thrust, then a 1 s ramp</text>
+  <text class="lblm" x="80" y="410">ARM is refused outside idle · hiding the tab drops thrust to zero, which disarms</text>
+
+  <!-- motor test card -->
+  <rect class="panel" x="64" y="442" width="732" height="216" rx="8"/>
+  <text class="lblm" x="80" y="464">Motor test — PID bypassed · bench use, disarmed only (PROTOCOL.md §5)</text>
+  <text class="lbl" x="80" y="488">Speed</text>
+  <rect class="field" x="134" y="472" width="64" height="22" rx="6"/>
+  <text class="lbl" x="166" y="487" text-anchor="middle">1200</text>
+  <text class="lblm" x="210" y="488">µs · 1000 = stopped</text>
+
+  <text class="lbl" x="80" y="517">M1</text>
+  <rect class="btn-pri" x="134" y="502" width="56" height="22" rx="6"/><text class="lblw" x="162" y="517" text-anchor="middle">Run</text>
+  <rect class="btn" x="196" y="502" width="56" height="22" rx="6"/><text class="lbl" x="224" y="517" text-anchor="middle">Stop</text>
+  <text class="lbl" x="80" y="543">M2</text>
+  <rect class="btn-pri" x="134" y="528" width="56" height="22" rx="6"/><text class="lblw" x="162" y="543" text-anchor="middle">Run</text>
+  <rect class="btn" x="196" y="528" width="56" height="22" rx="6"/><text class="lbl" x="224" y="543" text-anchor="middle">Stop</text>
+  <text class="lbl" x="80" y="569">M3</text>
+  <rect class="btn-pri" x="134" y="554" width="56" height="22" rx="6"/><text class="lblw" x="162" y="569" text-anchor="middle">Run</text>
+  <rect class="btn" x="196" y="554" width="56" height="22" rx="6"/><text class="lbl" x="224" y="569" text-anchor="middle">Stop</text>
+  <text class="lbl" x="80" y="595">M4</text>
+  <rect class="btn-pri" x="134" y="580" width="56" height="22" rx="6"/><text class="lblw" x="162" y="595" text-anchor="middle">Run</text>
+  <rect class="btn" x="196" y="580" width="56" height="22" rx="6"/><text class="lbl" x="224" y="595" text-anchor="middle">Stop</text>
+
+  <rect class="btn" x="134" y="606" width="72" height="22" rx="6"/>
+  <text class="lbl" x="170" y="621" text-anchor="middle">Run all</text>
+  <rect class="btn-dan" x="212" y="606" width="88" height="22" rx="6"/>
+  <text class="lblw" x="256" y="621" text-anchor="middle">STOP ALL</text>
+  <rect class="btn" x="316" y="606" width="122" height="22" rx="6"/>
+  <text class="lbl" x="377" y="621" text-anchor="middle">holding — 150 ms</text>
+
+  <text class="lblm" x="80" y="648">Run parks the other three · Run all spins all four at the shared speed · STOP ALL sends enable = 0</text>
+
+  <!-- status line -->
+  <text class="lblm" x="64" y="684">all motors at 1200 µs — re-sending every 150 ms</text>
+
+  <!-- ============================ right column ============================ -->
+  <rect class="card" x="850" y="108" width="350" height="176" rx="10"/>
+  <text class="h2" x="868" y="134">What it is</text>
+  <line class="rule" x1="868" y1="144" x2="1182" y2="144"/>
+  <text class="lbl" x="868" y="168">Same wire as UDP</text>
+  <text class="lblm" x="868" y="186">one binary WS frame = one [CRTP …][checksum] packet</text>
+  <text class="lbl" x="868" y="210">Nothing to install</text>
+  <text class="lblm" x="868" y="228">any browser on the drone's WiFi network</text>
+  <text class="lbl" x="868" y="252">Replies follow the sender</text>
+  <text class="lblm" x="868" y="270">a phone/tuner and the page take turns, never mix</text>
+
+  <rect class="card" x="850" y="300" width="350" height="176" rx="10"/>
+  <text class="h2" x="868" y="326">The panels</text>
+  <line class="rule" x1="868" y1="336" x2="1182" y2="336"/>
+  <text class="lbl" x="868" y="360">Status card</text>
+  <text class="lblm" x="868" y="378">battery, mode, armed, tilt, motor µs — live</text>
+  <text class="lbl" x="868" y="402">Flight card</text>
+  <text class="lblm" x="868" y="420">ARM / DISARM / EMERGENCY, Thrust % spin-up</text>
+  <text class="lbl" x="868" y="444">Motor test card</text>
+  <text class="lblm" x="868" y="462">Run / Stop per motor · Run all · STOP ALL</text>
+
+  <rect class="card" x="850" y="492" width="350" height="176" rx="10"/>
+  <text class="h2" x="868" y="518">Safety</text>
+  <line class="rule" x1="868" y1="528" x2="1182" y2="528"/>
+  <text class="lbl" x="868" y="552">Disarmed bench use only</text>
+  <text class="lblm" x="868" y="570">the firmware refuses the test while armed</text>
+  <text class="lbl" x="868" y="594">Two watchdogs</text>
+  <text class="lblm" x="868" y="612">300 ms motor test · 500 ms link failsafe</text>
+  <text class="lbl" x="868" y="636">Hiding or closing the tab</text>
+  <text class="lblm" x="868" y="654">sends enable = 0 and zero thrust first</text>
+</svg>

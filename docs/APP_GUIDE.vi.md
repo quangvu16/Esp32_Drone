@@ -1,13 +1,13 @@
-# Hướng dẫn ứng dụng — từng màn hình của ba ứng dụng
+# Hướng dẫn ứng dụng — từng màn hình của bốn ứng dụng
 
 *English: [APP_GUIDE.md](APP_GUIDE.md)*
 
-Tham chiếu theo từng màn hình cho **ứng dụng Android**, **ứng dụng iOS** và
-**ứng dụng Python tuner**: mọi nút bấm làm gì, mọi cài đặt nghĩa là gì, và màn
-hình nào đọc/ghi định dạng tệp nào. Các ảnh chụp là bản vẽ SVG dạng screen map.
-Quy trình bay, an toàn và danh sách kiểm tra trước chuyến bay nằm trong
-**[hướng dẫn phi công](USER_GUIDE.vi.md)**; cài đặt nằm trong
-**[INSTALL.md](INSTALL.md)**; định dạng truyền tin nằm trong
+Tham chiếu theo từng màn hình cho **ứng dụng Android**, **ứng dụng iOS**,
+**ứng dụng Python tuner** và **trang Web** của drone: mọi nút bấm làm gì, mọi
+cài đặt nghĩa là gì, và màn hình nào đọc/ghi định dạng tệp nào. Các ảnh chụp là
+bản vẽ SVG dạng screen map. Quy trình bay, an toàn và danh sách kiểm tra trước
+chuyến bay nằm trong **[hướng dẫn phi công](USER_GUIDE.vi.md)**; cài đặt nằm
+trong **[INSTALL.md](INSTALL.md)**; định dạng truyền tin nằm trong
 **[../PROTOCOL.md](../PROTOCOL.md)**.
 
 ## Mục lục
@@ -15,14 +15,17 @@ Quy trình bay, an toàn và danh sách kiểm tra trước chuyến bay nằm t
 1. [Ứng dụng Android](#1-ứng-dụng-android)
 2. [Ứng dụng iOS](#2-ứng-dụng-ios)
 3. [Ứng dụng Python tuner](#3-ứng-dụng-python-tuner)
-4. [Dùng chung: tệp, vùng cấm và đường truyền nhiệm vụ](#4-dùng-chung-tệp-vùng-cấm-và-đường-truyền-nhiệm-vụ)
+4. [Trang Web](#4-trang-web)
+5. [Dùng chung: tệp, vùng cấm và đường truyền nhiệm vụ](#5-dùng-chung-tệp-vùng-cấm-và-đường-truyền-nhiệm-vụ)
 
 ---
 
 # 1. Ứng dụng Android
 
 `se.bitcraze.crazyfliecontrol2`, minSdk 21, chỉ xoay ngang. Đường truyền:
-WiFi SoftAP, WiFi Station, Bluetooth Classic SPP và BLE GATT.
+WiFi SoftAP, WiFi Station, Bluetooth Classic SPP và BLE GATT — dùng riêng hoặc
+trong các hồ sơ chung sống của drone (SoftAP+BLE, Station+BLE, SPP+BLE). Android
+12+ xin quyền Bluetooth chạy khi dùng phương thức Bluetooth.
 
 ## 1.1 Các màn hình và điều hướng
 
@@ -61,7 +64,7 @@ chip trạng thái armed (`● ARMED` / `DISARMED`) · **CUT MOTORS**.
 | **Takeoff** / **Land** | một nút đổi theo trạng thái armed: Takeoff arm, bay lên tới mức ga giữ và giữ độ cao; Land giảm ga dần và disarm |
 | **ROLL / PITCH / SEQUENCE / FLIGHT** | các ô trực tiếp: hai góc nghiêng, trạng thái chuỗi tự động (`idle` `takeoff` `hold` `land`) và thời gian kể từ khi arm |
 | **More** | mở bảng More |
-| **Connect** (chưa kết nối) | kết nối theo phương thức trong Setup; thẻ này cũng liệt kê các bước cho kiểu liên kết hiện tại |
+| **Connect** (chưa kết nối) | kết nối theo phương thức trong Setup. Với Bluetooth, trước hết hiện **danh sách thiết bị** — các thiết bị đang quảng bá BLE (quét 4 giây) hoặc thiết bị đã ghép đôi của máy (SPP), tên drone lên trước rồi tới tín hiệu mạnh nhất — và chạm một hàng là kết nối đúng thiết bị đó theo địa chỉ. Thẻ này cũng liệt kê các bước cho kiểu liên kết hiện tại |
 | **CUT MOTORS** (đầu trang) | **chạm hai lần trong 3 giây** — nút chuyển màu cam và đọc `TAP AGAIN: CUT`. Tắt khi chưa kết nối |
 
 Hai cần mờ xuống 45 % mỗi khi chế độ bay khác **Manual** — chỉ Manual mới lái.
@@ -159,7 +162,7 @@ P/I/D) và khối thống kê (n, min, max, mean, σ, RMS).
 | | nút start | **nhấn giữ 2 giây** ("Hold 2 s to start - props spinning; secure the drone on a stand or hold it tethered") |
 | | Stop tuner | dừng sau trial hiện tại |
 | **Hàng Gains** | Save / Load / Defaults | flash (NVS) của drone — **không** phải tệp trên điện thoại |
-| **Bench motor test** | thanh M1–M4 + Start/Stop test | quay từng động cơ bỏ qua PID, **chỉ khi disarmed**; link gửi lại mỗi 200 ms và firmware dừng động cơ sau 300 ms im lặng — rời màn hình hoặc mất link là dừng |
+| **Bench motor test** | thanh M1–M4 + Speed / **Run all** + Start/Stop test | quay động cơ bỏ qua PID — từng motor theo thanh trượt, hoặc cả bốn cùng lúc ở giá trị Speed (Run all), **chỉ khi disarmed**; link gửi lại mỗi 150 ms và firmware dừng động cơ sau 300 ms im lặng — rời màn hình hoặc mất link là dừng |
 | **Parameters** | 13 dòng | `pid.roll/pitch/yaw _kp/_ki/_kd`, hover thrust, takeoff ramp, land ramp, nav Kp — ô nhập kèm −10 %/+10 %; ghi trực tiếp trừ khi tuner đang giữ gains |
 
 Auto-tune từ chối khi bench motor test đang chạy ("Stop the bench motor test
@@ -173,9 +176,11 @@ Cost **dự đoán** tốt nhất của model được báo dạng chữ sau m�
 
 | Nhóm | Cài đặt | Mặc định |
 |---|---|---|
-| **Drone link** | Connection method: WiFi SoftAP / WiFi Station / Bluetooth Classic (SPP) / Bluetooth LE (GATT) | WiFi SoftAP |
+| **Drone link** | Connection method: WiFi SoftAP / WiFi Station / Bluetooth Classic (SPP) / Bluetooth LE (GATT) / WiFi SoftAP + BLE / WiFi Station + BLE / Bluetooth SPP + BLE — khớp các hồ sơ `LINK` 0–6 của drone | WiFi SoftAP |
 | | UDP host | `192.168.43.42` (Station: `esp-drone.local`) |
 | | UDP port (phone to drone) / (drone to phone) | 2390 / 2399 |
+| | Danh sách thiết bị Bluetooth | hiện khi bấm **Connect** với phương thức Bluetooth: mọi thiết bị tìm được (quét BLE hoặc SPP đã ghép đôi), tên drone (`ESP32_Done`, `ESP-Drone`, `Crazyflie`) lên trước rồi tới tín hiệu mạnh nhất — chạm một hàng để kết nối đúng thiết bị đó |
+| | **Switch drone to this profile** | gửi `FC_CMD_LINK` qua kết nối đang mở sau hộp thoại xác nhận; drone lưu hồ sơ và khởi động lại sau ~1,5 s (từ chối khi đang armed). Chưa kết nối: "Connect to the drone first" |
 | **Flight control** | Mode 1–4 (cần nào làm gì) | Mode 2 — trái: ga & yaw, phải: pitch & roll |
 | | Deadzone / Roll trim / Pitch trim | 0.2 / 0.0 / 0.0 |
 | | Advanced flight control ("Crazy mode") | bật |
@@ -197,9 +202,15 @@ Cost **dự đoán** tốt nhất của model được báo dạng chữ sau m�
 # 2. Ứng dụng iOS
 
 `Crazyflie client`, iOS 15+, Fly xoay ngang, Mission / Indoor / Tune dọc.
-Đường truyền: WiFi SoftAP, WiFi Station và BLE GATT. **Bluetooth Classic SPP
-không khả dụng trên iOS** — nó có trong danh sách chọn link nhưng hiện trên
-màn hình là không dùng được ("Not available on iOS") thay vì báo lỗi.
+Đường truyền: WiFi SoftAP, WiFi Station và BLE GATT, gồm các hồ sơ chung sống
+(app dùng phía WiFi của SoftAP+BLE / Station+BLE và phía BLE của SPP+BLE).
+**Bluetooth Classic SPP không khả dụng trên iOS** — nó bị làm mờ trong trình
+chọn link, không chọn được.
+
+Ứng dụng này cũng chạy trên **macOS 12+** (Mac Catalyst): cùng các màn hình
+và đường truyền, điều khiển bằng chuột — và **không có chế độ nghiêng máy để
+bay trên Mac** (máy Mac không có cảm biến chuyển động), nên dùng các cần gạt
+để bay. Mọi phần còn lại trong mục này cũng đúng với app Mac.
 
 ## 2.1 Các màn hình và điều hướng
 
@@ -226,7 +237,7 @@ trái và **CUT MOTORS** bên phải.
 
 | Điều khiển | Chức năng |
 |---|---|
-| **Connect / Cancel** (chưa kết nối) | kết nối với thanh tiến độ 0–100 %; thẻ liệt kê ba bước cho kiểu link hiện tại ("Link: WiFi SoftAP · change it in Setup") |
+| **Connect / Cancel** (chưa kết nối) | kết nối với thanh tiến độ 0–100 %; với BLE, nó đi thẳng tới thiết bị đã chọn trong danh sách của Setup (hoặc kết quả khớp tên đầu tiên). Thẻ liệt kê ba bước cho kiểu link hiện tại ("Link: WiFi SoftAP · change it in Setup") |
 | **Flight mode** | các segment `Manual` \| `Hold` \| `Auto`. `FOLLOW` và `RTH` nằm ở màn hình Mission |
 | **Takeoff / Land** | một nút đổi theo trạng thái armed: Takeoff arm, bay lên tới hover thrust 30000 và giữ; Land giảm dần và disarm |
 | **ROLL / PITCH / SEQUENCE / FLIGHT** | các ô trực tiếp: góc, trạng thái chuỗi tự động, thời gian từ khi arm |
@@ -300,7 +311,7 @@ Go-to dùng chung với màn hình Mission.
 | **Auto-tune model** | `ModelView` | cost các trial (trục log) và cost dự đoán theo gains (band = 2 std, hoặc bản đồ càng tối càng tốt cho hai gains) |
 | **Parameters** | 13 dòng | `pid.roll_kp … pid.yaw_kd`, `flight.hover_thrust`, `flight.takeoff_ms`, `flight.land_ms`, `nav.kp` — ô nhập + −10 %/+10 % + một dòng gợi ý; ghi trực tiếp |
 | | Save gains / Load gains / Restore defaults | **flash của drone**, không phải tệp trên điện thoại ("Saved to flash.", "Loaded from flash.", "Restored firmware defaults.") |
-| **Bench motor test** | thanh M1–M4 (1000–2000 µs) + Start/Stop test | chỉ khi disarmed ("Refused — disarm first."); gửi lại mỗi 200 ms, watchdog firmware dừng sau 300 ms im lặng |
+| **Bench motor test** | thanh M1–M4 (1000–2000 µs) + Speed / **Run all** + Start/Stop test | một chạm quay cả bốn motor cùng lúc ở giá trị Speed, hoặc từng thanh trượt điều khiển live; chỉ khi disarmed ("Refused — disarm first."); gửi lại mỗi 150 ms, watchdog firmware dừng sau 300 ms im lặng (cũng dừng khi app rời foreground) |
 | **Auto-tune** | các segment phương pháp | ML (Bayesian) là mặc định ("Gaussian process + expected improvement. Fewest trials; the default."); ngoài ra Neural, RL, CMA-ES, Differential evolution, PSO, Genetic, Nelder-Mead, SPSA, Twiddle, Random |
 | | **Hold to confirm — start auto-tune** | nhấn **giữ 1.5 giây** ("KEEP HOLDING…"), rồi xác nhận — hoặc "Arm and start" nếu drone chưa arm |
 | | **CUT MOTORS — stop tuner** | một chạm: motors off **và** tuner dừng |
@@ -319,10 +330,12 @@ Chip Setup mở một action sheet với hai mục.
 
 | Điều khiển | Ghi chú |
 |---|---|
-| Các segment kiểu link | WiFi SoftAP · WiFi Station · Bluetooth Classic (SPP) · Bluetooth BLE (GATT), kèm chú thích theo từng loại |
-| Host / ports | `192.168.43.42` hoặc `esp-drone.local`; drone 2390 / phone 2399 (chỉ kiểu UDP) |
-| SPP | có trong danh sách nhưng bị chặn trên iOS ("iOS only exposes Bluetooth Classic serial to MFi accessories"); Apply báo "Not available on iOS" |
-| BLE | "Scanning for drones advertising the Bitcraze service… first match is used" |
+| Các segment kiểu link | WiFi SoftAP · WiFi Station · Bluetooth Classic (SPP) · Bluetooth LE (GATT) · WiFi SoftAP + BLE · WiFi Station + BLE · Bluetooth SPP + BLE — khớp các hồ sơ `LINK` 0–6 của drone, kèm chú thích theo từng loại |
+| Host / ports | `192.168.43.42` hoặc `esp-drone.local`; drone 2390 / phone 2399 (kiểu UDP và phía WiFi của các hồ sơ chung sống) |
+| SPP | bị làm mờ trên iOS ("iOS only exposes Bluetooth Classic serial to MFi accessories") — không chọn được |
+| Tên BLE | ô tên drone để quét (trống = quảng bá đầu tiên; drone quảng bá dưới tên `ESP32_Done`); hiện ở các hồ sơ BLE |
+| Danh sách thiết bị | bảng sống các thiết bị BLE đang quảng bá (tên, cường độ tín hiệu, định danh), tên drone lên trước rồi tín hiệu mạnh nhất. **Chạm một hàng** để chọn (dấu tick, tên điền vào ô), **Connect to selected device** kết nối đúng thiết bị đó — định danh nó mang theo là thứ link dùng, nên hai drone trùng tên vẫn phân biệt được và lần kết nối sau bỏ qua bước quét. Gõ tay vào ô tên sẽ bỏ thiết bị đã chọn |
+| **Switch drone to this profile** | gửi `FC_CMD_LINK` qua kết nối đang mở sau hộp thoại xác nhận; drone lưu hồ sơ và khởi động lại sau ~1,5 s (từ chối khi đang armed). Không bao giờ gửi khi bấm Apply |
 
 **Sticks and sensitivity** (`SettingsViewController`, xoay ngang, Close lưu):
 
@@ -344,11 +357,16 @@ Chip Setup mở một action sheet với hai mục.
 # 3. Ứng dụng Python tuner
 
 `tools/pid-tune/tuner_gui.py` — công cụ bench tkinter + matplotlib dùng chung
-link CRTP/UDP với điện thoại. Cài đặt và mười một phương pháp tìm kiếm nằm ở
+link CRTP với điện thoại: UDP, Bluetooth LE hoặc Bluetooth Classic SPP. Cài đặt
+và mười một phương pháp tìm kiếm nằm ở
 **[../tools/pid-tune/README.md](../tools/pid-tune/README.md)**. CLI:
-`python tuner_gui.py --host 192.168.43.42 --axis roll` — cờ `--host`
-(192.168.43.42), `--device-port` (2390), `--app-port` (2399), `--axis`
-(roll/pitch/yaw), `--window` (10 s lịch sử đồ thị).
+`python tuner_gui.py --host 192.168.43.42 --axis roll` — cờ `--link`
+(udp/ble/spp), `--host` (192.168.43.42), `--device-port` (2390), `--app-port`
+(2399), `--ble` (tên, MAC hoặc UUID CoreBluetooth), `--spp` (MAC), `--axis`
+(roll/pitch/yaw), `--window` (10 s lịch sử đồ thị). BLE cần `pip install bleak`;
+SPP cần drone đã ghép cặp và máy chạy Linux. Liên lạc đầu tiên thất bại không
+còn thoát chương trình — cửa sổ vẫn mở, dòng trạng thái nói phải sửa gì, còn
+**Devices…** liệt kê thiết bị Bluetooth để chọn.
 
 ## 3.1 Cửa sổ tuner
 
@@ -356,14 +374,14 @@ link CRTP/UDP với điện thoại. Cài đặt và mười một phương phá
 
 | Bảng | Điều khiển | Chức năng |
 |---|---|---|
-| **Link** | địa chỉ, axis, Reconnect | đổi axis sẽ tháo cả hai khối log và dựng lại |
+| **Link** | các radio UDP / BLE / SPP, ô địa chỉ, nhãn link đang mở, axis, Reconnect, **Devices…** | chuyển tầng truyền hoặc địa chỉ (mission hoặc motor test dừng trước); đổi axis sẽ tháo cả hai khối log và dựng lại. Devices… liệt kê thiết bị BLE đang quảng bá hoặc SPP đã ghép đôi (tên drone trước, rồi tín hiệu mạnh nhất) và Connect trên một hàng là kết nối đúng thiết bị đó theo địa chỉ |
 | **Gains** | các trường P / I / D với − + | bị firmware kẹp: kp 0–100, ki 0–20, kd 0–200 |
 | | Get / Set / Save / Load / Defaults | đọc từ drone, ghi vào, lưu NVS, nạp lại |
 | **Drone** | ARM / DISARM / EMERGENCY | EMERGENCY luôn sẵn sàng và dừng động cơ |
 | | rate / window / Pause / Record CSV | tần số telemetry (mặc định 20 Hz), số giây lịch sử đồ thị, đóng băng, ghi CSV |
 | **Motor test** | Speed (1000–1500, 1000 = dừng) | tốc độ dùng chung cho cả bốn động cơ |
 | | Run / Stop × M1–M4 | Run quay **chỉ động cơ đó** và ghim ba động cơ còn lại ở 1000; Stop ghim động cơ của nó, giữ nguyên phần còn lại |
-| | STOP ALL | kết thúc phép thử ngay (enable = 0) |
+| | **Run all** / STOP ALL | Run all quay **cả bốn** động cơ cùng lúc ở tốc độ dùng chung; STOP ALL kết thúc phép thử ngay (enable = 0) |
 | **Auto-tune** | dropdown phương pháp, checkbox gains, learn from past trials | cùng mười một phương pháp; bỏ chọn một gain để giữ cố định; gieo lịch sử từ `ml_tune_log.csv` |
 | | Trials / Trial s / Range x | ngân sách tìm kiếm và hộp tìm kiếm nhân |
 | | Start / Stop · **Model** | chạy trong worker thread; Model mở cửa sổ model |
@@ -410,7 +428,59 @@ thoại có, trên máy tính:
 
 ---
 
-# 4. Dùng chung: tệp, vùng cấm và đường truyền nhiệm vụ
+# 4. Trang Web
+
+![Trang Web](screens/web-control.svg)
+
+Firmware phục vụ trang này tại **`http://192.168.43.42/`** — vào WiFi của drone
+(soft-AP **ESP-Drone** / **12345678**) rồi mở địa chỉ trong bất kỳ trình duyệt
+nào: điện thoại, máy tính bảng hay laptop, không cần cài gì. Trang nói chuyện
+với board qua **WebSocket** trên cùng cổng, mang đúng byte CRTP mà liên kết UDP
+mang ([PROTOCOL.md §8](../PROTOCOL.md#8-transports)), nên mọi nút ở đây đúng
+nghĩa như trong các app và tuner.
+
+## 4.1 Thẻ trạng thái
+
+| Mục | Ý nghĩa |
+| --- | --- |
+| **viên link** | `live` = WebSocket lên và telemetry đang về; `no reply` = socket mở nhưng drone im lặng 1,5 s; `lost` = đang kết nối lại mỗi 2 s |
+| **VBAT / MODE / ARMED** | volt pin, chế độ bay (Manual / Hold / Auto / Follow / Rth) và cờ armed, từ khối log trạng thái mỗi 200 ms |
+| **ROLL / PITCH / STATE** | góc cân bằng theo độ; STATE là tiểu trạng thái auto (Idle / Takeoff / Hold / Land) khi ở Auto |
+| **M1–M4** | bốn output động cơ theo µs đúng như firmware ghi ra — trong thử bàn đây là tốc độ thử |
+
+## 4.2 Thẻ điều khiển bay
+
+| Điều khiển | Làm gì |
+| --- | --- |
+| **ARM / DISARM** | ARM / DISARM port 7 (PROTOCOL.md §5); ARM bị từ chối trừ khi drone khởi động từ trạng thái nghỉ, và mọi thứ bị từ chối đều báo "refused by the drone" |
+| **EMERGENCY** | một nhấp, không xác nhận: tắt motor + disarm ngay |
+| **Thrust % + Spin up** | phát CommanderPackets cân bằng 50 Hz (§7): 0,5 s ở lực đẩy không, rồi bám 1 s tới % đã chọn (tối đa 60). Lực đẩy lên làm drone arm; **Stop motors** (hoặc giấu tab) đưa lực đẩy về không, tức là disarm |
+| **Stop motors** | kết thúc luồng bằng các gói lực đẩy không |
+
+ARM chỉ giữ trong khi luồng setpoint đang chạy: ở Manual luồng đó CHÍNH LÀ
+setpoint, và failsafe 500 ms disarm nửa giây sau khi nó dừng.
+
+## 4.3 Thẻ thử động cơ
+
+Bàn thử của PROTOCOL.md §5, giống hệt bảng Motor test của tuner: **Speed** dùng
+chung (1000–2000 µs), một cặp **Run** / **Stop** cho từng motor M1–M4, **Run
+all** và **STOP ALL**. Run đỗ ba motor còn lại; Stop đưa một motor về 1000 giữ
+nguyên trạng thái các motor khác; Run all chạy cả bốn ở tốc độ dùng chung (một
+gói `enable=1` mang bốn tốc độ); STOP ALL gửi `enable=0`. Trong khi có motor
+quay trang gửi lại gói mỗi 150 ms, vì firmware dừng thử sau 300 ms im lặng.
+Chỉ dùng trên bàn khi chưa armed — firmware từ chối thử khi đang armed và trang
+không bao giờ tự arm drone cho việc này.
+
+## 4.4 An toàn
+
+Giấu hoặc đóng tab sẽ gửi `enable=0` và lực đẩy không trước khi socket đóng,
+watchdog 300 ms của firmware bắt mọi thứ mất trên đường, và failsafe liên kết
+500 ms dừng motor nếu WiFi chết. Tháo cánh quạt hoặc cố định drone, như mọi
+công cụ bàn khác.
+
+---
+
+# 5. Dùng chung: tệp, vùng cấm và đường truyền nhiệm vụ
 
 **Mission files** — cả ba ứng dụng đọc và ghi cùng loại tệp Mission Planner
 `.waypoints` (QGC WPL 110): tiêu đề `QGC WPL 110`, rồi các dòng phân cách tab

@@ -105,7 +105,10 @@ Khi chưa kết nối, màn hình Fly hiển thị việc cần làm tiếp theo
 2. **Wi-Fi hotspot (mặc định):** trong cài đặt điện thoại, kết nối vào mạng
    Wi-Fi **ESP-Drone** (mật khẩu `12345678`).
    **Bluetooth LE:** bật Bluetooth trên điện thoại.
-3. **Chạm Connect (kết nối).**
+3. **Chạm Connect (kết nối).** Với Bluetooth, trước hết ứng dụng hiện **danh
+   sách thiết bị** — mọi thiết bị nhìn thấy được (hoặc với Classic, các thiết
+   bị đã ghép đôi), tên drone lên trước. Chạm vào drone là kết nối đúng thiết
+   bị đó.
 
 Thẻ này cho biết ứng dụng sẽ dùng kiểu kết nối nào. Muốn đổi, hãy mở
 **Setup**. Nút CUT MOTORS chuyển màu xám khi chưa kết nối — chưa có gì để
@@ -115,7 +118,7 @@ dừng.
 |---|---|---|---|
 | Wi-Fi hotspot (drone phát mạng `ESP-Drone`) | ✅ | ✅ | Đơn giản nhất. Mặc định. |
 | Mạng Wi-Fi (drone kết nối vào router của bạn) | ✅ | ✅ | Cài đặt qua cổng serial: `sta <ssid> <pass>` |
-| Bluetooth LE | ✅ | ✅ | |
+| Bluetooth LE | ✅ | ✅ | Connect hiện danh sách thiết bị — chạm vào drone |
 | Bluetooth Classic | ✅ | ❌ | iOS chỉ cho phép với phụ kiện MFi |
 
 Cách đổi kiểu kết nối phía drone nằm trong
@@ -448,7 +451,8 @@ hãy dùng công cụ chỉnh trên máy tính: [PID_TUNER_GUIDE.vi.md](PID_TUNE
 *Cửa sổ trên laptop (`tools/pid-tune/tuner_gui.py`), dạng sơ đồ.*
 
 Cùng các công cụ chỉnh PID, cộng thêm các bài thử trên bàn, chạy trên laptop
-kết nối vào mạng của drone. Xem
+kết nối vào mạng của drone — hoặc qua Bluetooth (nút **Devices…** liệt kê thiết
+bị và kết nối với thiết bị bạn chọn). Xem
 [tools/pid-tune/README.md](../tools/pid-tune/README.md) để biết cách khởi chạy.
 
 ### Thử động cơ

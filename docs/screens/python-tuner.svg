@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="28 100 852 913" width="852" height="913" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone Python tuner GUI — the tuner window</title>
-  <desc id="desc">The Drone Tuner window: the Link and Gains panels, the Drone buttons and telemetry settings, the Motor test panel with a Run and Stop pair per motor, the Auto-tune panel with the method dropdown and Model button, and the five live charts on the right.</desc>
+  <desc id="desc">The Drone Tuner window: the Link panel with the UDP / BLE / SPP transport picker, one address box (UDP host, BLE name or SPP MAC), a Devices… button that opens the Bluetooth device list, and Reconnect. The device list is shown open: BLE advertisers (or paired SPP devices) with name, address and signal, drone names first — picking a row connects to that exact device. Also the Gains panel, the Drone buttons and telemetry settings, the Motor test panel with a Run and Stop pair per motor plus a Run all button, the Auto-tune panel with the method dropdown and Model button, and the five live charts on the right.</desc>
 
   <defs>
     <style>
@@ -31,7 +31,7 @@
 
   <!-- ============================ header ============================ -->
   <text class="h1" x="40" y="44">Python tuner GUI — ESP-Drone</text>
-  <text class="sub" x="40" y="70">Bench tool · tools/pid-tune/tuner_gui.py · tkinter + matplotlib · run it from a laptop on the drone's network</text>
+  <text class="sub" x="40" y="70">Bench tool · tools/pid-tune/tuner_gui.py · tkinter + matplotlib · run it from a laptop on the drone's network or over Bluetooth (BLE or SPP)</text>
   <line class="rule" x1="40" y1="88" x2="1240" y2="88"/>
 
   <!-- ============================ window ============================ -->
@@ -45,19 +45,31 @@
   <circle cx="838" cy="147" r="5" fill="#8c959f"/>
   <circle cx="856" cy="147" r="5" fill="#8c959f"/>
 
-  <!-- link -->
+  <!-- link: live label, transport radios (UDP / BLE / SPP), one address box, axis, reconnect -->
   <rect class="panel" x="56" y="176" width="300" height="104" rx="6"/>
-  <text class="lbl" x="68" y="196">Link</text>
-  <text class="chip" x="68" y="216">192.168.43.42</text>
-  <text class="lblm" x="68" y="241">Axis</text>
-  <rect class="btn-pri" x="112" y="228" width="56" height="22" rx="6"/>
-  <text class="lblw" x="140" y="243" text-anchor="middle">Roll</text>
-  <rect class="btn" x="172" y="228" width="56" height="22" rx="6"/>
-  <text class="lbl" x="200" y="243" text-anchor="middle">Pitch</text>
-  <rect class="btn" x="232" y="228" width="48" height="22" rx="6"/>
-  <text class="lbl" x="256" y="243" text-anchor="middle">Yaw</text>
-  <rect class="btn" x="68" y="252" width="88" height="22" rx="6"/>
-  <text class="lbl" x="112" y="267" text-anchor="middle">Reconnect</text>
+  <text class="lbl" x="68" y="194">Link</text>
+  <text class="mono" x="110" y="194">udp 192.168.43.42</text>
+  <circle cx="74" cy="212" r="5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5"/>
+  <circle cx="74" cy="212" r="2.5" fill="#0969da"/>
+  <text class="lbl" x="86" y="216">UDP</text>
+  <circle cx="136" cy="212" r="5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5"/>
+  <text class="lblm" x="148" y="216">BLE</text>
+  <circle cx="198" cy="212" r="5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5"/>
+  <text class="lblm" x="210" y="216">SPP</text>
+  <rect class="field" x="68" y="228" width="188" height="20" rx="4"/>
+  <text class="mono" x="80" y="242">192.168.43.42</text>
+  <rect class="btn" x="264" y="227" width="80" height="22" rx="6"/>
+  <text class="lbl" x="304" y="242" text-anchor="middle">Devices…</text>
+  <text class="lblm" x="68" y="268">Axis</text>
+  <circle cx="110" cy="264" r="5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5"/>
+  <circle cx="110" cy="264" r="2.5" fill="#0969da"/>
+  <text class="lbl" x="122" y="268">roll</text>
+  <circle cx="162" cy="264" r="5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5"/>
+  <text class="lblm" x="174" y="268">pitch</text>
+  <circle cx="222" cy="264" r="5" fill="#ffffff" stroke="#8c959f" stroke-width="1.5"/>
+  <text class="lblm" x="234" y="268">yaw</text>
+  <rect class="btn" x="268" y="253" width="76" height="22" rx="6"/>
+  <text class="lbl" x="306" y="268" text-anchor="middle">Reconnect</text>
 
   <!-- gains -->
   <rect class="panel" x="56" y="288" width="300" height="142" rx="6"/>
@@ -118,9 +130,11 @@
   <text class="lbl" x="68" y="704">M4</text>
   <rect class="btn-pri" x="112" y="690" width="56" height="22" rx="6"/><text class="lblw" x="140" y="705" text-anchor="middle">Run</text>
   <rect class="btn" x="174" y="690" width="56" height="22" rx="6"/><text class="lbl" x="202" y="705" text-anchor="middle">Stop</text>
-  <rect class="btn-dan" x="68" y="716" width="110" height="22" rx="6"/>
-  <text class="lblw" x="123" y="731" text-anchor="middle">STOP ALL</text>
-  <text class="lblm" x="188" y="731">150 ms keepalive</text>
+  <rect class="btn" x="112" y="716" width="56" height="22" rx="6"/>
+  <text class="lbl" x="140" y="731" text-anchor="middle">Run all</text>
+  <rect class="btn-dan" x="174" y="716" width="88" height="22" rx="6"/>
+  <text class="lblw" x="218" y="731" text-anchor="middle">STOP ALL</text>
+  <text class="lblm" x="272" y="731">150 ms</text>
 
   <!-- auto-tune -->
   <rect class="panel" x="56" y="752" width="300" height="206" rx="6"/>
@@ -198,12 +212,38 @@
 
   <text class="lblm" x="376" y="978">live · Log Hz 20 · shared x-axis · Window s 10 · Pause and Record CSV sit in the Drone panel</text>
 
+  <!-- ============================ Devices… dialog (open) ============================ -->
+  <rect class="card" x="452" y="196" width="388" height="192" rx="10"/>
+  <text class="lbl" x="468" y="220">Bluetooth devices</text>
+  <text class="lblm" x="600" y="220">Devices… · BLE scan, or paired Classic for SPP</text>
+  <line class="rule" x1="468" y1="230" x2="824" y2="230"/>
+  <text class="lblm" x="472" y="248">name</text>
+  <text class="lblm" x="610" y="248">address</text>
+  <text class="lblm" x="822" y="248" text-anchor="end">rssi</text>
+  <rect x="462" y="254" width="368" height="22" rx="4" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="lbl" x="472" y="269">ESP32_Done</text>
+  <text class="mono" x="610" y="269">F866BB43-A4C5-…</text>
+  <text class="mono" x="806" y="269" text-anchor="end">-39</text>
+  <text class="lbl" x="822" y="269" text-anchor="middle">✓</text>
+  <rect x="462" y="276" width="368" height="22" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="472" y="291">ESP-Drone</text>
+  <text class="mono" x="610" y="291">08:B6:1F:9E:EE:F6</text>
+  <text class="mono" x="806" y="291" text-anchor="end">-62</text>
+  <rect x="462" y="298" width="368" height="22" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="472" y="313">(no name)</text>
+  <text class="mono" x="610" y="313">C4:7C:8D:12:34:56</text>
+  <text class="mono" x="806" y="313" text-anchor="end">-78</text>
+  <rect class="btn-pri" x="462" y="332" width="110" height="24" rx="6"/>
+  <text class="lblw" x="517" y="348" text-anchor="middle">Connect</text>
+  <text class="lblm" x="584" y="348">tap a row · double-click connects · drone names first</text>
+  <text class="lblm" x="462" y="374">the picked address is what the link uses — two drones with the same name stay apart</text>
+
   <!-- ============================ right column ============================ -->
   <rect class="card" x="890" y="132" width="350" height="250" rx="10"/>
   <text class="h2" x="908" y="158">Motor test panel</text>
   <line class="rule" x1="908" y1="168" x2="1222" y2="168"/>
-  <text class="lbl" x="908" y="192">Run / Stop per motor</text>
-  <text class="lblm" x="908" y="210">Run drives only that motor; the rest idle</text>
+  <text class="lbl" x="908" y="192">Run / Stop per motor · Run all</text>
+  <text class="lblm" x="908" y="210">Run parks the other three; Run all spins all four</text>
   <text class="lbl" x="908" y="234">Speed</text>
   <text class="lblm" x="908" y="252">shared by all four · 1000 = idle · max 1500</text>
   <text class="lbl" x="908" y="276">STOP ALL</text>
@@ -227,16 +267,18 @@
   <rect class="card" x="890" y="628" width="350" height="288" rx="10"/>
   <text class="h2" x="908" y="654">Files</text>
   <line class="rule" x1="908" y1="664" x2="1222" y2="664"/>
-  <text class="lblm" x="908" y="688">tools/pid-tune/tuner_gui.py</text>
-  <text class="lblm" x="908" y="712">tools/pid-tune/drone.py</text>
-  <text class="lblm" x="908" y="736">tools/pid-tune/planner.py</text>
-  <text class="lblm" x="908" y="760">tools/pid-tune/planner_test.py</text>
+  <text class="lblm" x="908" y="684">tools/pid-tune/tuner_gui.py</text>
+  <text class="lblm" x="908" y="704">tools/pid-tune/drone.py</text>
+  <text class="lblm" x="908" y="724">tools/pid-tune/btlink.py</text>
+  <text class="lblm" x="908" y="744">tools/pid-tune/planner.py</text>
+  <text class="lblm" x="908" y="764">tools/pid-tune/planner_test.py</text>
   <text class="lblm" x="908" y="784">tools/pid-tune/ml_tune.py</text>
-  <text class="lblm" x="908" y="808">tools/pid-tune/selftest.py</text>
-  <text class="lbl" x="908" y="840">cd tools/pid-tune</text>
-  <text class="lbl" x="908" y="862">python tuner_gui.py</text>
-  <text class="lblm" x="908" y="886">optional: --host 192.168.43.42 --axis roll</text>
-  <text class="lblm" x="908" y="906">see tools/pid-tune/README.md</text>
+  <text class="lblm" x="908" y="804">tools/pid-tune/selftest.py</text>
+  <text class="lbl" x="908" y="830">cd tools/pid-tune</text>
+  <text class="lbl" x="908" y="852">python tuner_gui.py</text>
+  <text class="lblm" x="908" y="876">--link udp|ble|spp · --ble NAME|MAC|UUID · --spp MAC</text>
+  <text class="lblm" x="908" y="896">Devices… lists the Bluetooth devices to pick from</text>
+  <text class="lblm" x="908" y="916">see tools/pid-tune/README.md</text>
 
   <rect class="card" x="890" y="932" width="350" height="428" rx="10"/>
   <text class="h2" x="908" y="958">Mission plan</text>

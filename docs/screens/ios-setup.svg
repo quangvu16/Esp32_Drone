@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 852 620" width="852" height="620" role="img" aria-labelledby="ttl desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 852 760" width="852" height="760" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone iOS app — Setup screens</title>
-  <desc id="desc">Setup on iOS is an action sheet with two entries. Link — Wi-Fi or Bluetooth opens the Connection form sheet with the four link types, host and ports; Bluetooth Classic SPP is listed but reports Not available on iOS. Sticks and sensitivity opens the settings screen with the Slow, Fast and Custom sensitivity presets, the three rate fields, the control mode segments and the stick map.</desc>
+  <desc id="desc">Setup on iOS is an action sheet with two entries. Link — Wi-Fi or Bluetooth opens the Connection form sheet with the seven link types mirroring the drone's LINK profiles 0-6 (SPP greyed out because iOS only exposes Classic serial to MFi accessories), host and ports, a BLE drone name field, a live device list of every BLE advertiser (tap a row to choose it, Connect to selected device links to that exact peripheral by identifier) and an explicit confirmed Switch drone to this profile action that sends FC_CMD_LINK. Sticks and sensitivity opens the settings screen with the Slow, Fast and Custom sensitivity presets, the three rate fields, the control mode segments and the stick map.</desc>
 
   <defs>
     <style>
@@ -17,12 +17,13 @@
       .btn-pri { fill: #0969da; stroke: #0969da; stroke-width: 1.5; }
       .seg     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
       .seg-on  { fill: #0969da; stroke: #0969da; stroke-width: 1.5; }
+      .seg-off { fill: #eaeef2; stroke: #d0d7de; stroke-width: 1.5; }
       .rule    { stroke: #d0d7de; stroke-width: 1; }
       .tag     { font: 600 11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #0969da; }
     </style>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="852" height="620"/>
+  <rect class="bg" x="0" y="0" width="852" height="760"/>
 
   <text class="h2" x="28" y="26">Setup</text>
   <text class="lblm" x="92" y="26">the Setup chip opens an action sheet — Link · Sticks and sensitivity</text>
@@ -38,34 +39,56 @@
   <text class="h2" x="28" y="212">Link — Wi-Fi or Bluetooth</text>
   <text class="lblm" x="252" y="212">ConnectionViewController · form sheet</text>
 
-  <rect class="bezel" x="28" y="226" width="390" height="374" rx="14"/>
-  <rect class="screen" x="38" y="236" width="370" height="354" rx="8"/>
+  <rect class="bezel" x="28" y="226" width="390" height="500" rx="14"/>
+  <rect class="screen" x="38" y="236" width="370" height="480" rx="8"/>
 
   <rect class="btn" x="50" y="248" width="60" height="22" rx="6"/><text class="lblm" x="80" y="263" text-anchor="middle">Cancel</text>
   <rect class="btn-pri" x="336" y="248" width="60" height="22" rx="6"/><text class="lblw" x="366" y="263" text-anchor="middle">Apply</text>
   <text class="lbl" x="183" y="263" text-anchor="middle">Connection</text>
   <line class="rule" x1="38" y1="278" x2="408" y2="278"/>
 
-  <rect class="seg-on" x="50" y="290" width="82" height="22" rx="6"/><text class="lblm" x="91" y="305" text-anchor="middle">SoftAP</text>
-  <rect class="seg" x="136" y="290" width="82" height="22" rx="6"/><text class="lblm" x="177" y="305" text-anchor="middle">Station</text>
-  <rect class="seg" x="222" y="290" width="60" height="22" rx="6"/><text class="lblm" x="252" y="305" text-anchor="middle">SPP</text>
-  <rect class="seg" x="286" y="290" width="60" height="22" rx="6"/><text class="lblm" x="316" y="305" text-anchor="middle">BLE</text>
-  <text class="lblm" x="50" y="334">Join the drone's ESP-Drone network. Drone at 192.168.43.42,</text>
-  <text class="lblm" x="50" y="352">UDP 2390 out / 2399 in.</text>
+  <rect class="seg-on" x="50" y="288" width="82" height="22" rx="6"/><text class="lblm" x="91" y="303" text-anchor="middle">SoftAP</text>
+  <rect class="seg" x="136" y="288" width="82" height="22" rx="6"/><text class="lblm" x="177" y="303" text-anchor="middle">Station</text>
+  <rect class="seg-off" x="222" y="288" width="60" height="22" rx="6"/><text class="lblm" x="252" y="303" text-anchor="middle" fill="#8c959f">SPP</text>
+  <rect class="seg" x="286" y="288" width="60" height="22" rx="6"/><text class="lblm" x="316" y="303" text-anchor="middle">BLE</text>
 
-  <text class="lbl" x="50" y="382">Host</text>
-  <rect class="panel" x="50" y="390" width="346" height="24" rx="6"/><text class="mono" x="386" y="407" text-anchor="end">192.168.43.42</text>
-  <text class="lblm" x="50" y="432">192.168.43.42 or esp-drone.local</text>
+  <rect class="seg" x="50" y="314" width="106" height="22" rx="6"/><text class="lblm" x="103" y="329" text-anchor="middle">SoftAP+BLE</text>
+  <rect class="seg" x="162" y="314" width="106" height="22" rx="6"/><text class="lblm" x="215" y="329" text-anchor="middle">Station+BLE</text>
+  <rect class="seg" x="274" y="314" width="106" height="22" rx="6"/><text class="lblm" x="327" y="329" text-anchor="middle">SPP+BLE</text>
 
-  <text class="lbl" x="50" y="460">Drone UDP port</text>
-  <rect class="panel" x="50" y="468" width="160" height="24" rx="6"/><text class="mono" x="200" y="485" text-anchor="end">2390</text>
-  <text class="lbl" x="236" y="460">Phone UDP port</text>
-  <rect class="panel" x="236" y="468" width="160" height="24" rx="6"/><text class="mono" x="386" y="485" text-anchor="end">2399</text>
+  <text class="lblm" x="50" y="352">Join the drone's ESP-Drone network. Drone at 192.168.43.42,</text>
+  <text class="lblm" x="50" y="368">UDP 2390 out / 2399 in.</text>
 
-  <text class="lbl" x="50" y="520" fill="#cf222e">Bluetooth Classic (SPP) — not available on iOS</text>
-  <text class="lblm" x="50" y="538">iOS only exposes Bluetooth Classic serial to MFi accessories.</text>
-  <text class="lblm" x="50" y="556">Apply on SPP says “Not available on iOS” rather than failing.</text>
-  <text class="lblm" x="50" y="576">BLE: scanning for the Bitcraze service — first match is used.</text>
+  <text class="lbl" x="50" y="392">Host</text>
+  <rect class="panel" x="50" y="398" width="346" height="22" rx="6"/><text class="mono" x="386" y="414" text-anchor="end">192.168.43.42</text>
+
+  <text class="lbl" x="50" y="442">Drone UDP port</text>
+  <rect class="panel" x="50" y="448" width="160" height="22" rx="6"/><text class="mono" x="200" y="464" text-anchor="end">2390</text>
+  <text class="lbl" x="236" y="442">Phone UDP port</text>
+  <rect class="panel" x="236" y="448" width="160" height="22" rx="6"/><text class="mono" x="386" y="464" text-anchor="end">2399</text>
+
+  <text class="lbl" x="50" y="492">BLE drone name</text>
+  <rect class="panel" x="50" y="498" width="346" height="22" rx="6"/><text class="mono" x="386" y="514" text-anchor="end" fill="#8c959f">ESP32_Done · blank = first match</text>
+
+  <text class="lblm" x="50" y="542">Tap a device in the list to choose it, then Connect. Or type a name.</text>
+
+  <!-- live device list: drone names first, then strongest signal -->
+  <rect x="50" y="552" width="346" height="22" rx="4" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="lbl" x="60" y="567">ESP32_Done</text>
+  <text class="mono" x="386" y="567" text-anchor="end" fill="#57606a">-39 dBm · F866BB43-… ✓</text>
+  <rect x="50" y="574" width="346" height="22" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="60" y="589">ESP-Drone</text>
+  <text class="mono" x="386" y="589" text-anchor="end" fill="#8c959f">-62 dBm · 6B9C21…</text>
+  <rect x="50" y="596" width="346" height="22" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="60" y="611">(no name)</text>
+  <text class="mono" x="386" y="611" text-anchor="end" fill="#8c959f">-78 dBm · 1D0F44…</text>
+
+  <rect class="btn-pri" x="50" y="628" width="210" height="26" rx="8"/><text class="lblw" x="155" y="645" text-anchor="middle">Connect to selected device</text>
+  <text class="lblm" x="270" y="645">connects by identifier</text>
+
+  <text class="lblm" x="50" y="682">SPP greyed out — iOS only exposes Classic serial to MFi accessories.</text>
+  <rect class="btn-pri" x="50" y="690" width="180" height="24" rx="6"/><text class="lblw" x="140" y="706" text-anchor="middle">Switch drone to this profile</text>
+  <text class="lblm" x="240" y="706">confirm · FC_CMD_LINK · reboots ~1.5 s</text>
 
   <!-- ============================ sticks and sensitivity ============================ -->
   <text class="h2" x="448" y="212">Sticks and sensitivity</text>

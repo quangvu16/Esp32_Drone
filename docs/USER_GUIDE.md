@@ -96,7 +96,9 @@ When the app is not connected, the Fly screen shows what to do next:
 2. **Wi-Fi hotspot (default):** join the Wi-Fi network **ESP-Drone**
    (password `12345678`) in your phone settings.
    **Bluetooth LE:** keep the phone's Bluetooth on.
-3. **Tap Connect.**
+3. **Tap Connect.** For Bluetooth, the app first shows the **device list** —
+   every device it can see (or, for Classic, the paired ones), drone names
+   first. Tap the drone and it connects to that exact device.
 
 The card shows which link type the app will use. To change it, open **Setup**.
 CUT MOTORS is greyed out while nothing is connected — there is nothing to stop.
@@ -105,7 +107,7 @@ CUT MOTORS is greyed out while nothing is connected — there is nothing to stop
 |---|---|---|---|
 | Wi-Fi hotspot (drone hosts `ESP-Drone`) | ✅ | ✅ | Simplest. Default. |
 | Wi-Fi network (drone joins your router) | ✅ | ✅ | Set it up on the serial console: `sta <ssid> <pass>` |
-| Bluetooth LE | ✅ | ✅ | |
+| Bluetooth LE | ✅ | ✅ | Connect shows the device list — tap the drone |
 | Bluetooth Classic | ✅ | ❌ | iOS only allows it for MFi accessories |
 
 How to switch the drone's link is in [INSTALL.md § Connect](INSTALL.md#4-connect).
@@ -423,8 +425,9 @@ tuner instead: [PID_TUNER_GUIDE.md](PID_TUNER_GUIDE.md).
 *The bench window (`tools/pid-tune/tuner_gui.py`), as a screen map.*
 
 The same tuning tools, plus bench tests, on a laptop connected to the drone's
-network. See [tools/pid-tune/README.md](../tools/pid-tune/README.md) for how to
-start it.
+network — or over Bluetooth (the **Devices…** button lists the devices and
+connects to the one you pick). See
+[tools/pid-tune/README.md](../tools/pid-tune/README.md) for how to start it.
 
 ### Motor test
 

@@ -80,7 +80,9 @@ one header that always shows link, battery voltage, mode, **ARMED** and a red
 **CUT MOTORS** button in the same place. The Fly screen has one main button
 that follows the situation (Takeoff / Land), live roll, pitch, sequence and
 flight time, and a More panel for the rest. Also: WiFi (soft-AP and station),
-Bluetooth Classic SPP and BLE GATT; PID tuning with live charts and auto-tune;
+Bluetooth Classic SPP and BLE GATT — separately or together (the drone's seven
+link profiles, `LINK` 0–6, picked in Setup with an explicit "Switch drone to
+this profile" action); PID tuning with live charts and auto-tune;
 phone-IMU tilt-to-fly (Android); and GPS mission navigation with waypoints,
 Mission Planner `.waypoints` import and return-to-launch.
 
@@ -90,16 +92,24 @@ Mission Planner `.waypoints` import and return-to-launch.
 in the [pilot's guide](docs/USER_GUIDE.md).*
 
 iOS cannot use Bluetooth Classic SPP — iOS only exposes SPP to MFi accessories.
-Use WiFi or BLE GATT there.
+Use WiFi or BLE GATT there (on `LINK` 6 the iOS app uses the BLE side).
 
 **Desktop tuner** — [`tools/pid-tune/`](tools/pid-tune/) tunes one axis at a
-time over the same CRTP/UDP link, with eleven search algorithms (Gaussian-
-process Bayesian optimisation, a neural ensemble, CMA-ES, differential
-evolution, PSO and the rest) and a live plot of the stabiliser. It scores a
-trial with the same cost model as the phone apps, so a gain set found on the
-desktop means the same thing as one found on the phone.
+time over the same CRTP link — UDP, Bluetooth LE or Classic SPP — with eleven
+search algorithms (Gaussian-process Bayesian optimisation, a neural ensemble,
+CMA-ES, differential evolution, PSO and the rest) and a live plot of the
+stabiliser. It scores a trial with the same cost model as the phone apps, so a
+gain set found on the desktop means the same thing as one found on the phone.
 **Spin up** streams level setpoints at a thrust you choose so the motors run on
 a tuning stand. Step-by-step: [docs/PID_TUNER_GUIDE.md](docs/PID_TUNER_GUIDE.md).
+
+**Web page** — the firmware also serves a control page at
+**`http://192.168.43.42/`**: join the drone's WiFi and open the address in any
+browser (phone, tablet or laptop — nothing to install). It carries the same
+CRTP bytes as UDP over a WebSocket and runs the tuner's **Drone** and
+**Motor test** panels: ARM / DISARM / EMERGENCY, Thrust % with the spin-up
+stream, and per-motor Run/Stop plus **Run all** / STOP ALL. Hiding or closing
+the tab stops the motors.
 
 ## Building
 
@@ -108,16 +118,19 @@ in the Arduino IDE. Board *ESP32 Dev Module*, partition scheme **Huge APP**.
 
 **Android** — `cd ESP-Drone-Android && ./gradlew assembleDebug`
 
-**iOS** — `cd ESP-Drone-iOS && pod install`, then open
+**iOS / macOS** — `cd ESP-Drone-iOS && pod install`, then open
 `Crazyflie client.xcworkspace`. Run *Product → Test* for the unit tests.
+The same project builds the **macOS app** (Mac Catalyst): pick the *My Mac
+(Mac Catalyst)* destination, or
+`xcodebuild -workspace "Crazyflie client.xcworkspace" -scheme "Crazyflie client" -destination 'platform=macOS,variant=Mac Catalyst' build`.
 
 ## Tests
 
 | Suite | Run | Covers |
 |---|---|---|
-| `Esp32_drone/test/` | `./run.sh` | 83 checks in five suites: the launch-frame rotation, body↔world yaw rotation, log-config parsing including the client's wire padding, the self-level sign, and SBUS failsafe/lost-frame rejection. `run.sh` also checks the accelerometer scale matches the configured range |
-| `Crazyflie clientTests` | *Product → Test* | 24 tests: great-circle geo math, `.waypoints` codec, mission edits, waypoint sequencing, launch frame |
-| `tools/pid-tune/selftest.py` | `python selftest.py` | the whole tuner without hardware: wire framing and struct budgets, the link against a fake firmware transcribed from the sketch, the exact port-7 command bytes, the stand-thrust stream (arms on thrust-up, disarms at zero), telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all eleven optimisers against a synthetic bowl, history seeding, and the error paths |
+| `Esp32_drone/test/` | `./run.sh` | 257 checks in nine suites: the launch-frame rotation, body↔world yaw rotation, log-config parsing including the client's wire padding, the self-level sign, SBUS failsafe/lost-frame rejection, the mission engine (local-frame conversion, DO_JUMP accounting, jump chains), MAVLink framing and `crc_extra`, the WebSocket handshake accept key plus frame codec, and the BLE segmenter/reassembler (`bleSend`/`bleRxSeg`) including the 20-byte single-segment edge. `run.sh` also checks the accelerometer scale matches the configured range |
+| `Crazyflie clientTests` | *Product → Test* | 34 tests in three suites: great-circle geo math, `.waypoints` codec, mission edits, waypoint sequencing, launch frame, and the Mission Planner `.waypoints` codec (WPL 110 rows, DO_JUMP, header refusal) |
+| `tools/pid-tune/selftest.py` | `python selftest.py` | the whole tuner without hardware: wire framing and struct budgets, the link against a fake firmware transcribed from the sketch, the exact port-7 command bytes, the stand-thrust stream (arms on thrust-up, disarms at zero), telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all eleven optimisers against a synthetic bowl, history seeding, the error paths, and the Bluetooth link layer (BLE segmentation and SPP framing pinned to the firmware, `Drone(link=...)` round-trip) |
 
 The firmware suite is deliberately self-guarding: it greps the sketch for the
 formula lines it copies and fails loudly if they drift, so the tests cannot pass

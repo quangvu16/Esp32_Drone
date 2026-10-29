@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1520" width="1280" height="1520" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone iOS app</title>
-  <desc id="desc">Screen map of the ESP-Drone iOS client: the landscape stick screen, the link picker, the flight commands, the Mission screen with read-only zones, the Plan (Mission Planner Flight Plan) screen, the Indoor Map annotation editor and the PID tuning screen. Bluetooth Classic SPP is not available on iOS.</desc>
+  <desc id="desc">Screen map of the ESP-Drone iOS client: the landscape stick screen, the link picker with its live BLE device list (tap a row to choose that exact drone, Connect to selected device links to it by identifier), the flight commands, the Mission screen with read-only zones, the Plan (Mission Planner Flight Plan) screen, the Indoor Map annotation editor and the PID tuning screen. Bluetooth Classic SPP is not available on iOS.</desc>
 
   <defs>
     <style>
@@ -85,7 +85,7 @@
   <!-- ============================ right column ============================ -->
   <rect class="card" x="890" y="132" width="350" height="202" rx="10"/>
   <text class="h2" x="908" y="158">Link picker</text>
-  <text class="lblm" x="1000" y="158">ConnectionViewController</text>
+  <text class="lblm" x="1000" y="158">ConnectionViewController · SPP needs MFi</text>
   <line class="rule" x1="908" y1="168" x2="1222" y2="168"/>
   <rect class="seg-on" x="908" y="180" width="76" height="22" rx="6"/>
   <text class="lblw" x="946" y="195" text-anchor="middle">SoftAP</text>
@@ -104,9 +104,16 @@
   <text class="mono" x="978" y="253">drone 2390</text>
   <rect class="panel" x="1098" y="238" width="124" height="22" rx="5"/>
   <text class="mono" x="1108" y="253">phone 2399</text>
-  <text class="lblm" x="908" y="284">SPP is listed but cannot open: iOS only</text>
-  <text class="lblm" x="908" y="302">exposes Bluetooth Classic to MFi accessories.</text>
-  <text class="lblm" x="908" y="318">The app says so on screen rather than failing.</text>
+  <text class="lblm" x="908" y="272">Device list — BLE advertisers, drone names first:</text>
+  <rect x="908" y="278" width="314" height="18" rx="3" fill="#ddf4ff" stroke="#0969da" stroke-width="1.2"/>
+  <text class="lbl" x="916" y="291">ESP32_Done</text>
+  <text class="mono" x="1214" y="291" text-anchor="end">-39 dBm · F866BB43-… ✓</text>
+  <rect x="908" y="296" width="314" height="18" rx="3" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="916" y="309">ESP-Drone</text>
+  <text class="mono" x="1214" y="309" text-anchor="end">-62 dBm · 6B9C21…</text>
+  <rect x="908" y="314" width="314" height="18" rx="3" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="916" y="327">(no name)</text>
+  <text class="mono" x="1214" y="327" text-anchor="end">-78 dBm · 1D0F44…</text>
 
   <rect class="card" x="890" y="348" width="350" height="194" rx="10"/>
   <text class="h2" x="908" y="372">Flight commands</text>

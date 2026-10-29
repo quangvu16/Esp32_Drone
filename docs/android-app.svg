@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1520" width="1280" height="1520" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone Android app</title>
-  <desc id="desc">Screen map of the ESP-Drone Android client: the landscape flight screen with twin joysticks and the flight-mode panel, the GPS mission screen with read-only zones, the Plan (Mission Planner Flight Plan) screen, the Indoor Map annotation editor and the PID tuning screen.</desc>
+  <desc id="desc">Screen map of the ESP-Drone Android client: the landscape flight screen with twin joysticks and the flight-mode panel, shown with the Bluetooth device list that Connect opens for a Bluetooth method (tap a row to link to that exact device), the GPS mission screen with read-only zones, the Plan (Mission Planner Flight Plan) screen, the Indoor Map annotation editor and the PID tuning screen.</desc>
 
   <defs>
     <style>
@@ -114,6 +114,24 @@
   <rect class="btn-dan" x="608" y="498" width="216" height="26" rx="6"/>
   <text class="lblw" x="716" y="515" text-anchor="middle">EMERGENCY · TAP TWICE</text>
 
+  <!-- Connect-time Bluetooth device list, open over the flight screen -->
+  <rect class="card" x="300" y="196" width="340" height="176" rx="10"/>
+  <text class="lbl" x="314" y="220">Bluetooth devices</text>
+  <text class="lblm" x="452" y="220">Connect with a Bluetooth method</text>
+  <line class="rule" x1="314" y1="230" x2="626" y2="230"/>
+  <rect x="308" y="238" width="324" height="22" rx="4" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="lbl" x="318" y="253">ESP32_Done</text>
+  <text class="mono" x="622" y="253" text-anchor="end">08:B6:… · -38 dBm ✓</text>
+  <rect x="308" y="260" width="324" height="22" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="318" y="275">ESP-Drone</text>
+  <text class="mono" x="622" y="275" text-anchor="end">AA:BB:… · -62 dBm</text>
+  <rect x="308" y="282" width="324" height="22" rx="4" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+  <text class="lblm" x="318" y="297">(no name)</text>
+  <text class="mono" x="622" y="297" text-anchor="end">C4:7C:… · -78 dBm</text>
+  <text class="lblm" x="314" y="326">tap a row to connect to that exact device</text>
+  <text class="lblm" x="314" y="344">drone names first, then strongest signal · SPP lists paired devices</text>
+  <text class="lblm" x="314" y="362">BLE scans 4 s · two drones with the same name stay apart</text>
+
   <!-- ============================ right column ============================ -->
   <rect class="card" x="890" y="132" width="350" height="214" rx="10"/>
   <text class="h2" x="908" y="158">Transports</text>
@@ -123,9 +141,9 @@
   <text class="lbl" x="908" y="234">WiFi Station</text>
   <text class="lblm" x="908" y="252">joins your network · esp-drone.local</text>
   <text class="lbl" x="908" y="276">Bluetooth Classic SPP</text>
-  <text class="lblm" x="908" y="294">pair first · WiFi off in this mode</text>
+  <text class="lblm" x="908" y="294">pair first · Connect lists the paired devices</text>
   <text class="lbl" x="908" y="318">BLE GATT</text>
-  <text class="lblm" x="908" y="336">Bitcraze service 00000201…</text>
+  <text class="lblm" x="908" y="336">Bitcraze 00000201… · Connect scans and lists</text>
 
   <rect class="card" x="890" y="360" width="350" height="182" rx="10"/>
   <text class="h2" x="908" y="372">Flight commands</text>
