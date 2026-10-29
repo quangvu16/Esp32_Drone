@@ -75,6 +75,11 @@ final class PlannerViewController: UIViewController, MissionTransferListener {
 
     private lazy var transfer = MissionTransfer(listener: self)
     private let locationManager = CLLocationManager()
+    /// The shared zone store (PROTOCOL.md §10) — taps are vetoed against it and
+    /// its zones are drawn on the map, like the Mission screen does.
+    /// Kho vùng dùng chung (PROTOCOL.md mục 10) — chạm bị nó phủ quyết và các
+    /// vùng của nó được vẽ lên bản đồ, như màn Mission vẫn làm.
+    private let navigator = NavStore.shared.navigator
 
     // MARK: - Init
 
@@ -192,8 +197,8 @@ final class PlannerViewController: UIViewController, MissionTransferListener {
         let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
         // Keep-out zones veto the placement outright (PROTOCOL.md §10).
         // Vùng cấm bay phủ quyết việc đặt điểm ngay (PROTOCOL.md mục 10).
-        if let refusal = NavStore.shared.navigator.checkWaypoint(coordinate.latitude,
-                                                                coordinate.longitude) {
+        if let refusal = navigator.checkWaypoint(coordinate.latitude,
+                                                coordinate.longitude) {
             flash("Cannot place waypoint: \(refusal)")
             return
         }
@@ -499,9 +504,31 @@ final class PlannerViewController: UIViewController, MissionTransferListener {
             mapView.addOverlay(MKPolyline(coordinates: &coords, count: coords.count))
         }
 
+        // Zones (§10), read-only like the Mission screen — they veto taps in
+        // mapTapped, so the plan has to show them.
+        // Các vùng (mục 10), chỉ xem như màn Mission — chúng phủ quyết chạm ở
+        // mapTapped, nên kế hoạch phải hiển thị chúng.
+        refreshAnnotationOverlays()
+
         statusLabel.text = String(format: "%d items · home %.6f, %.6f",
                                   mission.size, mission.home.lat, mission.home.lon)
         fillEditStrip()
+    }
+
+    /// The shared zones as read-only overlays — same shapes as the Mission
+    /// screen, without selection and its editing handles.
+    /// Các vùng dùng chung dưới dạng overlay chỉ xem — cùng hình với màn
+    /// Mission, không có lựa chọn và tay nắm sửa của nó.
+    private func refreshAnnotationOverlays() {
+        let shapes = mapView.overlays.compactMap { $0 as? MapAnnotationShape }
+        if !shapes.isEmpty {
+            mapView.removeOverlays(shapes)
+        }
+        for annotation in navigator.mission.annotations {
+            // Read-only here: no selection, so no editing handles are drawn.
+            // Chỉ để xem ở đây: không có lựa chọn nên không vẽ tay nắm sửa.
+            mapView.addOverlay(MapAnnotationShape(annotation: annotation, selected: false))
+        }
     }
 
     private func fillEditStrip() {
@@ -753,6 +780,9 @@ extension PlannerViewController: MKMapViewDelegate {
             r.lineWidth = 2
             return r
         }
+        if let shape = overlay as? MapAnnotationShape {
+            return MapAnnotationRenderer(overlay: shape)
+        }
         return MKOverlayRenderer(overlay: overlay)
     }
 
@@ -816,5 +846,16 @@ extension PlannerViewController: CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        // Asking before the grant does not start the updates — restart them
+        // once the permission arrives (the Mission screen does the same).
+        // Hỏi trước khi được cấp sẽ không khởi động cập nhật — khởi động lại
+        // khi quyền được cấp (màn Mission cũng vậy).
+        if manager.authorizationStatus == .authorizedWhenInUse
+            || manager.authorizationStatus == .authorizedAlways {
+            manager.startUpdatingLocation()
+        }
     }
 }

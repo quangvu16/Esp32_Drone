@@ -29,6 +29,9 @@ Esp32_drone_backup_*.ino.txt
 apps_ui_backup_*.zip
 zi5dtisj
 
+# Office lock files — must never be committed
+~$*
+
 # agent / research scratch
 .claude-scratch/
 .claude-scratch-verify/

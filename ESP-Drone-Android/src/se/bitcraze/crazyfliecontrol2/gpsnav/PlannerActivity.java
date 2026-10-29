@@ -4,10 +4,12 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -62,7 +64,10 @@ import se.bitcraze.crazyfliecontrol2.FlyHeader;
  * CRTP port 7 kênh 2 với chu kỳ gửi lại 500 ms. Chạm bản đồ thêm một waypoint —
  * bán kính chấp nhận bắt đầu ở mức mặc định 2.5 m của firmware.
  */
-public class PlannerActivity extends AppCompatActivity implements MissionTransfer.Listener {
+public class PlannerActivity extends AppCompatActivity
+        implements MissionTransfer.Listener, LocationListener {
+
+    private static final String LOG_TAG = "PlannerActivity";
 
     private static final int REQUEST_OPEN_WAYPOINTS = 1;
     private static final int REQUEST_SAVE_WAYPOINTS = 2;
@@ -99,6 +104,10 @@ public class PlannerActivity extends AppCompatActivity implements MissionTransfe
     private MissionTransfer mTransfer;
     private LocationManager mLocationManager;
 
+    /** Centre the map once on the first phone fix (the Mission screen's rule). */
+    /** Căn giữa bản đồ một lần ở fix đầu tiên của điện thoại (quy tắc của màn Mission). */
+    private boolean mCenteredOnPhone;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -113,6 +122,11 @@ public class PlannerActivity extends AppCompatActivity implements MissionTransfe
 
         mStatusText = findViewById(R.id.planner_status);
         mMapView = findViewById(R.id.planner_map);
+        // Zones on this screen are read-only context (the Mission screen's
+        // rule): no handles and no drags; the Indoor Map screen edits them.
+        // Các vùng trên màn hình này là bối cảnh chỉ xem (quy tắc của màn
+        // Mission): không tay nắm, không kéo được; màn Indoor Map mới sửa chúng.
+        mMapView.setAnnotationsEditable(false);
         mGrid = findViewById(R.id.planner_grid);
         mEditStrip = findViewById(R.id.planner_edit);
         mCommandSpinner = findViewById(R.id.planner_cmd);
@@ -289,12 +303,19 @@ public class PlannerActivity extends AppCompatActivity implements MissionTransfe
         super.onResume();
         mHeader.start();
         mTransfer.attach(DroneSession.get());
+        // Zones can be edited on the Indoor Map screen; pick up the changes here.
+        // Các vùng có thể được sửa ở màn Indoor Map; nhận các thay đổi ở đây.
+        refreshUi();
+        startLocationUpdates();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         mHeader.stop();
+        if (mLocationManager != null) {
+            mLocationManager.removeUpdates(this);
+        }
     }
 
     @Override
@@ -649,6 +670,13 @@ public class PlannerActivity extends AppCompatActivity implements MissionTransfe
             }
         }
         mMapView.setWaypoints(waypoints, active);
+        // -1: read-only zones, no selection and no handles on this screen.
+        // -1: các vùng chỉ xem, không chọn và không có tay nắm trên màn hình này.
+        Navigator navigator = NavStore.navigator();
+        synchronized (navigator) {
+            mMapView.setAnnotations(new ArrayList<MapAnnotation>(
+                    navigator.getMission().getAnnotations()), -1);
+        }
         PlannerItem home = mMission.home();
         mStatusText.setText(String.format(Locale.US, "%d items · home %.6f, %.6f",
                 items.size(), home.lat, home.lon));
@@ -752,6 +780,8 @@ public class PlannerActivity extends AppCompatActivity implements MissionTransfe
                             Manifest.permission.ACCESS_FINE_LOCATION,
                             Manifest.permission.ACCESS_COARSE_LOCATION },
                     REQUEST_LOCATION_PERMISSION);
+        } else {
+            startLocationUpdates();
         }
     }
 
@@ -759,10 +789,60 @@ public class PlannerActivity extends AppCompatActivity implements MissionTransfe
     public void onRequestPermissionsResult(int requestCode, String[] permissions,
             int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_LOCATION_PERMISSION
-                && (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED)) {
-            toast("Location permission denied - home falls back to the file/drone origin");
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startLocationUpdates();
+            } else {
+                toast("Location permission denied - home falls back to the file/drone origin");
+            }
         }
+    }
+
+    /** Same provider mix as the Mission screen: GPS first, network as backup. */
+    /** Cùng tổ hợp nhà cung cấp như màn Mission: GPS trước, network dự phòng. */
+    private void startLocationUpdates() {
+        if (mLocationManager == null
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        try {
+            mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0.5f, this);
+        } catch (IllegalArgumentException e) {
+            logMissingProvider(LocationManager.GPS_PROVIDER);
+        }
+        try {
+            mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000, 0f, this);
+        } catch (IllegalArgumentException e) {
+            logMissingProvider(LocationManager.NETWORK_PROVIDER);
+        }
+    }
+
+    private void logMissingProvider(String provider) {
+        Log.w(LOG_TAG, "No location provider: " + provider);
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        if (!mCenteredOnPhone) {
+            // Centre the map once on the first fix so the pilot is not panning from (0, 0).
+            // Căn giữa bản đồ một lần ở bản vị đầu tiên để người điều khiển không phải kéo từ (0, 0).
+            mMapView.getController().setCenter(new org.osmdroid.util.GeoPoint(
+                    location.getLatitude(), location.getLongitude()));
+            mCenteredOnPhone = true;
+        }
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
     }
 
     private void toast(String message) {

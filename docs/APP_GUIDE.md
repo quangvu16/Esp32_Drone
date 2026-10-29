@@ -99,6 +99,11 @@ The status line under the header carries the transfer progress
 the results (`Mission uploaded`, `Upload failed: …`, `Mission started`,
 `Start refused`, `No reply from the drone`).
 
+The map loads the shared keep-out / corridor / wind zones from the Indoor
+screen **read-only** — the same shapes the Mission screen shows, without
+handles — because taps inside them are refused, and it centres itself once on
+the phone's first GPS fix.
+
 ## 1.4 Mission screen — fly the plan
 
 ![Android Mission screen](screens/android-mission.svg)
@@ -253,7 +258,9 @@ Same model as Android's Plan screen, in a portrait layout:
 | **Add WP / Alt / Set** | append a waypoint; Set writes the altitude to the selected row, else it becomes the default ("New waypoints will use alt 3.0") |
 | **Upload / Download / Start** | the onboard mission (CRTP port 7 ch 2). Start flies the **stored** mission and arms first |
 
-CUT MOTORS in the header is **one tap** on this screen.
+CUT MOTORS in the header is **one tap** on this screen. The map also draws the
+shared keep-out / corridor / wind zones **read-only** — the same shapes the
+Mission screen shows — because taps inside them are refused.
 
 ## 2.4 Mission screen — fly the plan
 

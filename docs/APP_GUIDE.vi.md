@@ -98,6 +98,11 @@ Dòng trạng thái dưới tiêu đề mang tiến độ truyền (`Uploading 3
 (`Mission uploaded`, `Upload failed: …`, `Mission started`, `Start refused`,
 `No reply from the drone`).
 
+Bản đồ nạp các vùng cấm bay / hành lang / gió dùng chung từ màn Indoor ở chế
+độ **chỉ xem** — cùng hình với màn Mission, không có tay nắm — vì chạm vào
+chúng bị từ chối, và bản đồ tự căn giữa một lần ở fix GPS đầu tiên của điện
+thoại.
+
 ## 1.4 Màn hình Mission — bay theo kế hoạch
 
 ![Màn hình Mission Android](screens/android-mission.svg)
@@ -250,7 +255,9 @@ Cùng mô hình với màn hình Plan của Android, bố cục dọc:
 | **Add WP / Alt / Set** | thêm waypoint; Set ghi độ cao cho dòng đã chọn, ngược lại thành mặc định ("New waypoints will use alt 3.0") |
 | **Upload / Download / Start** | nhiệm vụ trên board (CRTP port 7 ch 2). Start bay nhiệm vụ **đã lưu trữ** và arm trước |
 
-CUT MOTORS ở tiêu đề màn hình này là **một chạm**.
+CUT MOTORS ở tiêu đề màn hình này là **một chạm**. Bản đồ cũng vẽ các vùng
+cấm bay / hành lang / gió dùng chung ở chế độ **chỉ xem** — cùng hình với màn
+Mission — vì chạm vào chúng bị từ chối.
 
 ## 2.4 Màn hình Mission — bay theo kế hoạch
 
