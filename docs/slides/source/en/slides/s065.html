@@ -1,0 +1,21 @@
+<section id="s065" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Motion sensor</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">The filter in code</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0">angle_pitch_deg += gx * dt;&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// 1. predict with gyro</span><br>angle_roll_deg&#160;&#160;+= gy * dt;<br>angle_pitch_deg = angle_pitch_deg * 0.996f<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;+ angle_pitch_acc * 0.004f;&#160;&#160; <span style="color:#8FA3B8">// 2. correct</span><br>angle_roll_deg&#160;&#160;= angle_roll_deg&#160;&#160;* 0.996f<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;+ angle_roll_acc&#160;&#160;* 0.004f;</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>Step 1</b>: move the angle by what the gyro says happened this loop.</p>
+<p style="font-size:29px;line-height:1.4"><b>Step 2</b>: blend 99.6% of that with 0.4% of the accelerometer angle.</p>
+<p style="font-size:29px;line-height:1.4">On the very first loop, the angle starts from the accelerometer (gyro_angles_set).</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Angle 10.00°, gyro says +0.04° this loop, accel says 9.0° → (10.04 × 0.996) + (9.0 × 0.004) = 10.036°.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Motion sensor · 65 · Source: Esp32_drone.ino attitudeUpdate()</p>
+<aside>That is the whole filter: two lines per axis. It is called complementary because the two weights add to 1, and the gyro covers high frequencies while the accelerometer covers low frequencies.</aside>
+</section>

@@ -1,0 +1,29 @@
+<section id="s032" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Phần cứng</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Đo pin: cầu chia điện áp</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">Hai điện trở hạ điện áp pin xuống mức an toàn.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Chân ADC đọc tới khoảng 3,3 V, nhưng cell đầy là 4,2 V.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Điện áp chân = pin × 33 ÷ 43. Firmware nhân ngược lại <b>43 ÷ 33</b> (VBAT_DIVIDER).</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Đổi điện trở → phải đổi cả VBAT_DIVIDER.</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:24px 32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:26px;line-height:1.4">Chân đọc 3,00 V → pin = 3,00 × 43 ÷ 33 = 3,91 V.</p>
+</div>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Sơ đồ: cực dương pin qua 10 kilô-ôm tới nút giữa, rồi 33 kilô-ôm xuống mass; nút giữa nối GPIO 36" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><defs><marker id="s032m13202E" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#13202E" stroke="none"/></marker></defs><line x1="300.0" y1="60.0" x2="300.0" y2="110.0" stroke="#13202E" stroke-width="4" stroke-linecap="round"/><path d="M 300 110 L 324 118.33333333333333 L 276 135.0 L 324 151.66666666666669 L 276 168.33333333333334 L 324 185.0 L 276 201.66666666666669 L 300 210" fill="none" stroke="#B5501A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><line x1="300.0" y1="210.0" x2="300.0" y2="300.0" stroke="#13202E" stroke-width="4" stroke-linecap="round"/><circle cx="300.0" cy="260.0" r="10.0" fill="#13202E" stroke="none" stroke-width="0"/><path d="M 300 300 L 324 308.3333333333333 L 276 325.0 L 324 341.6666666666667 L 276 358.3333333333333 L 324 375.0 L 276 391.6666666666667 L 300 400" fill="none" stroke="#2F6FA3" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><line x1="300.0" y1="400.0" x2="300.0" y2="450.0" stroke="#13202E" stroke-width="4" stroke-linecap="round"/><line x1="265.0" y1="452.0" x2="335.0" y2="452.0" stroke="#13202E" stroke-width="4" stroke-linecap="round"/><line x1="277.0" y1="466.0" x2="323.0" y2="466.0" stroke="#13202E" stroke-width="4" stroke-linecap="round"/><line x1="289.0" y1="480.0" x2="311.0" y2="480.0" stroke="#13202E" stroke-width="4" stroke-linecap="round"/><line x1="300.0" y1="260.0" x2="586.0" y2="260.0" stroke="#13202E" stroke-width="4" stroke-linecap="round" marker-end="url(#s032m13202E)"/><circle cx="300.0" cy="56.0" r="10.0" fill="#B5501A" stroke="none" stroke-width="0"/></svg>
+<p style="position:absolute;left:590px;top:220px;width:200px;height:80px;font-size:24px;line-height:1.2;color:#F6F5F0;text-align:center;background:#13202E;border:3px solid #13202E;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-weight:600">GPIO 36<br>ADC</p>
+<p style="position:absolute;left:330px;top:30px;width:320px;font-size:24px;line-height:1.25;color:#B5501A;text-align:left;font-weight:600">Pin + (tới 4,2 V)</p>
+<p style="position:absolute;left:344px;top:140px;width:140px;font-size:26px;line-height:1.25;color:#B5501A;text-align:left;font-weight:600">10 kΩ</p>
+<p style="position:absolute;left:344px;top:330px;width:140px;font-size:26px;line-height:1.25;color:#2F6FA3;text-align:left;font-weight:600">33 kΩ</p>
+<p style="position:absolute;left:330px;top:212px;width:258px;font-size:24px;line-height:1.25;color:#13202E;text-align:left">4,2 × 33/43 = <b>3,22 V</b></p>
+<p style="position:absolute;left:340px;top:470px;width:120px;font-size:24px;line-height:1.25;color:#13202E;text-align:left;font-weight:600">GND</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Phần cứng · 32 · Nguồn: #define VBAT_DIVIDER</p>
+<aside>Vì sao chọn các giá trị này? 4,2 V × 33/43 = 3,22 V, vừa trong dải ADC. Điện trở lớn cũng tốn rất ít dòng pin. Nếu đổi điện trở, bạn phải đổi VBAT_DIVIDER.</aside>
+</section>

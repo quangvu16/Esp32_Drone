@@ -1,0 +1,21 @@
+<section id="s107" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Đầu vào</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Tham số: TOC và kiểm tra dải</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0">{ "pid", "roll_kp", PT_FLOAT, 4, TOC_ACCESS_RW,<br>&#160;&#160;&amp;pid_p_gain_roll, 0.0f, 100.0f },<br>{ "flight", "takeoff_ms", PT_UINT16, 2, TOC_ACCESS_RW,<br>&#160;&#160;&amp;takeoff_ms, 100.0f, 20000.0f },<br><span style="color:#8FA3B8">// on write:</span><br><span style="color:#F29E5C">if</span> (!isfinite(v)) <span style="color:#F29E5C">return</span>;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// refused</span><br>v = paramClampF(e, v);&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// clamp into [lo, hi]</span></p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>TOC</b> = mục lục: ứng dụng tải danh sách tên, kiểu và quyền truy cập.</p>
+<p style="font-size:29px;line-height:1.4">Mỗi mục đọc-ghi mang dải <b>lo</b> và <b>hi</b>.</p>
+<p style="font-size:29px;line-height:1.4">Phản hồi lặp lại giá trị thật đã lưu, nên ứng dụng hiện đúng sự thật.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Ứng dụng ghi roll_kp = 1000 → lưu thành 100 (giới hạn hi) → phản hồi báo ứng dụng 100.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Đầu vào · 107 · Nguồn: PARAM_TOC, paramStore()</p>
+<aside>Vì sao kiểm tra? Trước bản sửa này, hệ số NaN hoặc takeoff_ms bằng 0 từ ứng dụng lọt vào mã bay. takeoff_ms là số chia trong đường dốc cất cánh, nên 0 nghĩa là chia cho 0. Giờ mọi lần ghi đều được kiểm tra, và giá trị nạp từ flash cũng vậy (paramSanitizeAll).</aside>
+</section>

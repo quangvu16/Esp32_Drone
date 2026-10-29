@@ -1,0 +1,23 @@
+<section id="s066" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Cảm biến</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Vì sao 0,996 và 0,004?</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">0,4%</p>
+<p style="font-size:30px;line-height:1.35">phần gia tốc kế mỗi vòng: nhỏ, nên rung gần như không lọt vào</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">≈ 1 s</p>
+<p style="font-size:30px;line-height:1.35">hằng số thời gian: 0,004 s ÷ 0,004 — tốc độ kéo độ trôi ra</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">250</p>
+<p style="font-size:30px;line-height:1.35">vòng mỗi giây, nên các cú nhích 0,4% cộng lại nhanh</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Hỏi tại sao: các trọng số này sẽ thế nào nếu vòng lặp chạy ở 500 Hz?</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Cảm biến · 66 · Nguồn: attitudeUpdate()</p>
+<aside>Đánh đổi: trọng số gia tốc kế lớn hơn, như 0,02, loại độ trôi nhanh hơn nhưng để rung lọt vào góc. Nhỏ hơn, như 0,001, mượt hơn nhưng trôi lâu hơn sau va chạm. Khoảng một giây là lựa chọn phổ biến cho drone nhỏ. Nếu đổi LOOP_TIME_US, phải đổi trọng số, nếu không hằng số thời gian sẽ lệch.</aside>
+</section>

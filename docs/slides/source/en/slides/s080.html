@@ -1,0 +1,21 @@
+<section id="s080" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">PID control</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Self-level in code</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">float</span> roll_err_deg = angle_roll_deg - sp_roll_deg;<br>roll_level_adjust = constrain(<br>&#160;&#160;&#160;&#160;roll_err_deg * LEVEL_SENSITIVITY, -200.0f, 200.0f);<br><span style="color:#8FA3B8">// The level term is SUBTRACTED.</span><br>roll_setpoint = sp_roll_rate - roll_level_adjust;</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Angle error → times 15 → a rate in °/s, clamped to ±200.</p>
+<p style="font-size:29px;line-height:1.4"><b>Subtracted</b>: tilted too far one way, ask to rotate the other way.</p>
+<p style="font-size:29px;line-height:1.4">sp_roll_rate adds the pilot's own rate command (SBUS) on top.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Tilted +5° past the target → adjust = 5 × 15 = 75 → rate setpoint −75 °/s → the drone rotates back.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">PID control · 80 · Source: Esp32_drone.ino loop() self-level block</p>
+<aside>The comment in the sketch explains the subtraction: tilted +5 degrees past the target, the rate loop must be asked for a NEGATIVE rate to come back. The next slide shows what happened when it was added instead.</aside>
+</section>

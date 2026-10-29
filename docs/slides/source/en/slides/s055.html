@@ -1,0 +1,26 @@
+<section id="s055" style="background:#13202E;color:#F6F5F0;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:3px;text-transform:uppercase">Architecture · Ask why</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Check your understanding</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why are the motors stopped first in setup()?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: what could a floating gate do?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why use a busy-wait instead of delay()?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: what happens to the period when work time changes?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why must commands be safe to apply twice?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: what does the app do when an ack is lost?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why is SAVE refused while armed?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: how long does a flash erase take?</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#8FA3B8">Architecture · 55</p>
+<aside>Deeper: the loop does everything in one thread. What would you gain and lose by moving the radio handling into a separate FreeRTOS task on the other core? Think about timing jitter on one side, and shared-variable races on the other.</aside>
+</section>

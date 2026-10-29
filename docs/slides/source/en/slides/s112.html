@@ -1,0 +1,17 @@
+<section id="s112" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Modes and safety</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Five flight modes</h2>
+</div>
+<table style="font-size:29px;color:#13202E">
+<tr><th style="width:16%">Mode</th><th style="width:30%">Who flies</th><th style="width:54%">What the drone holds</th></tr>
+<tr><td>MANUAL</td><td>pilot (phone sticks or RC)</td><td>nothing automatic — sticks command tilt or rate</td></tr>
+<tr><td>HOLD</td><td>drone</td><td>level attitude, locked heading, a fixed thrust</td></tr>
+<tr><td>AUTO</td><td>drone</td><td>take-off ramp → hover → landing ramp</td></tr>
+<tr><td>FOLLOW</td><td>drone + phone GPS</td><td>tilts toward the phone's target offset</td></tr>
+<tr><td>RTH</td><td>drone</td><td>tilts back toward the launch point</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Modes apply to the phone path only. SBUS always flies MANUAL.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Modes and safety · 112 · Source: Esp32_drone.ino FLIGHT MODES section comment</p>
+<aside>None of these modes holds altitude: there is no barometer, so HOLD keeps a thrust level and the height drifts with the battery. SBUS always stays in manual rate mode, because the physical RC is the safety net and must never be overridden by an automatic mode.</aside>
+</section>

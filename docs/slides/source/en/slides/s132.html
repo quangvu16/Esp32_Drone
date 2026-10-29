@@ -1,0 +1,21 @@
+<section id="s132" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Navigation</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Removing gravity</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> ax_b = raw_ax / NAV_ACC_LSB_PER_G * G;&#160;&#160; <span style="color:#8FA3B8">// m/s²</span><br><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> ay_b = raw_ay / NAV_ACC_LSB_PER_G * G;<br><span style="color:#8FA3B8">// gravity seen by the tilted sensor</span><br><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> gx_g = -G * sin(roll) * cos(pitch);<br><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> gy_g = +G * sin(pitch);<br><span style="color:#F29E5C">float</span> fwd&#160;&#160;= (ay_b - gy_g) * NAV_FWD_SIGN;<br><span style="color:#F29E5C">float</span> left = (ax_b - gx_g) * NAV_LEFT_SIGN;</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">A tilted drone feels part of gravity on its flat axes, even when it is not moving.</p>
+<p style="font-size:29px;line-height:1.4">The tilt angles from section 5 say how much; subtract it.</p>
+<p style="font-size:29px;line-height:1.4">What is left is real horizontal acceleration.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Tilted 5° forward, not moving: ay_b ≈ 9.81 × sin 5° = 0.85 m/s². Subtract gy_g = 0.85 → fwd = 0.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Navigation · 132 · Source: Esp32_drone.ino navUpdate()</p>
+<aside>Shortened: the sketch computes the sines and cosines once into sg, cg, st, ct. This is where the attitude estimate and the navigation meet: a 1 degree error in the tilt angle leaves about 0.17 m/s² of fake acceleration — far bigger than the bias on the previous slide.</aside>
+</section>

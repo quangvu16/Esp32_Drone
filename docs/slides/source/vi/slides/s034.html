@@ -1,0 +1,16 @@
+<section id="s034" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Phần cứng</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Sơ đồ chân</h2>
+</div>
+<table style="font-size:30px;color:#13202E">
+<tr><th style="width:15%">Chân</th><th style="width:35%">Dùng cho</th><th style="width:15%">Chân</th><th style="width:35%">Dùng cho</th></tr>
+<tr><td>GPIO 15</td><td>Động cơ RF (trước-phải)</td><td>GPIO 18</td><td>SPI SCK</td></tr>
+<tr><td>GPIO 13</td><td>Động cơ RR (sau-phải)</td><td>GPIO 19</td><td>SPI MISO</td></tr>
+<tr><td>GPIO 12</td><td>Động cơ LR (sau-trái)</td><td>GPIO 23</td><td>SPI MOSI</td></tr>
+<tr><td>GPIO 14</td><td>Động cơ LF (trước-trái)</td><td>GPIO 5</td><td>Chọn chip MPU</td></tr>
+<tr><td>GPIO 4</td><td>SBUS vào (UART2 RX)</td><td>GPIO 36</td><td>ADC đo pin</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Phần cứng · 34 · Nguồn: #define PIN_*</p>
+<aside>Các số này lấy từ khối #define đầu sketch, khớp với sơ đồ mạch. Nếu bạn tự làm bo mạch, đây là chỗ đầu tiên cần sửa. GPIO 36 chỉ là đầu vào trên ESP32, rất hợp cho ADC.</aside>
+</section>

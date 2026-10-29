@@ -1,0 +1,26 @@
+<section id="s038" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Hardware</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">What is NOT on the board — and why it matters</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">No barometer</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Cannot measure height. Hold keeps a thrust level, not an altitude.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">No compass</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Heading comes from the gyro only, so it drifts slowly.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">No GPS</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Cannot know its position. Follow uses the phone's GPS and dead reckoning.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">No rangefinder</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Cannot see the ground. Landing is a timed thrust ramp.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Hardware · 38 · Source: Esp32_drone.ino FLIGHT MODES and NAVIGATION section comments</p>
+<aside>This is the most important design constraint in the firmware. The code comments say it plainly, and the app UI is honest about it too: it never draws a fake altitude. When you read the flight-mode and navigation code later, remember these four missing sensors.</aside>
+</section>

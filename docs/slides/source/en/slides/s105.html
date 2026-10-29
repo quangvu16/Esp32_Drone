@@ -1,0 +1,17 @@
+<section id="s105" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Radio inputs</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">The commander packet (port 3)</h2>
+</div>
+<table style="font-size:29px;color:#13202E">
+<tr><th style="width:16%">Bytes</th><th style="width:18%">Field</th><th style="width:18%">Type</th><th style="width:48%">Meaning</th></tr>
+<tr><td>0</td><td>header</td><td>0x30</td><td>port 3, channel 0</td></tr>
+<tr><td>1 – 4</td><td>roll</td><td>float</td><td>tilt angle, degrees</td></tr>
+<tr><td>5 – 8</td><td>pitch</td><td>float</td><td>tilt angle, degrees</td></tr>
+<tr><td>9 – 12</td><td>yaw</td><td>float</td><td>yaw rate, °/s</td></tr>
+<tr><td>13 – 14</td><td>thrust</td><td>uint16</td><td>0 – 65535</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Sanity checks: NaN or infinity → ignored; |roll| or |pitch| over 180, or |yaw| over 2000 → ignored.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Radio inputs · 105 · Source: Esp32_drone.ino crtpHandleCommander()</p>
+<aside>crtpHandleCommander() copies these with memcpy, then rejects the packet if any float is NaN or infinite, or the angles are absurd (more than 180 degrees, or a yaw rate over 2000). A bad packet is ignored, so the last good command stays and the failsafe timer keeps running.</aside>
+</section>

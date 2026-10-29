@@ -30,6 +30,7 @@ UDP_APP_PORT = 2399           # drone replies here
                               # drone trả lời ở đây
 
 PORT_PARAMS, PORT_LOG, PORT_FLIGHT = 2, 5, 7
+PORT_COMMANDER = 3            # <roll f32><pitch f32><yaw f32><thrust u16>, all LE
 CH_TOC, CH_READ, CH_WRITE = 0, 1, 2
 LOG_CH_TOC, LOG_CH_CTRL, LOG_CH_DATA = 0, 1, 2
 NAV_CH, MISSION_CH = 1, 2        # port 7: navigation / mission (§6, §12)
@@ -44,11 +45,13 @@ LOG_CREATE, LOG_APPEND, LOG_DELETE, LOG_START, LOG_STOP, LOG_RESET = 0, 1, 2, 3,
 # flight-control extension (port 7, ch 0). send() already writes the CRTP header
 # byte (0x70 = port 7 | ch 0), so the payload is just <cmd><args...> — do NOT lead
 # it with 0x70 again: the firmware reads cmd = p[1] (the first payload byte) and a
-# second 0x70 would be parsed as an unknown command and dropped.
+# second 0x70 would be parsed as an unknown command and dropped. The reply payload
+# is <cmd><status>, status 0 = OK, 1 = refused.
 # phần mở rộng điều khiển bay (port 7, ch 0). send() đã ghi byte header CRTP
 # (0x70 = cổng 7 | kênh 0), nên phần dữ liệu chỉ là <cmd><args...> — KHÔNG được
 # mở đầu bằng 0x70 lần nữa: firmware đọc cmd = p[1] (byte dữ liệu đầu tiên) và
-# một 0x70 nữa sẽ bị coi là lệnh lạ rồi bỏ.
+# một 0x70 nữa sẽ bị coi là lệnh lạ rồi bỏ. Phần trả lời là <cmd><status>,
+# status 0 = OK, 1 = bị từ chối.
 FC_MAGIC = 0x70                         # the CRTP header send() emits — wire only
                                        # header CRTP mà send() phát — chỉ trên dây
 FC_SET_MODE, FC_TAKEOFF, FC_LAND, FC_SET_HOVER = 0x01, 0x02, 0x03, 0x04
@@ -457,6 +460,81 @@ class Drone:
 
     def defaults(self):
         return self._fc(FC_DEFAULTS)[-1] == 0
+
+
+# --- stand thrust ----------------------------------------------------------
+#
+# The firmware only spins the motors in MANUAL while CommanderPackets keep
+# arriving: they ARE the setpoint, and without them the 500 ms failsafe
+# disarms (loop(), phone_ok = cmd_ok in MANUAL). Thrust going up from zero
+# arms the board (armUpdate: thrust <= 500 seen, then > 1000); thrust back at
+# zero disarms it. So a tuning run on a stand needs this stream, and stopping
+# the stream -- or closing the program -- stops the motors within 0.5 s.
+
+THRUST_MAX_PCT = 60.0                 # never more than 60 % of full thrust from here
+SETPOINT_HZ = 50
+
+
+def thrust_counts(pct):
+    """Percent of full thrust -> the firmware's 0..65535 thrust units."""
+    pct = max(0.0, min(THRUST_MAX_PCT, float(pct)))
+    return int(round(pct / 100.0 * 65535))
+
+
+class ThrustStream:
+    """Sends level CommanderPackets (roll 0, pitch 0, yaw rate 0) at 50 Hz.
+
+    Starts at zero thrust for half a second so the firmware sees the stick
+    "low" before it may arm, then ramps to the target over `ramp_s`. Changing
+    the target ramps too. stop() sends zero thrust (which disarms) a few times
+    and ends the thread."""
+
+    def __init__(self, drone, pct=0.0, ramp_s=1.0):
+        self.drone = drone
+        self.target = thrust_counts(pct)
+        self.current = 0.0
+        self.ramp_per_tick = 65535.0 / (ramp_s * SETPOINT_HZ) if ramp_s > 0 else 65535.0
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    @property
+    def running(self):
+        return self._thread.is_alive() and not self._stop.is_set()
+
+    def set_pct(self, pct):
+        self.target = thrust_counts(pct)
+
+    def _send(self, thrust):
+        self.drone.send(PORT_COMMANDER, 0,
+                        struct.pack("<fffH", 0.0, 0.0, 0.0, int(thrust)))
+
+    def _run(self):
+        period = 1.0 / SETPOINT_HZ
+        hold_low = int(0.5 * SETPOINT_HZ)
+        try:
+            while not self._stop.is_set():
+                if hold_low > 0:
+                    hold_low -= 1
+                    self.current = 0.0
+                else:
+                    step = max(-self.ramp_per_tick, min(self.ramp_per_tick, self.target - self.current))
+                    self.current += step
+                self._send(self.current)
+                time.sleep(period)
+        except OSError:
+            return                              # socket closed under us
+        for _ in range(5):                      # zero thrust: the firmware disarms
+            try:
+                self._send(0)
+            except OSError:
+                return
+            time.sleep(period)
+
+    def stop(self):
+        self._stop.set()
+        self.target = 0
+        self._thread.join(timeout=1.0)
 
 
 # --- telemetry blocks ------------------------------------------------------

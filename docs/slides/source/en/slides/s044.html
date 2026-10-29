@@ -1,0 +1,19 @@
+<section id="s044" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Architecture</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Map of the sketch</h2>
+</div>
+<table style="font-size:27px;color:#13202E">
+<tr><th style="width:24%">Section</th><th style="width:52%">Main functions</th><th style="width:24%">Course section</th></tr>
+<tr><td>Config #defines</td><td>pins, rates, gains, limits</td><td>3, 4</td></tr>
+<tr><td>MPU6500</td><td>mpuInit, mpuReadRaw, mpuCalibrateGyro</td><td>5</td></tr>
+<tr><td>SBUS</td><td>sbusInit, sbusDecode, sbusPoll</td><td>8</td></tr>
+<tr><td>Transport + CRTP</td><td>linkInit, linkPoll, crtpDispatch, handlers</td><td>8</td></tr>
+<tr><td>Motors + battery</td><td>motorInit, usToDuty, motorWrite, batteryUpdate</td><td>3, 7</td></tr>
+<tr><td>PID + attitude</td><td>pidCompute, attitudeUpdate</td><td>5, 6</td></tr>
+<tr><td>Navigation</td><td>navUpdate, navSetpoints</td><td>10</td></tr>
+<tr><td>Modes + arming</td><td>flightSetpoints, armUpdate, motorMix</td><td>6, 7, 9</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Architecture · 44 · Source: Esp32_drone.ino section banners</p>
+<aside>The sketch is ordered roughly from hardware up: configuration, drivers, protocol, control, then modes and the loop at the very end. When you search the file, search for these function names.</aside>
+</section>

@@ -1,0 +1,26 @@
+<section id="s068" style="background:#13202E;color:#F6F5F0;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:3px;text-transform:uppercase">Motion sensor · Ask why</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Check your understanding</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why does the SPI read byte have bit 7 set?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: how does the sensor tell read from write?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why calibrate the gyro at every power-on?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: does bias change with temperature?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why not use only the accelerometer for tilt?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: what does it feel during a throttle punch?</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;border-left:6px solid #F29E5C;padding-left:28px">
+<p style="font-size:34px;font-weight:600;line-height:1.3">Why can roll be corrected but heading cannot?</p>
+<p style="font-size:27px;line-height:1.4;color:#BFC9D4">Hint: which direction does gravity point?</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#8FA3B8">Motion sensor · 68</p>
+<aside>Deeper: the 92 Hz low-pass filter in the sensor and the complementary filter both smooth the data, but they solve different problems. One removes vibration in the raw samples; the other fuses two sensors. Can you explain which is which, and what would happen if you removed each one?</aside>
+</section>

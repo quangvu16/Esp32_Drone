@@ -1,0 +1,23 @@
+<section id="s099" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Đầu vào</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Lỗi thật: đọc nhầm byte</h2>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#13202E">Lệch một byte, cờ failsafe không bao giờ được thấy.</p>
+<div style="display:flex;gap:32px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #B42318">
+<h3 style="font-size:38px;font-weight:600;color:#B42318">Trước (lỗi)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Đọc cờ từ byte 24, tức byte cuối khung</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Byte cuối luôn là 0x00 → cờ luôn trông như sạch</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Máy thu ở failsafe vẫn giữ động cơ chạy theo cần cũ</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px;border-top:8px solid #1F7A4D">
+<h3 style="font-size:38px;font-weight:600;color:#1F7A4D">Sau (đã sửa)</h3>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Đọc cờ từ byte 23</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Khung mất hoặc failsafe bị bỏ</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Thời hạn 500 ms sau đó dừng động cơ; sbus_test.cpp ghim lại</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Đầu vào · 99 · Nguồn: sbusFrameUsable(); test/sbus_test.cpp</p>
+<aside>Vì sao nguy hiểm đến vậy? Máy thu mất tín hiệu tay phát thường vẫn gửi khung với vị trí cần CUỐI CÙNG và bật cờ failsafe. Nếu không nhìn cờ, drone cứ bay với mức ga phi công để lại, mất kiểm soát. Bản sửa cũng không cập nhật sbus_last_frame_ms khi gặp khung failsafe, để thời hạn bình thường làm việc dừng động cơ.</aside>
+</section>

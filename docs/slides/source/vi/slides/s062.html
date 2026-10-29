@@ -1,0 +1,21 @@
+<section id="s062" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Cảm biến</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Hiệu chuẩn gyro: đo độ lệch khi đứng yên</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">int32_t</span> sx = 0, sy = 0, sz = 0;<br><span style="color:#F29E5C">for</span> (<span style="color:#F29E5C">int</span> i = 0; i &lt; 2000; i++) {<br>&#160;&#160;mpuReadRaw();<br>&#160;&#160;sx += raw_gx; sy += raw_gy; sz += raw_gz;<br>&#160;&#160;delay(3);<br>}<br>gyro_x_cal = sx / 2000;&#160;&#160; <span style="color:#8FA3B8">// average = bias</span><br>gyro_y_cal = sy / 2000;<br>gyro_z_cal = sz / 2000;</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Gyro đứng yên lẽ ra đọc 0, nhưng chip nào cũng lệch một chút — gọi là <b>độ lệch (bias)</b>.</p>
+<p style="font-size:29px;line-height:1.4">2.000 mẫu × 3 ms ≈ 6 giây. Trung bình là độ lệch, được trừ đi mỗi vòng.</p>
+<p style="font-size:29px;line-height:1.4"><b>Giữ drone phẳng và đứng yên</b>, nếu không độ lệch sẽ sai.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Độ lệch 0,3 °/s không được trừ → sau 60 s hướng sai 0,3 × 60 = 18°.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Cảm biến · 62 · Nguồn: mpuCalibrateGyro()</p>
+<aside>Vì sao độ lệch quan trọng đến vậy? Góc là tổng tốc độ gyro theo thời gian. Độ lệch 0,3 °/s để nguyên trong 60 giây thành sai số hướng 18 độ. Xê dịch drone khi hiệu chuẩn sẽ nhúng một cú xoay giả vào mọi chuyến bay cho tới lần bật nguồn sau.</aside>
+</section>

@@ -1,0 +1,21 @@
+<section id="s033" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Hardware</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Reading and smoothing the battery</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">uint32_t</span> mv = analogReadMilliVolts(PIN_VBAT);<br><span style="color:#F29E5C">float</span> sample = (mv / 1000.0f) * VBAT_DIVIDER;<br><span style="color:#F29E5C">if</span> (vbat &lt;= 0.0f) vbat = sample;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// first read</span><br><span style="color:#F29E5C">else</span> vbat += VBAT_FILTER_ALPHA * (sample - vbat);</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>analogReadMilliVolts</b> uses the chip's factory calibration.</p>
+<p style="font-size:29px;line-height:1.4"><b>Alpha 0.02</b>: each loop moves 2% toward the new reading — about a 0.2 s time constant.</p>
+<p style="font-size:29px;line-height:1.4"><b>Why smooth?</b> One reading is noisy and dips with every throttle punch.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Old value 3.90 V, one noisy sample 3.60 V → new value 3.90 + 0.02 × (−0.30) = 3.894 V. One bad reading barely moves it.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Hardware · 33 · Source: Esp32_drone.ino batteryUpdate()</p>
+<aside>This is a first-order low-pass filter, also called an exponential moving average. Example: the old value is 3.90 V and a noisy sample reads 3.60 V. The new value is 3.90 + 0.02 × (−0.30) = 3.894 V. One bad sample barely moves it, but a real drop shows up within a fraction of a second.</aside>
+</section>

@@ -1,0 +1,21 @@
+<section id="s080" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Điều khiển PID</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Tự cân bằng trong mã</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">float</span> roll_err_deg = angle_roll_deg - sp_roll_deg;<br>roll_level_adjust = constrain(<br>&#160;&#160;&#160;&#160;roll_err_deg * LEVEL_SENSITIVITY, -200.0f, 200.0f);<br><span style="color:#8FA3B8">// The level term is SUBTRACTED.</span><br>roll_setpoint = sp_roll_rate - roll_level_adjust;</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Sai số góc → nhân 15 → tốc độ °/s, kẹp trong ±200.</p>
+<p style="font-size:29px;line-height:1.4"><b>Bị trừ</b>: nghiêng quá về một phía thì đòi xoay về phía kia.</p>
+<p style="font-size:29px;line-height:1.4">sp_roll_rate cộng thêm lệnh tốc độ của phi công (SBUS).</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Nghiêng +5° quá mục tiêu → adjust = 5 × 15 = 75 → tốc độ mục tiêu −75 °/s → drone xoay về.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Điều khiển PID · 80 · Nguồn: khối tự cân bằng trong loop()</p>
+<aside>Chú thích trong sketch giải thích phép trừ: nghiêng +5 độ quá mục tiêu thì vòng tốc độ phải được đòi tốc độ ÂM để quay về. Slide sau cho thấy chuyện gì xảy ra khi nó bị cộng.</aside>
+</section>

@@ -1,0 +1,22 @@
+<section id="s116" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Chế độ và an toàn</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Arm từ điện thoại: ba quy tắc</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Ga thấp trước</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Ở MANUAL, tăng ga chỉ arm sau khi ứng dụng đã báo ga bằng 0. Điện thoại kết nối khi cần đang cao không thể làm cánh quay.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">ARM chỉ từ trạng thái nghỉ</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">ARM bị từ chối ở HOLD, FOLLOW hay RTH, nơi động cơ sẽ nhảy lên lực đẩy hover. Ở đó hãy dùng TAKEOFF.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">TAKEOFF arm an toàn</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Nó kiểm tra pin, đặt điểm cất cánh và bắt đầu dốc từ 0.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Chế độ và an toàn · 116 · Nguồn: armUpdate(), FC_CMD_ARM, flightTakeoff()</p>
+<aside>Mỗi quy tắc ngăn một tai nạn thật: cái đầu ngăn khởi động bất ngờ ở ga tối đa khi kết nối lại; cái thứ hai ngăn động cơ nhảy lên lực đẩy hover trên bàn; cái thứ ba đảm bảo con đường duy nhất vào bay tự động bắt đầu từ lực đẩy 0. Kết nối lại cũng xóa crtp_thrust_was_low, nên phải thấy 0 lần nữa.</aside>
+</section>

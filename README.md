@@ -14,7 +14,7 @@ PROTOCOL.md        the wire protocol, in full
 ESP-Drone-Android/ Android client
 ESP-Drone-iOS/     iOS client
 tools/pid-tune/    desktop PID auto-tuner (Python)
-docs/              install guide, pilot's guide, app guide, diagrams, board schematic
+docs/              install guide, pilot's guide, app guide, course slides, diagrams, board schematic
 ```
 
 **Want to get flying?**
@@ -27,6 +27,15 @@ docs/              install guide, pilot's guide, app guide, diagrams, board sche
 3. **[docs/APP_GUIDE.md](docs/APP_GUIDE.md)** — the app reference: every
    screen and control of the Android app, the iOS app and the Python tuner,
    with screen-map screenshots. **Tiếng Việt:** [docs/APP_GUIDE.vi.md](docs/APP_GUIDE.vi.md).
+
+**Tuning PID from a computer?** [docs/PID_TUNER_GUIDE.md](docs/PID_TUNER_GUIDE.md)
+— step by step with the desktop tuner in `tools/pid-tune`
+(**Tiếng Việt:** [docs/PID_TUNER_GUIDE.vi.md](docs/PID_TUNER_GUIDE.vi.md)).
+
+**New to drones?** [docs/slides](docs/slides/README.md) — a 150-slide course on
+how the drone flies, every part on the board, and the firmware line by line
+([PDF](docs/slides/ESP32_Drone_Course_EN.pdf) ·
+[bản tiếng Việt](docs/slides/ESP32_Drone_Course_VI.pdf)).
 
 Start with **[PROTOCOL.md](PROTOCOL.md)** for the wire format. It is the
 authoritative reference for framing, the parameter and log TOCs, the
@@ -89,6 +98,8 @@ process Bayesian optimisation, a neural ensemble, CMA-ES, differential
 evolution, PSO and the rest) and a live plot of the stabiliser. It scores a
 trial with the same cost model as the phone apps, so a gain set found on the
 desktop means the same thing as one found on the phone.
+**Spin up** streams level setpoints at a thrust you choose so the motors run on
+a tuning stand. Step-by-step: [docs/PID_TUNER_GUIDE.md](docs/PID_TUNER_GUIDE.md).
 
 ## Building
 
@@ -106,7 +117,7 @@ in the Arduino IDE. Board *ESP32 Dev Module*, partition scheme **Huge APP**.
 |---|---|---|
 | `Esp32_drone/test/` | `./run.sh` | 83 checks in five suites: the launch-frame rotation, body↔world yaw rotation, log-config parsing including the client's wire padding, the self-level sign, and SBUS failsafe/lost-frame rejection. `run.sh` also checks the accelerometer scale matches the configured range |
 | `Crazyflie clientTests` | *Product → Test* | 24 tests: great-circle geo math, `.waypoints` codec, mission edits, waypoint sequencing, launch frame |
-| `tools/pid-tune/selftest.py` | `python selftest.py` | the whole tuner without hardware: wire framing and struct budgets, the link against a fake firmware transcribed from the sketch, telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all eleven optimisers against a synthetic bowl, history seeding, and the error paths |
+| `tools/pid-tune/selftest.py` | `python selftest.py` | the whole tuner without hardware: wire framing and struct budgets, the link against a fake firmware transcribed from the sketch, the exact port-7 command bytes, the stand-thrust stream (arms on thrust-up, disarms at zero), telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all eleven optimisers against a synthetic bowl, history seeding, and the error paths |
 
 The firmware suite is deliberately self-guarding: it greps the sketch for the
 formula lines it copies and fails loudly if they drift, so the tests cannot pass

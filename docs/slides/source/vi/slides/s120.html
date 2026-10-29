@@ -1,0 +1,16 @@
+<section id="s120" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Chế độ và an toàn</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Ai đang điều khiển? Vài tình huống</h2>
+</div>
+<table style="font-size:27px;color:#13202E">
+<tr><th style="width:44%">Tình huống</th><th style="width:16%">phone_ok</th><th style="width:16%">sbus_ok</th><th style="width:24%">Kết quả</th></tr>
+<tr><td>Điện thoại bay MANUAL, đang gửi cần</td><td>có</td><td>—</td><td>điện thoại lái</td></tr>
+<tr><td>Điện thoại ở AUTO lơ lửng, chỉ có log</td><td>có</td><td>—</td><td>điện thoại lái (AUTO)</td></tr>
+<tr><td>Ứng dụng đóng, có máy thu RC</td><td>không</td><td>có</td><td>RC lái, rate thủ công</td></tr>
+<tr><td>Mất điện thoại, không có máy thu</td><td>không</td><td>không</td><td>failsafe: dừng động cơ</td></tr>
+<tr><td>Tay phát RC tắt, máy thu ở failsafe</td><td>không</td><td>không (cờ)</td><td>failsafe: dừng động cơ</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Chế độ và an toàn · 120 · Nguồn: loop()</p>
+<aside>Đi qua từng dòng với mã ở slide 118. Dòng cuối là dòng mà bản sửa byte 23 của SBUS làm cho đúng: trước đó, khung failsafe của máy thu trông bình thường và sbus_ok vẫn true.</aside>
+</section>

@@ -1,0 +1,27 @@
+<section id="s073" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">PID control</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">D: brake before you overshoot</h2>
+</div>
+<p style="font-size:34px;line-height:1.4;color:#13202E">D reacts to how fast the error is changing. It is a damper.</p>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Code</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">D = Kd × (error − last error).</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Roll and pitch Kd</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">18 — large, because the change per 4 ms loop is small.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Too much D</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Hot motors and a high-pitched buzz: D amplifies sensor noise.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Error goes from 10 to 7 in one loop → change −3 → D = 18 × (−3) = −54, braking the correction before it overshoots.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">PID control · 73 · Source: Esp32_drone.ino #define PID_ROLL_KD, PID_YAW_KD</p>
+<aside>Why no D on yaw (Kd 0)? Yaw changes slowly and its torque is weak, so it rarely overshoots, and D would only add noise. Why is D so sensitive to noise? Noise changes quickly from loop to loop, and D multiplies every quick change by 18.</aside>
+</section>

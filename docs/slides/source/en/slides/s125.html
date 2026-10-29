@@ -1,0 +1,39 @@
+<section id="s125" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Modes and safety</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">CUT MOTORS, end to end</h2>
+</div>
+<div style="display:flex;gap:12px;align-items:stretch">
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Tap</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">2 taps on Fly, 1 tap on Mission and Tune</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">App sends</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">port 7: 0x70 0x05 (EMERGENCY)</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Firmware</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">flightEmergency(): disarm, motorStop, pidReset</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Mode</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">back to MANUAL, AUTO idle</p>
+</div>
+<p style="font-size:48px;color:#B5501A;align-self:center">→</p>
+<div style="flex:1;background:#FDFCF8;padding:28px 22px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:10px">
+<h3 style="font-size:30px;font-weight:600">Reply</h3>
+<p style="font-size:24px;line-height:1.35;color:#4A5568">0x70 0x05 0x00 → app shows stopped</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">EMERGENCY has no conditions. It is the one command that always works.</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Drone drifting toward a wall in HOLD → double-tap CUT MOTORS → props stop within one 4 ms loop of the packet arriving.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Modes and safety · 125 · Source: Esp32_drone.ino flightEmergency(); docs/USER_GUIDE.md</p>
+<aside>Why two taps on Fly? The Fly screen is where your thumbs are, so an accidental single tap is likely; the second tap confirms. On Mission and Tune you are not flying with your thumbs, so one tap is enough. EMERGENCY is honoured in every mode and state: no check can refuse it.</aside>
+</section>

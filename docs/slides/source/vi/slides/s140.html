@@ -1,0 +1,17 @@
+<section id="s140" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiểm thử</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Năm chương trình kiểm thử chạy trên máy tính</h2>
+</div>
+<table style="font-size:30px;color:#13202E">
+<tr><th style="width:24%">Bài kiểm thử</th><th style="width:76%">Chứng minh điều gì</th></tr>
+<tr><td>frame_test</td><td>mục tiêu từ điện thoại nằm đúng hệ mà ước tính vị trí dùng</td></tr>
+<tr><td>yawrot_test</td><td>phép quay thân ↔ cất cánh quay đúng chiều, với dấu của sketch</td></tr>
+<tr><td>logcfg_test</td><td>cài đặt khối log vẫn đúng khi bị gửi lại</td></tr>
+<tr><td>level_test</td><td>tự cân bằng kéo về mục tiêu và không bao giờ lật</td></tr>
+<tr><td>sbus_test</td><td>khung mất và failsafe bị loại; khung tốt được nhận</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Chạy tất cả bằng: <b>sh Esp32_drone/test/run.sh</b> — khoảng 100 dòng “ok” khi mọi thứ đạt.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiểm thử · 140 · Nguồn: Esp32_drone/test/</p>
+<aside>Vì sao kiểm thử trên máy tính? Không cần drone, cánh quạt hay pin, và có kết quả trong khoảng một giây. Các bài này không cố bao quát mọi thứ. Chúng bao những dòng từng sai và dễ sai lại: dấu, hệ tọa độ và các trường hợp biên của giao thức. Mỗi bài đều giữ phiên bản lỗi cũ làm đối chứng âm.</aside>
+</section>

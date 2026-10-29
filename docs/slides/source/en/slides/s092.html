@@ -1,0 +1,23 @@
+<section id="s092" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Mixer and motors</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Why 20 kHz and 10 bits fit together</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">80 MHz</p>
+<p style="font-size:30px;line-height:1.35">LEDC clock on the ESP32</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">4000</p>
+<p style="font-size:30px;line-height:1.35">clock ticks per 20 kHz cycle (80 M ÷ 20 k)</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">1024</p>
+<p style="font-size:30px;line-height:1.35">duty steps at 10 bits — fits inside 4000; 12 bits (4096) would not</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Resolution × frequency is a trade-off. Ask why: what would you pick for a silent gimbal motor?</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Mixer and motors · 92 · Source: Espressif ESP32 Technical Reference (LEDC); Esp32_drone.ino #define MOTOR_PWM_*</p>
+<aside>The PWM resolution is limited by how many clock ticks fit in one cycle. At 20 kHz there are 4000 ticks, so 10 bits (1024 steps) fits and 12 bits does not. A lower frequency would allow more bits but the motors would whine. 1024 steps is already finer than a small brushed motor can feel.</aside>
+</section>

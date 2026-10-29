@@ -1,0 +1,30 @@
+<section id="s043" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiến trúc</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">setup() làm gì, theo thứ tự</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">1</p>
+<p style="font-size:30px;line-height:1.35"><b>motorInit()</b> và <b>motorStop()</b> — tắt động cơ trước mọi thứ.</p>
+</div>
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">2</p>
+<p style="font-size:30px;line-height:1.35"><b>mpuInit()</b> — nếu WHO_AM_I sai, in gợi ý kiểm tra dây và dừng mãi.</p>
+</div>
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">3</p>
+<p style="font-size:30px;line-height:1.35">Đặt suy giảm ADC cho chân pin, rồi <b>sbusInit()</b>.</p>
+</div>
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">4</p>
+<p style="font-size:30px;line-height:1.35">Mở NVS và <b>cfgLoad()</b> — hệ số PID và cài đặt bay đã lưu.</p>
+</div>
+<div style="display:flex;gap:28px;align-items:center;background:#FDFCF8;padding:22px 36px;border:2px solid #E2DFD6;border-radius:16px">
+<p style="font-size:52px;font-weight:700;color:#B5501A;width:64px">5</p>
+<p style="font-size:30px;line-height:1.35"><b>linkInit()</b> (Wi-Fi / Bluetooth), rồi <b>mpuCalibrateGyro()</b> và đọc pin lần đầu.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiến trúc · 43 · Nguồn: setup()</p>
+<aside>Vì sao tắt động cơ trước? Khi bật nguồn, chân GPIO có thể thả nổi, và cực gate MOSFET thả nổi có thể làm quay động cơ. Đặt duty về 0 trước là mặc định an toàn. Vì sao hiệu chuẩn gyro sau cùng? Khởi động radio tốn thời gian; hiệu chuẩn sau cùng nghĩa là độ lệch được đo gần thời điểm bay nhất.</aside>
+</section>

@@ -1,0 +1,17 @@
+<section id="s136" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Dẫn đường</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Xoay theo drone: hai phép quay</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">const</span> <span style="color:#F29E5C">float</span> yaw_rel = (heading_deg - heading_ref_deg)<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;* NAV_HEADING_SIGN * DEG_TO_RAD;<br><span style="color:#8FA3B8">// body -&gt; launch (navUpdate)</span><br>ax_w = fwd * cy - left * sy;<br>ay_w = fwd * sy + left * cy;<br><span style="color:#8FA3B8">// launch -&gt; body (navSetpoints)</span><br>body_fwd&#160;&#160;=&#160;&#160;ux * cy + uy * sy;<br>body_left = -ux * sy + uy * cy;</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Drone có thể xoay sau khi cất cánh. Gia tốc đo trong hệ thân, còn vị trí nằm trong hệ cất cánh.</p>
+<p style="font-size:29px;line-height:1.4">Một phép quay đi thân → cất cánh, phép kia là nghịch đảo chính xác.</p>
+<p style="font-size:29px;line-height:1.4"><b>NAV_HEADING_SIGN = −1</b> làm chiều hướng của gyro khớp với hệ dương-bên-trái.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Dẫn đường · 136 · Nguồn: navUpdate(), navSetpoints(); test/yawrot_test.cpp</p>
+<aside>Vì sao cần hằng số dấu? heading_deg tăng theo chiều gyro gọi là dương, còn hệ cất cánh đo góc từ +x về +y, tức về bên trái. Nếu hai thứ này ngược nhau, mọi phép quay đều quay sai. yawrot_test.cpp được build với dấu đọc thẳng từ sketch, nên nó kiểm tra đúng cấu hình đang chạy.</aside>
+</section>

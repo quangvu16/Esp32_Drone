@@ -1,0 +1,17 @@
+<section id="s053" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiến trúc</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Các cấu hình kết nối điện thoại</h2>
+</div>
+<table style="font-size:29px;color:#13202E">
+<tr><th style="width:8%">#</th><th style="width:52%">Cấu hình</th><th style="width:40%">Phù hợp khi</th></tr>
+<tr><td>0</td><td>Wi-Fi điểm phát (drone là hotspot)</td><td>mặc định; đơn giản nhất</td></tr>
+<tr><td>1</td><td>Wi-Fi station (vào router nhà bạn)</td><td>điện thoại vẫn dùng Wi-Fi nhà</td></tr>
+<tr><td>2</td><td>Bluetooth Classic SPP</td><td>điện thoại Android</td></tr>
+<tr><td>3</td><td>Bluetooth Low Energy</td><td>iPhone (iOS không có SPP)</td></tr>
+<tr><td>4</td><td>Wi-Fi điểm phát + BLE</td><td>hai đường vào cùng lúc</td></tr>
+<tr><td>5</td><td>Wi-Fi station + BLE</td><td>router kèm BLE dự phòng</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiến trúc · 53 · Nguồn: #define LINK_MODE_*</p>
+<aside>Cấu hình được lưu trong NVS và áp dụng sau khi khởi động lại. Đổi bằng lệnh serial “link n” hoặc lệnh LINK trong ứng dụng, cả hai đều bị từ chối khi đang arm. Vì sao phải khởi động lại? Bật tắt radio khi đang chạy rất dễ lỗi; khởi động sạch thì tin cậy.</aside>
+</section>

@@ -1,0 +1,16 @@
+<section id="s122" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Modes and safety</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Critical battery → the drone lands itself</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">if</span> (armed &amp;&amp; vbat_crit) {<br>&#160;&#160;<span style="color:#F29E5C">if</span> (use_crtp &amp;&amp; flight_mode != MODE_MANUAL) {<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">if</span> (!(flight_mode == MODE_AUTO &amp;&amp; auto_state == AUTO_LAND))<br>&#160;&#160;&#160;&#160;&#160;&#160;flightLand();&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span style="color:#8FA3B8">// land once</span><br>&#160;&#160;} <span style="color:#F29E5C">else</span> {<br>&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// RC or MANUAL pilot: warn every 2 s, do not take over</span><br>&#160;&#160;&#160;&#160;crtpConsole("battery critical: land now");<br>&#160;&#160;}<br>}<br><span style="color:#8FA3B8">// and SET_MODE is refused while armed &amp;&amp; vbat_crit</span></p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Automatic modes <b>land</b>; a human pilot gets a <b>warning</b>.</p>
+<p style="font-size:29px;line-height:1.4">SET_MODE is refused so the app's regular mode resend cannot cancel the landing.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Modes and safety · 122 · Source: Esp32_drone.ino loop(), FC_CMD_SET_MODE</p>
+<aside>Why not take control from a manual pilot? A pilot may be over water or trees and need a few seconds to fly to a safe spot; forcing a landing could be worse. In automatic modes nobody is flying, so the drone lands. Shortened from loop() and the SET_MODE handler.</aside>
+</section>

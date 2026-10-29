@@ -1,0 +1,18 @@
+<section id="s109" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Đầu vào</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Port 7: các lệnh điều khiển bay</h2>
+</div>
+<table style="font-size:26px;color:#13202E">
+<tr><th style="width:16%">Mã</th><th style="width:26%">Lệnh</th><th style="width:58%">Làm gì</th></tr>
+<tr><td>0x01</td><td>SET_MODE</td><td>MANUAL, HOLD, AUTO, FOLLOW, RTH (từ chối khi pin nguy hiểm)</td></tr>
+<tr><td>0x02 / 0x03</td><td>TAKEOFF / LAND</td><td>bắt đầu dốc lên / dốc xuống</td></tr>
+<tr><td>0x04</td><td>SET_HOVER</td><td>lực đẩy lơ lửng, kẹp trong 8000 – 55000</td></tr>
+<tr><td>0x05</td><td>EMERGENCY</td><td>tắt động cơ ngay — luôn được thực hiện</td></tr>
+<tr><td>0x07 / 0x08</td><td>ARM / DISARM</td><td>ARM chỉ từ trạng thái nghỉ; DISARM luôn được</td></tr>
+<tr><td>0x09 – 0x0B</td><td>SAVE / DEFAULTS / LOAD</td><td>cài đặt trong flash; SAVE bị từ chối khi arm</td></tr>
+<tr><td>0x10</td><td>LINK</td><td>đổi cấu hình kết nối và khởi động lại; từ chối khi arm</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Đầu vào · 109 · Nguồn: crtpHandleFlightControl()</p>
+<aside>Mọi lệnh trả lời ba byte: 0x70, mã lệnh, và trạng thái (0 = OK, 1 = từ chối). Ứng dụng gửi lại mỗi 500 ms tới khi thấy phản hồi, đó là lý do mỗi lệnh phải an toàn khi áp dụng hai lần. Kênh 1 (0x71) mang dẫn đường: TARGET, RESET và ALIGN, trình bày ở phần 10.</aside>
+</section>

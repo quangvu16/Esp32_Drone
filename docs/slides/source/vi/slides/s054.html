@@ -1,0 +1,26 @@
+<section id="s054" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiến trúc</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Bốn nguyên tắc thiết kế bạn sẽ thấy khắp nơi</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">An toàn trước trong vòng lặp</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Failsafe và arm chạy trước điều khiển, mỗi vòng.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Trung thực về giới hạn</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Không có cảm biến áp suất → không giả độ cao. Chú thích nói rõ.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Lệnh idempotent</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Ứng dụng gửi lại mỗi 500 ms, nên áp dụng một lệnh hai lần phải an toàn.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Kiểm thử ghim dòng dễ hỏng</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">run.sh báo lỗi nếu công thức đã kiểm thử bị đổi trong sketch.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiến trúc · 54 · Nguồn: chú thích Esp32_drone.ino; test/run.sh</p>
+<aside>Bốn ý này giải thích phần lớn mã bạn sẽ đọc. Khi một đoạn mã trông lạ, hãy hỏi nó phục vụ nguyên tắc nào. Ví dụ, handler TAKEOFF bỏ qua TAKEOFF lặp lại khi đang bay lên: đó là nguyên tắc 3.</aside>
+</section>

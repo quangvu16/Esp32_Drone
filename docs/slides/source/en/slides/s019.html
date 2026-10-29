@@ -1,0 +1,23 @@
+<section id="s019" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">How it flies</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Why 250 times a second?</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">4 ms</p>
+<p style="font-size:30px;line-height:1.35">per loop (LOOP_TIME_US 4000). Short enough to catch a tilt before it grows.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">250 Hz</p>
+<p style="font-size:30px;line-height:1.35">the sensor sample rate is set to match: 1 kHz ÷ (1 + 3).</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">≈ 0.5°</p>
+<p style="font-size:30px;line-height:1.35">an example drift between two loops — small, so each correction is small.</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Rule of thumb: the loop must run much faster than the drone can tip over.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">How it flies · 19 · Source: Esp32_drone.ino #define LOOP_TIME_US, mpuInit() SMPLRT_DIV</p>
+<aside>Why not faster? The sensor is set to 250 Hz samples, the radios and logging need time, and the brushed motors cannot respond faster anyway. Why not slower? Corrections would come late and would have to be bigger, which makes the drone wobble. The 0.5 degree figure is an illustration.</aside>
+</section>

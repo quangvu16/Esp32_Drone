@@ -1,0 +1,17 @@
+<section id="s117" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Chế độ và an toàn</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Một kiểm tra trước arm cho mọi đường</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">bool</span> armChecksOk(<span style="color:#F29E5C">const</span> char *who) {<br>#<span style="color:#F29E5C">if</span> VBAT_ARM_CHECK<br>&#160;&#160;<span style="color:#F29E5C">if</span> (vbat &lt; VBAT_CELLS * VBAT_CELL_CRIT) {&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// 3.3 V</span><br>&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// rate-limited message, at most once a second</span><br>&#160;&#160;&#160;&#160;Serial.printf("[ARM] %s refused: battery %.2f V\n", who, vbat);<br>&#160;&#160;&#160;&#160;crtpConsole("arm refused: low battery");<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">return</span> <span style="color:#F29E5C">false</span>;<br>&#160;&#160;}<br>#endif<br>&#160;&#160;<span style="color:#F29E5C">return</span> <span style="color:#F29E5C">true</span>;<br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Được gọi bởi arm SBUS, tăng ga CRTP, ARM và TAKEOFF.</p>
+<p style="font-size:29px;line-height:1.4"><b>Vì sao một hàm?</b> Thêm một kiểm tra ở đây là bảo vệ mọi đường cùng lúc.</p>
+<p style="font-size:29px;line-height:1.4">Tin nhắn bị giới hạn tần suất để cần giữ lâu không làm ngập console.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Chế độ và an toàn · 117 · Nguồn: armChecksOk()</p>
+<aside>Trước khi có hàm này, mỗi đường arm có kiểm tra riêng, và chúng lệch dần. Đặt quy tắc ở một chỗ là mẫu an toàn kinh điển. Tham số who cho biết đường nào yêu cầu, giúp khi đọc log serial. Đã rút gọn từ sketch.</aside>
+</section>

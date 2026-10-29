@@ -1,0 +1,21 @@
+<section id="s033" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Phần cứng</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Đọc và làm mượt điện áp pin</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:30px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">uint32_t</span> mv = analogReadMilliVolts(PIN_VBAT);<br><span style="color:#F29E5C">float</span> sample = (mv / 1000.0f) * VBAT_DIVIDER;<br><span style="color:#F29E5C">if</span> (vbat &lt;= 0.0f) vbat = sample;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#8FA3B8">// first read</span><br><span style="color:#F29E5C">else</span> vbat += VBAT_FILTER_ALPHA * (sample - vbat);</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>analogReadMilliVolts</b> dùng hiệu chuẩn có sẵn từ nhà máy.</p>
+<p style="font-size:29px;line-height:1.4"><b>Alpha 0,02</b>: mỗi vòng tiến 2% về giá trị mới — hằng số thời gian khoảng 0,2 s.</p>
+<p style="font-size:29px;line-height:1.4"><b>Vì sao làm mượt?</b> Một lần đọc thì nhiễu và sụt theo mỗi cú tăng ga.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Cũ 3,90 V, một mẫu nhiễu 3,60 V → mới 3,90 + 0,02 × (−0,30) = 3,894 V. Một lần đọc xấu gần như không ảnh hưởng.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Phần cứng · 33 · Nguồn: batteryUpdate()</p>
+<aside>Đây là bộ lọc thông thấp bậc nhất, còn gọi là trung bình động hàm mũ. Ví dụ: giá trị cũ 3,90 V, một mẫu nhiễu đọc 3,60 V. Giá trị mới là 3,90 + 0,02 × (−0,30) = 3,894 V. Một mẫu xấu hầu như không làm nó lệch, nhưng một sự sụt thật sẽ hiện ra trong chưa tới một giây.</aside>
+</section>

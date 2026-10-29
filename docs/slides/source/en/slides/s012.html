@@ -1,0 +1,27 @@
+<section id="s012" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">How it flies</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Roll: make one side push harder</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">To roll right, the left motors speed up and the right motors slow down.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b style="color:#B5501A">Orange, bigger</b> = faster: LF and LR push harder, the left side rises.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b style="color:#2F6FA3">Blue, smaller</b> = slower: RF and RR push less, the right side drops.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E">Result: the drone tilts right and slides right →</p>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:24px 32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:26px;line-height:1.4">Hover at 50% on all four. Roll right: LF, LR → 55%; RF, RR → 45%. Average still 50%.</p>
+</div>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Top view: left motors larger and orange (faster), right motors smaller and blue (slower), arrow to the right" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><defs><marker id="s012mB5501A" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#B5501A" stroke="none"/></marker></defs><line x1="410.0" y1="280.0" x2="250.0" y2="120.0" stroke="#13202E" stroke-width="16" stroke-linecap="round"/><line x1="410.0" y1="280.0" x2="570.0" y2="120.0" stroke="#13202E" stroke-width="16" stroke-linecap="round"/><line x1="410.0" y1="280.0" x2="250.0" y2="440.0" stroke="#13202E" stroke-width="16" stroke-linecap="round"/><line x1="410.0" y1="280.0" x2="570.0" y2="440.0" stroke="#13202E" stroke-width="16" stroke-linecap="round"/><rect x="350.0" y="205.0" width="120.0" height="150.0" rx="20" fill="#13202E" stroke="none" stroke-width="0"/><path d="M 384 190 L 410 155 L 436 190 Z" fill="#B5501A" stroke="#B5501A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="250.0" cy="120.0" r="98.0" fill="#F8D3B8" stroke="#F29E5C" stroke-width="3"/><circle cx="570.0" cy="120.0" r="70.0" fill="#C9D9E8" stroke="#2F6FA3" stroke-width="3"/><circle cx="250.0" cy="440.0" r="98.0" fill="#F8D3B8" stroke="#F29E5C" stroke-width="3"/><circle cx="570.0" cy="440.0" r="70.0" fill="#C9D9E8" stroke="#2F6FA3" stroke-width="3"/><line x1="700.0" y1="280.0" x2="790.0" y2="280.0" stroke="#B5501A" stroke-width="8" stroke-linecap="round" marker-end="url(#s012mB5501A)"/></svg>
+<p style="position:absolute;left:170px;top:105px;width:160px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>LF</b></p>
+<p style="position:absolute;left:490px;top:105px;width:160px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>RF</b></p>
+<p style="position:absolute;left:170px;top:425px;width:160px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>LR</b></p>
+<p style="position:absolute;left:490px;top:425px;width:160px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>RR</b></p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">How it flies · 12</p>
+<aside>Total thrust stays about the same, so the drone does not climb or sink while it tilts. That idea — add on one side, take away on the other — is exactly what the mixer code does later.</aside>
+</section>

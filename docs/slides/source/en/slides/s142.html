@@ -1,0 +1,21 @@
+<section id="s142" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Testing</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Inside level_test: a tiny simulation</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">static</span> <span style="color:#F29E5C">float</span> simulate(<span style="color:#F29E5C">float</span> angle0, <span style="color:#F29E5C">float</span> sp_deg,<br>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;<span style="color:#F29E5C">float</span> sign, <span style="color:#F29E5C">float</span> seconds) {<br>&#160;&#160;<span style="color:#F29E5C">float</span> angle = angle0;<br>&#160;&#160;<span style="color:#F29E5C">for</span> (<span style="color:#F29E5C">int</span> i = 0; i &lt; (<span style="color:#F29E5C">int</span>)(seconds / 0.004f); i++) {<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">float</span> err = angle - sp_deg;<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">float</span> adj = clampf(err * 15.0f, -200, 200);<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">float</span> gyro = 0.0f + sign * adj;&#160;&#160;<span style="color:#8FA3B8">// perfect rate loop</span><br>&#160;&#160;&#160;&#160;angle += gyro * 0.004f;<br>&#160;&#160;&#160;&#160;<span style="color:#F29E5C">if</span> (fabsf(angle) &gt; 180.0f) <span style="color:#F29E5C">return</span> angle;&#160;&#160; <span style="color:#8FA3B8">// flipped</span><br>&#160;&#160;}<br>&#160;&#160;<span style="color:#F29E5C">return</span> angle;<br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4">Models one axis at 250 Hz with a perfect rate loop.</p>
+<p style="font-size:29px;line-height:1.4"><b>sign −1</b> = today's firmware → the angle shrinks to the target.</p>
+<p style="font-size:29px;line-height:1.4"><b>sign +1</b> = the old bug → the angle grows and flips.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Example</p>
+<p style="font-size:32px;line-height:1.4">Start at +10°, target 0°: after 1 s with sign −1 → about 0°. With sign +1 → past 180°, flipped.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Testing · 142 · Source: Esp32_drone/test/level_test.cpp</p>
+<aside>This is the most useful testing idea in the course: you do not need a full physics simulator to catch a sign error. Ten lines that model only the loop you care about are enough, and they run in microseconds. Shortened from the file.</aside>
+</section>

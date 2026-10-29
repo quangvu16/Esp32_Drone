@@ -1,0 +1,16 @@
+<section id="s145" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Kiểm thử</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Cổng serial trên bàn</h2>
+</div>
+<table style="font-size:30px;color:#13202E">
+<tr><th style="width:30%">Lệnh</th><th style="width:70%">Làm gì</th></tr>
+<tr><td>status</td><td>kết nối, chế độ, trạng thái auto, armed, lực đẩy hover, hướng, pin</td></tr>
+<tr><td>save / load / defaults</td><td>hệ số PID + cài đặt bay trong flash</td></tr>
+<tr><td>link n</td><td>đổi cấu hình kết nối 0–5, rồi khởi động lại</td></tr>
+<tr><td>sta ssid pass</td><td>lưu thông tin Wi-Fi station</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Telemetry, mỗi giây một dòng: <b>disarm | VBAT:3.92V | RC r:1500 p:1500 t:1000 y:1500 | ang p:+0.4 r:-0.2 | mot RF:1000 …</b></p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Kiểm thử · 145 · Nguồn: serialCommandPoll(), telemetry()</p>
+<aside>Mở serial monitor ở 115200 baud. Mỗi giây firmware cũng in một dòng telemetry. link, sta và save bị từ chối khi đang arm. Ví dụ dòng: “disarm | VBAT:3.92V | RC r:1500 p:1500 t:1000 y:1500 | ang p:+0.4 r:-0.2 | mot RF:1000 RR:1000 LR:1000 LF:1000”.</aside>
+</section>

@@ -1,0 +1,28 @@
+<section id="s127" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Modes and safety</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Safety in layers</h2>
+</div>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1;display:flex;flex-direction:column;gap:22px">
+<p style="font-size:32px;line-height:1.35;font-weight:500">No single check is perfect, so they are stacked.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Arming</b>: battery ≥ 3.3 V, thrust seen low, ARM only from idle.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Inputs</b>: checksums, NaN and range checks, SBUS flags.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>In the air</b>: 500 ms failsafe, signed time, auto-land.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>Limits</b>: tilt ±25°, PID ±400, throttle 1800, motor floor 1100.</p>
+<p style="font-size:28px;line-height:1.4;color:#13202E"><b>CUT MOTORS</b>: honoured in every state.</p>
+</div>
+<div style="position:relative;width:820px;height:560px;background:#FDFCF8;border-radius:16px">
+<svg aria-label="Swiss cheese picture: five slices, each with holes; a fault arrow passes through holes in three slices and is stopped by the fourth" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0px;top:0px" width="820" height="560" viewBox="0 0 820 560"><defs><marker id="s127mB42318" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#B42318" stroke="none"/></marker></defs><rect x="60.0" y="70.0" width="84.0" height="380.0" rx="14" fill="#F2D28B" stroke="#C9A24A" stroke-width="3"/><circle cx="102.0" cy="140.0" r="26.0" fill="#FDFCF8" stroke="#C9A24A" stroke-width="2"/><circle cx="102.0" cy="330.0" r="22.0" fill="#FDFCF8" stroke="#C9A24A" stroke-width="2"/><rect x="210.0" y="70.0" width="84.0" height="380.0" rx="14" fill="#F2D28B" stroke="#C9A24A" stroke-width="3"/><circle cx="252.0" cy="250.0" r="24.0" fill="#FDFCF8" stroke="#C9A24A" stroke-width="2"/><circle cx="252.0" cy="400.0" r="20.0" fill="#FDFCF8" stroke="#C9A24A" stroke-width="2"/><rect x="360.0" y="70.0" width="84.0" height="380.0" rx="14" fill="#F2D28B" stroke="#C9A24A" stroke-width="3"/><circle cx="402.0" cy="250.0" r="26.0" fill="#FDFCF8" stroke="#C9A24A" stroke-width="2"/><circle cx="402.0" cy="130.0" r="20.0" fill="#FDFCF8" stroke="#C9A24A" stroke-width="2"/><rect x="510.0" y="70.0" width="84.0" height="380.0" rx="14" fill="#F2D28B" stroke="#C9A24A" stroke-width="3"/><circle cx="552.0" cy="380.0" r="24.0" fill="#FDFCF8" stroke="#C9A24A" stroke-width="2"/><circle cx="552.0" cy="160.0" r="20.0" fill="#FDFCF8" stroke="#C9A24A" stroke-width="2"/><rect x="660.0" y="70.0" width="84.0" height="380.0" rx="14" fill="#F2D28B" stroke="#C9A24A" stroke-width="3"/><path d="M 10 250 L 560 250" fill="none" stroke="#B42318" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#s127mB42318)"/></svg>
+<p style="position:absolute;left:30px;top:466px;width:144px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>Arming</b></p>
+<p style="position:absolute;left:180px;top:466px;width:144px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>Inputs</b></p>
+<p style="position:absolute;left:330px;top:466px;width:144px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>In the air</b></p>
+<p style="position:absolute;left:480px;top:466px;width:144px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>Limits</b></p>
+<p style="position:absolute;left:630px;top:466px;width:144px;font-size:24px;line-height:1.25;color:#13202E;text-align:center"><b>CUT</b></p>
+<p style="position:absolute;left:10px;top:196px;width:200px;font-size:24px;line-height:1.25;color:#B42318;text-align:left;font-weight:600">a fault</p>
+<p style="position:absolute;left:560px;top:270px;width:240px;font-size:24px;line-height:1.25;color:#B42318;text-align:left;font-weight:600">stopped by<br>the 4th layer</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Modes and safety · 127 · Source: Esp32_drone.ino</p>
+<aside>No single check is perfect, so the firmware stacks them, like slices of Swiss cheese: a hole in one layer is covered by the next. When you add a feature, ask which layer it belongs to and whether it opens a hole in any other.</aside>
+</section>

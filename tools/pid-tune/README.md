@@ -1,5 +1,9 @@
 # pid-tune — desktop PID auto-tuning for the ESP32 drone
 
+![Screen map of the tuner](../../docs/pid-tuner-gui.svg)
+
+Step-by-step guide: **[docs/PID_TUNER_GUIDE.md](../../docs/PID_TUNER_GUIDE.md)** · Tiếng Việt: **[docs/PID_TUNER_GUIDE.vi.md](../../docs/PID_TUNER_GUIDE.vi.md)**
+
 A tkinter + matplotlib GUI that tunes one drone axis at a time (roll, pitch or
 yaw) over the same CRTP/UDP link the phone apps use. Ported from
 [`quangvu16/PID-Calibration`](https://github.com/quangvu16/PID-Calibration):
@@ -26,7 +30,8 @@ pip install numpy matplotlib
 
 1. Power the drone and join its network — soft-AP **ESP-Drone** / **12345678**,
    drone at `192.168.43.42`, or your own station-mode network.
-2. Put the drone on a stand, props clear. The tuner spins m1.
+2. Put the drone on a tuning stand (props on, one axis free) or take the props
+   off for a dry run. **Spin up** in the Drone panel runs all four motors.
 3. `python tuner_gui.py`
 
 ```
@@ -56,7 +61,21 @@ are clamped by the firmware (`paramClampF`) to kp 0–100, ki 0–20, kd 0–200
 the search box never leaves those bounds either.
 
 **Drone** — ARM / DISARM / EMERGENCY, the telemetry rate (20 Hz by default),
-how many seconds the plots show, Pause, and Record CSV.
+how many seconds the plots show, Pause, Record CSV, and **Thrust % / Spin up**.
+
+The firmware only runs the motors in MANUAL while CommanderPackets keep
+arriving — they *are* the setpoint, and without them the 500 ms failsafe
+disarms. **Spin up** starts a 50 Hz stream of level setpoints (roll 0, pitch 0,
+yaw rate 0): half a second at zero thrust, so the board sees the throttle low,
+then a one-second ramp to the Thrust % you set (capped at 60 %). Thrust going
+up arms the board; **Stop motors**, EMERGENCY or closing the window drops thrust
+to zero, which disarms it — and if the program dies, the failsafe stops the
+motors within 0.5 s. Auto-tune asks before starting without the motors
+spinning, because a still drone scores every gain set the same.
+
+EMERGENCY takes one click, with no confirmation dialog, like CUT MOTORS on the
+phones' Tune screen. A refused command (ARM not from idle, SAVE while armed) is
+shown as “refused by the drone” in the status line.
 
 **Motor test** — bench testing of single motors with the PID loop bypassed
 (`MOTOR_TEST`, `0x0C`, PROTOCOL.md §5). A shared **Speed** spinbox (1000–1500 in
@@ -182,8 +201,12 @@ past trials alongside the current run so you can see what the model already know
 
 ## Safety
 
-- The tuner writes one axis's gains and spins **m1 only**. Props off or the
-  drone secured to a stand.
+- The tuner writes one axis's gains. **Spin up** streams level setpoints so all
+  four motors run; the **Motor test** panel spins one motor at a time. Props
+  off, or the drone secured to a stand.
+- Stopping the setpoint stream — Stop motors, EMERGENCY, closing the window, or
+  the program crashing — stops the motors (zero thrust disarms; silence trips the
+  firmware's 500 ms failsafe).
 - The **Motor test** panel is for disarmed bench use only: it never arms the
   drone, `STOP ALL` / `Stop` end the run, and the firmware also stops on
   DISARM, EMERGENCY, on arming, or after 300 ms without a packet.
@@ -207,6 +230,8 @@ python selftest.py
 ```
 
 Sections: wire framing and struct budgets, the link against the fake firmware,
+the port-7 flight commands' exact bytes, the stand-thrust stream (arms on
+thrust-up, disarms at zero),
 telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all
 eleven optimisers, history seeding, and error paths (including that a CREATE
 with different variables over a live block is refused with `EXISTS`).

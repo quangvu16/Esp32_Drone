@@ -1,0 +1,15 @@
+<section id="s101" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Radio inputs</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Arming with an RC transmitter</h2>
+</div>
+<table style="font-size:29px;color:#13202E">
+<tr><th style="width:18%">Action</th><th style="width:18%">Throttle</th><th style="width:46%">Yaw stick or CH5</th><th style="width:18%">Hold</th></tr>
+<tr><td>Arm</td><td>below 1050</td><td>yaw right (above 1700) or CH5 high</td><td>1 s</td></tr>
+<tr><td>Disarm</td><td>below 1050</td><td>yaw left (below 1300)</td><td>1 s</td></tr>
+<tr><td>Disarm (switch)</td><td>any</td><td>CH5 dropped low, once a switch has been seen</td><td>1 s</td></tr>
+</table>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Every arming path also needs the battery at or above 3.3 V (armChecksOk).</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Radio inputs · 101 · Source: Esp32_drone.ino armUpdate(), #define YAW_ARM_THRESHOLD</p>
+<aside>Why hold for a second? A brief bump of the stick must not arm. Why throttle low? So the motors never jump to a high setting the instant they arm. Arming also runs armChecksOk(), so a battery below 3.3 V refuses to arm.</aside>
+</section>

@@ -1,0 +1,23 @@
+<section id="s082" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Điều khiển PID</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">LEVEL_SENSITIVITY = 15</h2>
+</div>
+<div style="display:flex;gap:28px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">15</p>
+<p style="font-size:30px;line-height:1.35">°/s tốc độ quay về cho mỗi độ sai số góc</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">±200</p>
+<p style="font-size:30px;line-height:1.35">°/s giới hạn tốc độ tự cân bằng</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#13202E;color:#F6F5F0;padding:44px;border-radius:16px">
+<p style="font-size:88px;font-weight:700;color:#F29E5C;line-height:1">≈ 13°</p>
+<p style="font-size:30px;line-height:1.35">sai số tại đó chạm giới hạn (200 ÷ 15)</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.4;color:#4A5568">Ví dụ: sai số 2° → 30 °/s quay về. Sai số 20° → 300 → giới hạn còn 200 °/s.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Điều khiển PID · 82 · Nguồn: #define LEVEL_SENSITIVITY; loop()</p>
+<aside>Vì sao 15? Lớn hơn thì bật về thăng bằng mạnh hơn nhưng có thể vượt quá và lắc; nhỏ hơn thì cảm giác lửng lơ và drone trôi. 15 là điểm khởi đầu cho drone nhỏ. Vì sao giới hạn 200? Một nhiễu lớn không nên đòi một cú xoay dữ dội.</aside>
+</section>

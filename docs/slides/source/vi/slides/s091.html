@@ -1,0 +1,17 @@
+<section id="s091" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Bộ trộn và động cơ</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Cài đặt phần cứng PWM (LEDC)</h2>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="flex:1.5"><div style="background:#1B2633;border-radius:16px;padding:32px 40px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;line-height:1.5;color:#E6EBF0"><span style="color:#F29E5C">for</span> (<span style="color:#F29E5C">uint8_t</span> i = 0; i &lt; 4; i++) {<br>&#160;&#160;pinMode(pins[i], OUTPUT);<br>&#160;&#160;digitalWrite(pins[i], LOW);<br>#<span style="color:#F29E5C">if</span> ESP_ARDUINO_VERSION_MAJOR &gt;= 3<br>&#160;&#160;ledcAttach(pins[i], MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);<br>#<span style="color:#F29E5C">else</span><br>&#160;&#160;ledcSetup(i, MOTOR_PWM_FREQ_HZ, MOTOR_PWM_BITS);<br>&#160;&#160;ledcAttachPin(pins[i], i);<br>#endif<br>}</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<p style="font-size:29px;line-height:1.4"><b>LEDC</b> là khối PWM của ESP32. Nó làm cho LED, nhưng lái MOSFET cũng tốt.</p>
+<p style="font-size:29px;line-height:1.4"><b>Hai API</b>: core Arduino-ESP32 bản 3.x đổi tên hàm, nên hỗ trợ cả hai.</p>
+<p style="font-size:29px;line-height:1.4">Các chân được kéo LOW trước: động cơ tắt.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Bộ trộn và động cơ · 91 · Nguồn: motorInit()</p>
+<aside>Vì sao có #if? Bản 3 của core Arduino-ESP32 thay ledcSetup và ledcAttachPin bằng một hàm ledcAttach làm việc theo chân thay vì theo kênh. Hỗ trợ cả hai giúp sketch build được trên bản cũ lẫn mới. Đã rút gọn: điều kiện thật còn kiểm tra macro phiên bản có tồn tại.</aside>
+</section>

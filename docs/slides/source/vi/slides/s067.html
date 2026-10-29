@@ -1,0 +1,27 @@
+<section id="s067" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Cảm biến</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">Hướng bị trôi — và mã nói rõ điều đó</h2>
+</div>
+<p style="font-size:34px;line-height:1.4;color:#13202E">Roll và pitch có trọng lực sửa. Hướng (yaw) không có gì.</p>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Cách tính</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">heading_deg += gz × dt, quấn trong 0…360°.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Vì sao trôi</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Không có la bàn: mọi độ lệch gyro còn sót cộng dồn mãi.</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Ảnh hưởng tới</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Giữ hướng trong HOLD/AUTO và hệ tọa độ dẫn đường.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Độ lệch còn sót 0,05 °/s → khoảng 3° trôi hướng mỗi phút bay.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Cảm biến · 67 · Nguồn: chú thích attitudeUpdate()</p>
+<aside>Chú thích trong attitudeUpdate() viết: giữ hướng chỉ tốt bằng độ lệch gyro trong một chuyến bay — nó trôi chậm; đó là giới hạn thật, không phải thứ để che giấu. Dẫn đường xử lý bằng cách nhờ điện thoại, vốn có la bàn, cung cấp hướng ban đầu (NAV_CMD_ALIGN).</aside>
+</section>

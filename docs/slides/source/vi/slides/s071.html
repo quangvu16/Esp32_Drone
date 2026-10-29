@@ -1,0 +1,27 @@
+<section id="s071" style="background:#F6F5F0;color:#13202E;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-size:24px;font-weight:600;color:#B5501A;letter-spacing:3px;text-transform:uppercase">Điều khiển PID</p>
+<h2 style="font-size:60px;font-weight:700;line-height:1.1">P: đẩy tỷ lệ với sai số</h2>
+</div>
+<p style="font-size:34px;line-height:1.4;color:#13202E">P = Kp × sai số. Sai số gấp đôi, lực đẩy gấp đôi.</p>
+<div style="display:flex;gap:28px">
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Kp của roll và pitch</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">1,3</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">Kp của yaw</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">4,0 (mô-men yaw yếu)</p>
+</div>
+<div style="flex:1;background:#FDFCF8;padding:36px 40px;border:2px solid #E2DFD6;border-radius:16px;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600">P quá lớn</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5568">Drone rung nhanh (dao động). Quá nhỏ: cảm giác mềm, lười.</p>
+</div>
+</div>
+<div style="background:#13202E;color:#F6F5F0;border-radius:16px;padding:36px 48px;display:flex;flex-direction:column;gap:10px">
+<p style="font-size:24px;font-weight:600;color:#F29E5C;letter-spacing:2px;text-transform:uppercase">Ví dụ</p>
+<p style="font-size:32px;line-height:1.4">Drone lăn 10 °/s mà ta muốn 0 → sai số 10 → P = 1,3 × 10 = 13 đơn vị sửa động cơ.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">Điều khiển PID · 71 · Nguồn: #define PID_ROLL_KP</p>
+<aside>Chỉ có P thường để lại một sai số nhỏ không đổi, vì khi sai số nhỏ thì lực đẩy cũng nhỏ. Đó là việc của I. Chỉ có P cũng hay vượt quá, đó là việc của D.</aside>
+</section>
