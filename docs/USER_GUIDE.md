@@ -26,14 +26,15 @@ New here? Install the firmware and an app first — see
 5. [CUT MOTORS](#5-cut-motors)
 6. [Arming and disarming](#6-arming-and-disarming)
 7. [What the drone does on its own](#7-what-the-drone-does-on-its-own)
-8. [Mission (GPS)](#8-mission-gps)
-9. [Indoor Map](#9-indoor-map)
-10. [Tune (PID)](#10-tune-pid)
-11. [Bench — the Python tuner GUI](#11-bench--the-python-tuner-gui)
-12. [Setup](#12-setup)
-13. [First-flight checklist](#13-first-flight-checklist)
-14. [Troubleshooting](#14-troubleshooting)
-15. [Known limits](#15-known-limits)
+8. [Plan (Flight Plan)](#8-plan-flight-plan)
+9. [Mission (GPS)](#9-mission-gps)
+10. [Indoor Map](#10-indoor-map)
+11. [Tune (PID)](#11-tune-pid)
+12. [Bench — the Python tuner GUI](#12-bench--the-python-tuner-gui)
+13. [Setup](#13-setup)
+14. [First-flight checklist](#14-first-flight-checklist)
+15. [Troubleshooting](#15-troubleshooting)
+16. [Known limits](#16-known-limits)
 
 ---
 
@@ -63,7 +64,7 @@ layout; small details differ by platform.*
 
 | Header item | What it tells you |
 |---|---|
-| **Fly · Mission · Indoor · Tune · Setup** | The five sections. The current one is white. |
+| **Fly · Plan · Mission · Indoor · Tune · Setup** | The six sections. The current one is white. |
 | **Wi-Fi / Link** | Green when connected, with signal strength. Grey = not connected. |
 | **Battery (volts)** | The real cell voltage. Ink = OK, **amber below 3.50 V**, **red below 3.30 V**. |
 | **Mode chip** | MANUAL, HOLD, AUTO, FOLLOW or RTH — what the drone reports. |
@@ -75,10 +76,11 @@ drone's first status report arrives.
 
 **Moving between sections**
 
-- **Fly** is home. Mission, Indoor Map and Tune open from it; closing them (or
-  tapping *Fly*) returns there.
-- **Switching sections is blocked while a mission is flying or auto-tune is
-  running** — the app tells you why. Land, end the mission, stop the tuner, or
+- **Fly** is home. Plan, Mission, Indoor Map and Tune open from it; closing
+  them (or tapping *Fly*) returns there.
+- **Switching sections is blocked while a mission is flying, a mission
+  transfer is running, or auto-tune is running** — the app tells you why. Land,
+  end the mission, stop the tuner, or
   use CUT MOTORS first. This stops you from accidentally closing the screen
   that is flying the drone.
 
@@ -176,11 +178,11 @@ immediately and disarms. The drone falls.** Use it when anything goes wrong.
 | Screen | How to use it |
 |---|---|
 | **Fly** | **Tap twice within 3 seconds.** The first tap turns it orange and shows *TAP AGAIN*; the second tap cuts. If you don't tap again, it goes back to red. |
-| **Mission, Tune** | **One tap** cuts at once. On Tune it also stops the auto-tuner. |
+| **Mission, Plan, Tune** | **One tap** cuts at once. On Tune it also stops the auto-tuner. |
 
 The Fly screen needs two taps because your thumbs are on the sticks right next
-to it; a stray touch must not drop the drone. Mission and Tune are used with
-the drone further away, where speed matters more.
+to it; a stray touch must not drop the drone. Mission, Plan and Tune are used
+with the drone further away, where speed matters more.
 
 > The button looks the same on every screen but confirms differently. Practise
 > it on the bench (props off) on each screen before you fly.
@@ -247,7 +249,47 @@ while armed — both pause or restart the board.
 
 ---
 
-## 8. Mission (GPS)
+## 8. Plan (Flight Plan)
+
+![Plan screen](android-app.svg)
+
+*The Plan screen, as a screen map. The iOS app
+([ios-app.svg](ios-app.svg)) has the same tools in its own layout.*
+
+The **Plan** tab is the Mission Planner *Flight Plan* screen: a map, the
+Command / Param1–4 / Lat / Lon / Alt grid, and Read / Write / Start for the
+mission the drone keeps in its own memory. Plan the flight here, then fly it
+from the drone — or move the plan in and out as a `.waypoints` file.
+
+| Part | What it does |
+|---|---|
+| **Map** | Tap to add a waypoint at that point (keep-out zones refuse the tap). The selected row's marker turns orange. |
+| **Grid** | One row per mission item: `#`, command, P1–P4, Lat, Lon, Alt. Tap a row to select and edit it. |
+| **Command menu** | The item's command: WAYPOINT, TAKEOFF, LAND, RETURN_TO_LAUNCH, DO_JUMP — or any MAV_CMD number. |
+| **Alt + Set** | The altitude new waypoints get; **Set** also writes it to the selected row. |
+| ↑ ↓ 🗑 (icons) | Reorder or remove the selected item. |
+| 📁 💾 (icons) | Load / save a `.waypoints` file — the same QGC WPL 110 format Mission Planner writes, so plans move between the two. |
+| **Upload** | Writes the whole plan into the drone's memory (Write waypoints). |
+| **Download** | Reads the plan back out of the drone (Read waypoints). |
+| **Start** | Arms and flies the stored plan onboard (Start mission). |
+
+**The plan lives on the drone.** Upload writes it there and Download reads it
+back; the file buttons are just for keeping plans on the phone. Before Upload
+or Start the app sends the plan's home as the flight origin (the drone has no
+GPS and flies a dead-reckoned local frame — the origin is the bridge between
+the plan's coordinates and that frame).
+
+**The plan is coordinates; the flying still drifts.** The drone flies the
+stored mission from its motion-sensor estimate, so waypoints are "roughly
+there", never survey-accurate. Keep the first leg short and watch it.
+
+**From the bench, a laptop can do the same** over the drone's Wi-Fi: the
+firmware speaks MAVLink (UDP 14550) as well as the app protocol, so Mission
+Planner or QGroundControl can Read / Write / Start the same onboard mission.
+
+---
+
+## 9. Mission (GPS)
 
 ![Mission screen design](images/mission.png)
 
@@ -296,13 +338,13 @@ names.
 
 **Keep-out zones and corridors are drawn on this map, but not edited here.** The
 map is read-only for those so the plan cannot change mid-flight; the editor is
-the [Indoor Map](#9-indoor-map) page. If a waypoint is refused ("inside keep-out
+the [Indoor Map](#10-indoor-map) page. If a waypoint is refused ("inside keep-out
 zone") or a hold starts ("keep-out zone entered - holding"), the red shape you
 see is the reason.
 
 ---
 
-## 9. Indoor Map
+## 10. Indoor Map
 
 ![Indoor Map screen](android-app.svg)
 
@@ -312,7 +354,8 @@ see is the reason.
 The **Indoor** tab is the map-annotation editor — the place to tell the drone
 about things the map cannot know on its own: where it must not fly, where it may
 cross a keep-out zone, and where the air is unsteady. Everything you draw here
-is shared with the [Mission](#8-mission-gps) page: the zones edited here are the
+is shared with the [Mission](#9-mission-gps) and [Plan](#8-plan-flight-plan)
+pages: the zones edited here are the
 zones the mission runner obeys.
 
 ### The modes
@@ -351,7 +394,7 @@ The screen maps of both apps: [android-app.svg](android-app.svg) ·
 
 ---
 
-## 10. Tune (PID)
+## 11. Tune (PID)
 
 For tuning the stabiliser on the bench. **Auto-tune spins the props. Strap the
 drone to a stand or hold it tethered.**
@@ -368,7 +411,7 @@ drone to a stand or hold it tethered.**
 
 ---
 
-## 11. Bench — the Python tuner GUI
+## 12. Bench — the Python tuner GUI
 
 ![Python tuner GUI](pid-tune-gui.svg)
 
@@ -397,7 +440,7 @@ acked, the drone is armed — disarm first.
 
 ---
 
-## 12. Setup
+## 13. Setup
 
 | | Android | iOS |
 |---|---|---|
@@ -409,7 +452,7 @@ link, use the serial console (`link <n>`) — see
 
 ---
 
-## 13. First-flight checklist
+## 14. First-flight checklist
 
 Do every step. Do steps 1–6 **with the props off.**
 
@@ -420,8 +463,8 @@ Do every step. Do steps 1–6 **with the props off.**
    way, **stop** and fix the sign settings in the sketch (`GYRO_*_SIGN`,
    `ACC_*_SIGN`) before going on.
 4. **Arm, then CUT.** Tap Takeoff (or throttle up from zero), see **● ARMED**,
-   then use CUT MOTORS. DISARMED must come back at once. Repeat on the Mission
-   and Tune screens to feel the one-tap version.
+   then use CUT MOTORS. DISARMED must come back at once. Repeat on the Mission,
+   Plan and Tune screens to feel the one-tap version.
 5. **Link-loss test.** Arm, then turn the phone's Wi-Fi off. Within half a
    second the motors must stop.
 6. **Motor direction.** Props off, arm, raise throttle a little: RF and LR spin
@@ -439,7 +482,7 @@ test Follow / Return home only after a stable hover.
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 | Symptom | Likely cause and fix |
 |---|---|
@@ -451,7 +494,7 @@ test Follow / Return home only after a stable hover.
 | Takeoff refused | Battery low, or already flying in another mode. |
 | Motors cut suddenly in flight | Link lost for 0.5 s, or the RC receiver reported failsafe. Stay closer; check Wi-Fi signal in the header. |
 | Drone landed by itself | Battery below 3.30 V for 3 s. |
-| Can't switch section | A mission or auto-tune is running — end it, land, or CUT first. |
+| Can't switch section | A mission, a mission transfer or auto-tune is running — end it, land, or CUT first. |
 | Save / link change refused | The drone is armed. Disarm first. |
 | Drone tilts further when pushed (props on) | Wrong sensor sign settings. Stop and fix before flying. |
 | Hold climbs or sinks | Expected — Hold is a thrust level, not a height. Adjust hover thrust. |
@@ -460,11 +503,11 @@ test Follow / Return home only after a stable hover.
 
 ---
 
-## 15. Known limits
+## 16. Known limits
 
 - **No height, no position.** Only a motion sensor. See the box at the top.
-- **CUT MOTORS confirms differently** on Fly (two taps) and Mission / Tune (one
-  tap). See [section 5](#5-cut-motors).
+- **CUT MOTORS confirms differently** on Fly (two taps) and Mission / Plan /
+  Tune (one tap). See [section 5](#5-cut-motors).
 - **Setup is not redesigned yet.** It opens the existing settings screens.
 - **The redesigned app screens are new.** Build them in Android Studio and
   Xcode and check them on a phone before relying on them in flight.

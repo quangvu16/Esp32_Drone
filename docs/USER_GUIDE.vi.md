@@ -30,14 +30,15 @@ Mới bắt đầu? Hãy cài firmware và ứng dụng trước — xem
 5. [CUT MOTORS (tắt động cơ)](#s5)
 6. [Arm và disarm (mở khoá / khoá động cơ)](#s6)
 7. [Những gì drone tự làm](#s7)
-8. [Mission (bay theo GPS)](#s8)
-9. [Indoor Map (bản đồ trong nhà)](#s9)
-10. [Tune (chỉnh PID)](#s10)
-11. [Bàn thử — giao diện bộ chỉnh PID trên Python](#s11)
-12. [Setup (cài đặt)](#s12)
-13. [Danh sách kiểm tra chuyến bay đầu tiên](#s13)
-14. [Xử lý sự cố](#s14)
-15. [Giới hạn đã biết](#s15)
+8. [Plan (kế hoạch bay)](#s8)
+9. [Mission (bay theo GPS)](#s9)
+10. [Indoor Map (bản đồ trong nhà)](#s10)
+11. [Tune (chỉnh PID)](#s11)
+12. [Bàn thử — giao diện bộ chỉnh PID trên Python](#s12)
+13. [Setup (cài đặt)](#s13)
+14. [Danh sách kiểm tra chuyến bay đầu tiên](#s14)
+15. [Xử lý sự cố](#s15)
+16. [Giới hạn đã biết](#s16)
 
 ---
 
@@ -71,7 +72,7 @@ một vài chi tiết nhỏ khác nhau tuỳ nền tảng.*
 
 | Mục trên thanh tiêu đề | Ý nghĩa |
 |---|---|
-| **Fly · Mission · Indoor · Tune · Setup** | Năm mục chính. Mục đang mở có nền trắng. |
+| **Fly · Plan · Mission · Indoor · Tune · Setup** | Sáu mục chính. Mục đang mở có nền trắng. |
 | **Wi-Fi / Link** | Màu xanh lá khi đã kết nối, kèm cường độ tín hiệu. Màu xám = chưa kết nối. |
 | **Pin (vôn)** | Điện áp thật của cell pin. Màu chữ thường = ổn, **hổ phách dưới 3,50 V**, **đỏ dưới 3,30 V**. |
 | **Ô chế độ** | MANUAL, HOLD, AUTO, FOLLOW hoặc RTH — chế độ drone đang báo về. |
@@ -83,10 +84,11 @@ báo cáo trạng thái đầu tiên.
 
 **Chuyển giữa các mục**
 
-- **Fly** là màn hình chính. Mission, Indoor Map và Tune được mở từ Fly; đóng
-  chúng (hoặc chạm *Fly*) sẽ quay về Fly.
-- **Không thể chuyển mục khi đang bay một nhiệm vụ (mission) hoặc khi
-  auto-tune đang chạy** — ứng dụng sẽ báo lý do. Hãy hạ cánh, kết thúc nhiệm
+- **Fly** là màn hình chính. Plan, Mission, Indoor Map và Tune được mở từ Fly;
+  đóng chúng (hoặc chạm *Fly*) sẽ quay về Fly.
+- **Không thể chuyển mục khi đang bay một nhiệm vụ (mission), khi một phiên
+  truyền nhiệm vụ đang chạy, hoặc khi auto-tune đang chạy** — ứng dụng sẽ báo
+  lý do. Hãy hạ cánh, kết thúc nhiệm
   vụ, dừng bộ chỉnh, hoặc dùng CUT MOTORS trước. Điều này giúp bạn không vô
   tình đóng màn hình đang điều khiển drone.
 
@@ -190,11 +192,11 @@ ngay lập tức và disarm. Drone sẽ rơi.** Dùng khi có bất cứ điều
 | Màn hình | Cách dùng |
 |---|---|
 | **Fly** | **Chạm hai lần trong vòng 3 giây.** Lần chạm đầu nút chuyển màu cam và hiện *TAP AGAIN* (chạm lần nữa); lần chạm thứ hai tắt động cơ. Nếu không chạm lần nữa, nút trở lại màu đỏ. |
-| **Mission, Tune** | **Chạm một lần** là tắt ngay. Ở màn hình Tune, nút này cũng dừng bộ tự chỉnh (auto-tuner). |
+| **Mission, Plan, Tune** | **Chạm một lần** là tắt ngay. Ở màn hình Tune, nút này cũng dừng bộ tự chỉnh (auto-tuner). |
 
 Màn hình Fly cần chạm hai lần vì ngón tay bạn đang đặt trên cần điều khiển
-ngay cạnh nút; một cú chạm nhầm không được làm rơi drone. Mission và Tune được
-dùng khi drone ở xa hơn, nơi tốc độ quan trọng hơn.
+ngay cạnh nút; một cú chạm nhầm không được làm rơi drone. Mission, Plan và
+Tune được dùng khi drone ở xa hơn, nơi tốc độ quan trọng hơn.
 
 > Nút trông giống nhau trên mọi màn hình nhưng cách xác nhận khác nhau. Hãy
 > tập dùng trên bàn (đã tháo cánh) ở từng màn hình trước khi bay.
@@ -267,7 +269,48 @@ arm — cả hai đều làm bo mạch tạm dừng hoặc khởi động lại.
 ---
 
 <a id="s8"></a>
-## 8. Mission (bay theo GPS)
+## 8. Plan (kế hoạch bay)
+
+![Màn hình Plan](android-app.svg)
+
+*Màn hình Plan, dạng sơ đồ. Ứng dụng iOS
+([ios-app.svg](ios-app.svg)) có các công cụ tương tự theo bố cục riêng.*
+
+Mục **Plan** là màn hình *Flight Plan* của Mission Planner: một bản đồ, lưới
+Lệnh / Tham số 1–4 / Vĩ độ / Kinh độ / Độ cao, và Read / Write / Start cho
+nhiệm vụ mà drone lưu trong bộ nhớ của chính nó. Lên kế hoạch bay ở đây, rồi
+bay nó từ drone — hoặc chuyển kế hoạch ra vào bằng tệp `.waypoints`.
+
+| Bộ phận | Chức năng |
+|---|---|
+| **Bản đồ** | Chạm để thêm waypoint tại điểm đó (vùng cấm bay từ chối lượt chạm). Marker của dòng đang chọn chuyển màu cam. |
+| **Lưới** | Mỗi dòng một mục nhiệm vụ: `#`, lệnh, P1–P4, vĩ độ, kinh độ, độ cao. Chạm một dòng để chọn và sửa. |
+| **Menu lệnh** | Lệnh của mục: WAYPOINT, TAKEOFF, LAND, RETURN_TO_LAUNCH, DO_JUMP — hoặc bất kỳ số MAV_CMD nào. |
+| **Alt + Set** | Độ cao cho các waypoint mới; **Set** cũng ghi độ cao vào dòng đang chọn. |
+| ↑ ↓ 🗑 (biểu tượng) | Di chuyển lên/xuống hoặc xoá mục đang chọn. |
+| 📁 💾 (biểu tượng) | Mở / lưu tệp `.waypoints` — đúng định dạng QGC WPL 110 mà Mission Planner ghi, nên kế hoạch đi lại được giữa hai bên. |
+| **Upload** | Ghi toàn bộ kế hoạch vào bộ nhớ của drone (Write waypoints). |
+| **Download** | Đọc kế hoạch ra khỏi drone (Read waypoints). |
+| **Start** | Arm và bay kế hoạch đã lưu ngay trên drone (Start mission). |
+
+**Kế hoạch nằm trên drone.** Upload ghi nó vào đó và Download đọc nó ra; các
+nút tệp chỉ để giữ kế hoạch trên điện thoại. Trước Upload hoặc Start, ứng dụng
+gửi home của kế hoạch làm điểm gốc bay (drone không có GPS và bay theo khung
+cục bộ tự dẫn đường — điểm gốc là cây cầu nối toạ độ của kế hoạch với khung đó).
+
+**Kế hoạch là toạ độ; việc bay vẫn bị trôi.** Drone bay nhiệm vụ đã lưu theo
+ước tính cảm biến chuyển động, nên các waypoint "đúng vào vùng đó", không bao
+giờ chính xác như đo đạc. Hãy giữ chặng đầu ngắn và quan sát nó.
+
+**Từ bàn thử, máy tính cũng làm được điều tương tự** qua Wi-Fi của drone:
+firmware nói cả MAVLink (UDP 14550) lẫn giao thức của ứng dụng, nên Mission
+Planner hoặc QGroundControl có thể Read / Write / Start đúng nhiệm vụ trên
+bo đó.
+
+---
+
+<a id="s9"></a>
+## 9. Mission (bay theo GPS)
 
 ![Thiết kế màn hình Mission](images/mission.png)
 
@@ -316,14 +359,14 @@ nghe tên của chúng.
 
 **Các vùng cấm bay và hành lang được vẽ trên bản đồ này, nhưng không sửa ở
 đây.** Bản đồ chỉ đọc với chúng để kế hoạch bay không thể đổi giữa chuyến bay;
-trình sửa nằm ở trang [Indoor Map](#s9). Nếu một waypoint bị từ chối ("inside
+trình sửa nằm ở trang [Indoor Map](#s10). Nếu một waypoint bị từ chối ("inside
 keep-out zone") hoặc một lần giữ bắt đầu ("keep-out zone entered - holding"),
 hình màu đỏ bạn thấy chính là lý do.
 
 ---
 
-<a id="s9"></a>
-## 9. Indoor Map (bản đồ trong nhà)
+<a id="s10"></a>
+## 10. Indoor Map (bản đồ trong nhà)
 
 ![Màn hình Indoor Map](android-app.svg)
 
@@ -333,7 +376,8 @@ hình màu đỏ bạn thấy chính là lý do.
 Mục **Indoor** là trình sửa chú thích bản đồ — nơi bạn cho drone biết những
 thứ bản đồ không tự biết: chỗ nào không được bay, chỗ nào được đi xuyên qua
 vùng cấm bay, và chỗ nào không khí không ổn định. Mọi thứ bạn vẽ ở đây được
-chia sẻ với trang [Mission](#s8): các vùng sửa ở đây chính là các vùng mà trình
+chia sẻ với trang [Mission](#s9) và [Plan](#s8): các vùng sửa ở đây chính là
+các vùng mà trình
 chạy nhiệm vụ tuân theo.
 
 ### Các chế độ
@@ -373,8 +417,8 @@ Sơ đồ màn hình của hai ứng dụng: [android-app.svg](android-app.svg) 
 
 ---
 
-<a id="s10"></a>
-## 10. Tune (chỉnh PID)
+<a id="s11"></a>
+## 11. Tune (chỉnh PID)
 
 Dùng để chỉnh bộ ổn định khi thử trên bàn. **Auto-tune làm cánh quạt quay.
 Buộc drone vào giá đỡ hoặc giữ bằng dây.**
@@ -391,8 +435,8 @@ Buộc drone vào giá đỡ hoặc giữ bằng dây.**
 
 ---
 
-<a id="s11"></a>
-## 11. Bàn thử — giao diện bộ chỉnh PID trên Python
+<a id="s12"></a>
+## 12. Bàn thử — giao diện bộ chỉnh PID trên Python
 
 ![Giao diện bộ chỉnh PID Python](pid-tune-gui.svg)
 
@@ -422,8 +466,8 @@ hãy disarm trước.
 
 ---
 
-<a id="s12"></a>
-## 12. Setup (cài đặt)
+<a id="s13"></a>
+## 13. Setup (cài đặt)
 
 | | Android | iOS |
 |---|---|---|
@@ -435,8 +479,8 @@ drone**, dùng cổng serial (`link <n>`) — xem
 
 ---
 
-<a id="s13"></a>
-## 13. Danh sách kiểm tra chuyến bay đầu tiên
+<a id="s14"></a>
+## 14. Danh sách kiểm tra chuyến bay đầu tiên
 
 Làm đủ mọi bước. Làm bước 1–6 **khi đã tháo cánh quạt.**
 
@@ -448,7 +492,7 @@ Làm đủ mọi bước. Làm bước 1–6 **khi đã tháo cánh quạt.**
    `ACC_*_SIGN`) trước khi làm tiếp.
 4. **Arm, rồi CUT.** Chạm Takeoff (hoặc đẩy ga từ 0 lên), thấy **● ARMED**,
    rồi dùng CUT MOTORS. DISARMED phải hiện lại ngay. Làm lại trên màn hình
-   Mission và Tune để làm quen với kiểu chạm một lần.
+   Mission, Plan và Tune để làm quen với kiểu chạm một lần.
 5. **Thử mất kết nối.** Arm, rồi tắt Wi-Fi trên điện thoại. Trong vòng nửa
    giây, động cơ phải dừng.
 6. **Chiều quay động cơ.** Đã tháo cánh, arm, tăng ga một chút: RF và LR quay
@@ -467,8 +511,8 @@ mượt, và chỉ thử Follow / Return home sau khi đã treo ổn định.
 
 ---
 
-<a id="s14"></a>
-## 14. Xử lý sự cố
+<a id="s15"></a>
+## 15. Xử lý sự cố
 
 | Hiện tượng | Nguyên nhân có thể và cách xử lý |
 |---|---|
@@ -480,7 +524,7 @@ mượt, và chỉ thử Follow / Return home sau khi đã treo ổn định.
 | Takeoff bị từ chối | Pin yếu, hoặc drone đang bay ở chế độ khác. |
 | Động cơ đột ngột tắt khi đang bay | Mất kết nối 0,5 giây, hoặc bộ thu RC báo failsafe. Đứng gần hơn; xem tín hiệu Wi-Fi trên thanh tiêu đề. |
 | Drone tự hạ cánh | Pin dưới 3,30 V trong 3 giây. |
-| Không chuyển được mục | Một nhiệm vụ hoặc auto-tune đang chạy — kết thúc nó, hạ cánh, hoặc CUT trước. |
+| Không chuyển được mục | Một nhiệm vụ, một phiên truyền nhiệm vụ hoặc auto-tune đang chạy — kết thúc nó, hạ cánh, hoặc CUT trước. |
 | Lưu / đổi kết nối bị từ chối | Drone đang arm. Disarm trước. |
 | Drone nghiêng thêm khi bị đẩy (đã lắp cánh) | Thiết lập dấu cảm biến sai. Dừng lại và sửa trước khi bay. |
 | Hold bay lên hoặc tụt xuống | Bình thường — Hold là một mức lực đẩy, không phải độ cao. Chỉnh hover thrust. |
@@ -489,13 +533,13 @@ mượt, và chỉ thử Follow / Return home sau khi đã treo ổn định.
 
 ---
 
-<a id="s15"></a>
-## 15. Giới hạn đã biết
+<a id="s16"></a>
+## 16. Giới hạn đã biết
 
 - **Không có độ cao, không có vị trí.** Chỉ có cảm biến chuyển động. Xem khung
   ở đầu trang.
-- **CUT MOTORS xác nhận khác nhau** ở Fly (chạm hai lần) và Mission / Tune
-  (chạm một lần). Xem [mục 5](#s5).
+- **CUT MOTORS xác nhận khác nhau** ở Fly (chạm hai lần) và Mission / Plan /
+  Tune (chạm một lần). Xem [mục 5](#s5).
 - **Setup chưa được thiết kế lại.** Nó vẫn mở các màn hình cài đặt cũ.
 - **Các màn hình ứng dụng thiết kế lại còn mới.** Hãy build chúng trong
   Android Studio và Xcode và kiểm tra trên điện thoại trước khi tin dùng khi

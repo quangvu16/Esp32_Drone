@@ -244,6 +244,13 @@ public class MainActivity extends EspActivity {
 
         // Header sections. Fly is this screen.
         // Các mục trên header. Fly chính là màn hình này.
+        findViewById(R.id.tab_plan).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                launchChild(new Intent(MainActivity.this,
+                        se.bitcraze.crazyfliecontrol2.gpsnav.PlannerActivity.class));
+            }
+        });
         findViewById(R.id.tab_mission).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

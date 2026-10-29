@@ -141,6 +141,16 @@ final class ViewController: UIViewController {
         present(nav, animated: true)
     }
 
+    @objc private func openPlan() {
+        guard let session = viewModel?.session else { return }
+        let vc = PlannerViewController(client: session.crazyFlie.crtp,
+                                       telemetry: session.telemetry)
+        vc.onSwitchSection = { [weak self] section in self?.openSection(section) }
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
+    }
+
     @objc private func openIndoor() {
         guard let session = viewModel?.session else { return }
         let vc = IndoorMapViewController(client: session.crazyFlie.crtp,
@@ -301,7 +311,7 @@ final class ViewController: UIViewController {
         tabs.layoutMargins = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
         tabs.backgroundColor = Fly.track
         tabs.layer.cornerRadius = 10
-        for (index, title) in ["Fly", "Mission", "Indoor", "Tune", "Setup"].enumerated() {
+        for (index, title) in ["Fly", "Plan", "Mission", "Indoor", "Tune", "Setup"].enumerated() {
             let b = UIButton(type: .system)
             var config = UIButton.Configuration.plain()
             config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)
@@ -427,13 +437,14 @@ final class ViewController: UIViewController {
     private func openSection(_ section: AppSection) {
         switch section {
         case .fly: break
+        case .plan: openPlan()
         case .mission: openNav()
         case .indoor: openIndoor()
         case .tune: openTune()
         case .setup:
-            // Setup is the fifth chip now (Fly / Mission / Indoor / Tune / Setup).
-            // Setup giờ là chip thứ năm (Fly / Mission / Indoor / Tune / Setup).
-            let anchor: UIView = sectionButtons.count > 4 ? sectionButtons[4] : view
+            // Setup is the sixth chip now (Fly / Plan / Mission / Indoor / Tune / Setup).
+            // Setup giờ là chip thứ sáu (Fly / Plan / Mission / Indoor / Tune / Setup).
+            let anchor: UIView = sectionButtons.count > 5 ? sectionButtons[5] : view
             openSetup(from: anchor)
         }
     }

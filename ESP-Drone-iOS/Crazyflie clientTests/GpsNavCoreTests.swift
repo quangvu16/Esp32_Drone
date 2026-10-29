@@ -296,3 +296,128 @@ final class GpsNavCoreTests: XCTestCase {
         XCTAssertEqual(target.y, -ne.east, accuracy: 1e-6)
     }
 }
+
+/// Pins the Plan page's PlannerMission codec against the exact Mission Planner
+/// reader/writer rules (MissionFile.cs) — every quirk the Java CodecCheck
+/// pinned on Android, here so the two clients cannot drift apart.
+/// Ghim codec PlannerMission của trang Plan theo đúng quy tắc đọc/ghi của
+/// Mission Planner (MissionFile.cs) — mọi điểm lạ mà CodecCheck Java đã ghim
+/// trên Android, tại đây để hai client không thể lệch nhau.
+final class PlannerCodecTests: XCTestCase {
+
+    /// A Mission-Planner-written file must round-trip byte-for-byte.
+    /// Number formats: home lat/lng 7 decimals, row p/lat/lon 8, alt 6.
+    /// Một tệp do Mission Planner viết phải đi-về nguyên vẹn từng byte.
+    /// Định dạng số: lat/lng của home 7 chữ số thập phân, p/lat/lon của dòng 8,
+    /// alt 6.
+    func testRoundTrip() throws {
+        let file = "QGC WPL 110\n"
+            + "0\t1\t0\t16\t0\t0\t0\t0\t10.7626220\t106.6601720\t30.000000\t1\n"
+            + "1\t0\t3\t22\t0.00000000\t2.50000000\t0.00000000\t0.00000000\t10.76262200\t106.66017200\t30.000000\t1\n"
+            + "2\t0\t3\t16\t0.00000000\t2.50000000\t0.00000000\t0.00000000\t10.76270000\t106.66020000\t25.500000\t1\n"
+            + "3\t0\t3\t177\t1.00000000\t3.00000000\t0.00000000\t0.00000000\t0.00000000\t0.00000000\t0.000000\t1\n"
+        let mission = try PlannerMission.parse(file)
+        XCTAssertTrue(mission.invalidLines.isEmpty)
+        XCTAssertEqual(mission.size, 3)
+        XCTAssertEqual(mission.home.lat, 10.7626220)
+        XCTAssertEqual(mission.home.lon, 106.6601720)
+        XCTAssertEqual(mission.home.alt, 30.0)
+        XCTAssertEqual(mission.items[0].command, PlannerItem.cmdTakeoff)
+        XCTAssertEqual(mission.items[0].p2, 2.5)
+        XCTAssertEqual(mission.items[2].command, PlannerItem.cmdDoJump)
+        XCTAssertEqual(mission.items[2].p1, 1.0)
+        XCTAssertEqual(mission.items[2].p2, 3.0)
+        XCTAssertEqual(mission.format(), file)
+    }
+
+    /// The blank-home quirk: a first row that is not index 0 inserts a blank
+    /// home, and the comment/separator rules of the reader.
+    /// Điểm lạ home trống: dòng đầu không phải index 0 sẽ chèn một home trống,
+    /// cùng các quy tắc chú thích/dấu phân cách của trình đọc.
+    func testBlankHomeQuirk() throws {
+        let quirky = "QGC WPL 110\n"
+            + "# a comment line\n"
+            + "1, 0, 3, WAYPOINT, 0, 2.5, 0, 0, 1.5, 2.5, 10.0, 1\n"
+            + "  2 0 3 16 0 2.5 0 0 3.5 4.5 12.0 1\n"
+        let q = try PlannerMission.parse(quirky)
+        XCTAssertTrue(q.invalidLines.isEmpty)
+        XCTAssertEqual(q.size, 2)
+        XCTAssertEqual(q.home.lat, 0)
+        XCTAssertEqual(q.home.lon, 0)
+        XCTAssertEqual(q.home.frame, PlannerItem.frameGlobal)
+        // The leading separator of the space row must not shift its fields —
+        // RemoveEmptyEntries drops that empty token.
+        // Dấu phân cách đầu dòng của dòng cách-spaces không được đẩy lệc các
+        // trường — RemoveEmptyEntries bỏ token rỗng đó.
+        XCTAssertEqual(q.items[0].command, PlannerItem.cmdWaypoint)
+        XCTAssertEqual(q.items[0].lat, 1.5)
+        XCTAssertEqual(q.items[0].p2, 2.5)
+        XCTAssertEqual(q.items[1].lat, 3.5)
+        XCTAssertEqual(q.items[1].alt, 12.0)
+    }
+
+    /// Command 99 is rewritten to 0 (the legacy waypoint id).
+    /// Lệnh 99 được viết lại thành 0 (id waypoint kiểu cũ).
+    func testLegacyCommand99() throws {
+        let legacy = "QGC WPL 110\n"
+            + "0\t1\t0\t16\t0\t0\t0\t0\t1.0000000\t2.0000000\t3.000000\t1\n"
+            + "1\t0\t3\t99\t0\t0\t0\t0\t5.00000000\t6.00000000\t7.000000\t1\n"
+        let l = try PlannerMission.parse(legacy)
+        XCTAssertEqual(l.items[0].command, 0)
+    }
+
+    /// Bad rows are skipped and reported; the rest still loads.
+    /// Dòng sai bị bỏ qua và được báo cáo; phần còn lại vẫn nạp.
+    func testInvalidLineReported() throws {
+        let bad = "QGC WPL 110\n"
+            + "0\t1\t0\t16\t0\t0\t0\t0\t1.0000000\t2.0000000\t3.000000\t1\n"
+            + "1\t0\t3\tNOT_A_COMMAND\t0\t0\t0\t0\t5.00000000\t6.00000000\t7.000000\t1\n"
+            + "2\t0\t3\t16\t0\t0\t0\t0\t8.00000000\t9.00000000\t10.000000\t1\n"
+        let b = try PlannerMission.parse(bad)
+        XCTAssertEqual(b.invalidLines.count, 1)
+        XCTAssertEqual(b.size, 1)
+        XCTAssertEqual(b.items[0].lat, 8.0)
+    }
+
+    /// A file without the QGC WPL header is refused.
+    /// Tệp thiếu header QGC WPL bị từ chối.
+    func testHeaderRefused() {
+        XCTAssertThrowsError(try PlannerMission.parse("not a mission file\n"))
+    }
+
+    /// Short rows are skipped silently (<= 9 fields), like Mission Planner.
+    /// Dòng ngắn bị bỏ qua im lặng (<= 9 trường), như Mission Planner.
+    func testShortRowsSkippedSilently() throws {
+        let shortRows = "QGC WPL 110\n"
+            + "junk line\n"
+            + "0\t1\t0\t16\t0\t0\t0\t0\t1.0000000\t2.0000000\t3.000000\t1\n"
+        let s = try PlannerMission.parse(shortRows)
+        XCTAssertTrue(s.invalidLines.isEmpty)
+        XCTAssertEqual(s.home.lat, 1.0)
+    }
+
+    /// The writer's fallback home row for a non-finite home.
+    /// Dòng home dự phòng của trình ghi khi home không hữu hạn.
+    func testFallbackHomeRow() {
+        let f = PlannerMission()
+        f.home.lat = Double.nan
+        XCTAssertEqual(f.format(), "QGC WPL 110\n0\t1\t0\t0\t0\t0\t0\t0\t0\t0\t0\t1\n")
+    }
+
+    /// Name table pins (the MAV_CMD enum from common.xml).
+    /// Ghim bảng tên (enum MAV_CMD từ common.xml).
+    func testCommandNameTable() {
+        XCTAssertEqual(PlannerItem.parseCommand("WAYPOINT"), 16)
+        XCTAssertEqual(PlannerItem.parseCommand("DO_JUMP"), 177)
+        // NAV_SPLINE_WAYPOINT displays as SPLINE_WAYPOINT.
+        // NAV_SPLINE_WAYPOINT hiển thị là SPLINE_WAYPOINT.
+        XCTAssertEqual(PlannerItem.parseCommand("SPLINE_WAYPOINT"), 82)
+        XCTAssertEqual(PlannerItem.parseCommand("waypoint"), -1, "case-sensitive like Enum.Parse")
+        XCTAssertEqual(PlannerItem.parseCommand("NOPE"), -1)
+        // Enum.Parse takes any number, even one with no enum member.
+        // Enum.Parse nhận mọi con số, kể cả số không có thành viên enum.
+        XCTAssertEqual(PlannerItem.parseCommand("31000"), 31000)
+        XCTAssertEqual(PlannerItem.commandNameOf(12345), "UNKNOWN")
+        XCTAssertEqual(PlannerItem.commandNameOf(16), "WAYPOINT")
+    }
+}

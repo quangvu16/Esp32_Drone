@@ -63,6 +63,11 @@ final class CrtpClient {
     var onParamValue: ((UInt8, CrtpValue) -> Void)?  // (id, value) from read/write echoes
                                                      // (id, value) từ phần echo của lệnh đọc/ghi
     var onConnectionEvent: ((String) -> Void)?
+    /// Raw `[cmd][args]` payload of every port 7 channel 2 packet (PROTOCOL.md
+    /// §12) — the mission transfer's reply path.
+    /// Phần dữ liệu `[cmd][args]` thô của mọi gói cổng 7 kênh 2 (PROTOCOL.md
+    /// mục 12) — đường trả lời của phiên truyền nhiệm vụ.
+    var onMissionPacket: ((Data) -> Void)?
 
     private let driver: CrtpDriver
     private let queue = DispatchQueue(label: "crtp.client")
@@ -224,13 +229,26 @@ final class CrtpClient {
         }
     }
 
-    // MARK: - Port 7: flight control (ch 0) and navigation (ch 1)
+    // MARK: - Port 7: flight control (ch 0), navigation (ch 1), missions (ch 2)
 
     private func handleGeneric(_ packet: CrtpPacket) {
         let payload = packet.payload
+        if packet.channel == MissionPacket.channel {
+            // Mission replies are `[cmd][args]` (PROTOCOL.md §12) — forward the
+            // raw payload; the transfer decodes its own commands.
+            // Câu trả lời nhiệm vụ là `[cmd][args]` (PROTOCOL.md mục 12) — chuyển
+            // nguyên phần dữ liệu; phiên truyền tự giải mã lệnh của nó.
+            guard !payload.isEmpty else { return }
+            onMissionPacket?(payload)
+            return
+        }
         guard payload.count >= 2 else { return }
-        let command = payload[payload.index(payload.startIndex, offsetBy: 1)]
-        let status = payload.count >= 3 ? payload[payload.index(payload.startIndex, offsetBy: 2)] : 1
+        // Flight/nav replies are `{hdr, cmd, status}` — after the header is
+        // stripped the command is at payload[0], the status at payload[1].
+        // Câu trả lời điều khiển bay/định hướng là `{hdr, cmd, status}` — sau khi
+        // bỏ header, lệnh nằm ở payload[0], status ở payload[1].
+        let command = payload[payload.startIndex]
+        let status = payload[payload.index(payload.startIndex, offsetBy: 1)]
         switch packet.channel {
         case 0: onFlightAck?(command, status)
         case 1: onNavAck?(command, status)
@@ -424,7 +442,7 @@ final class CrtpClient {
         sendReliable(packet,
                      matches: { p in
                          p.port == .generic && p.channel == 0 &&
-                         !p.payload.isEmpty && p.payload[payload.startIndex] == command.rawValue
+                         p.payload.first == command.rawValue
                      })
     }
 
@@ -496,16 +514,21 @@ final class CrtpClient {
         case target = 0x20
         case reset = 0x21
         case align = 0x22
+        case origin = 0x23
     }
 
     private func sendNav(_ command: NavCommand, args: Data = Data()) {
         var payload = Data([command.rawValue])
         payload.append(args)
         let packet = CrtpPacket(port: .generic, channel: 1, payload: payload)
+        // The reply echoes the command at payload[0] with a status byte after
+        // it (`{NAV_HDR, cmd, status}` on the wire).
+        // Câu trả lời lặp lại lệnh tại payload[0] kèm byte status phía sau
+        // (`{NAV_HDR, cmd, status}` trên đường truyền).
         sendReliable(packet,
                      matches: { p in
                          p.port == .generic && p.channel == 1 &&
-                         p.payload.count >= 2 && p.payload[p.payload.index(p.payload.startIndex, offsetBy: 1)] == command.rawValue
+                         p.payload.first == command.rawValue
                      })
     }
 
@@ -530,5 +553,18 @@ final class CrtpClient {
         var args = Data()
         withUnsafeBytes(of: alphaDegrees.bitPattern.littleEndian) { args.append(contentsOf: $0) }
         sendNav(.align, args: args)
+    }
+
+    /// The mission home in WGS-84 degrees (§12) — the only thing that converts
+    /// mission items and MAVLink telemetry to and from the launch frame. Pair
+    /// it with ALIGN before Upload/Start.
+    /// Vị trí home của nhiệm vụ theo độ WGS-84 (mục 12) — thứ duy nhất chuyển
+    /// đổi giữa mục nhiệm vụ/telemetry MAVLink và khung cất cánh. Gửi kèm ALIGN
+    /// trước Upload/Start.
+    func sendNavOrigin(latitude: Double, longitude: Double) {
+        var args = Data()
+        withUnsafeBytes(of: latitude.bitPattern.littleEndian) { args.append(contentsOf: $0) }
+        withUnsafeBytes(of: longitude.bitPattern.littleEndian) { args.append(contentsOf: $0) }
+        sendNav(.origin, args: args)
     }
 }

@@ -438,6 +438,70 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define AUTO_TAKEOFF         1
 #define AUTO_HOLD            2
 #define AUTO_LAND            3
+#define AUTO_MISSION         4        // flying an onboard mission item (§12)
+                                     // bay một mục nhiệm vụ trên bo (§12)
+
+// ---- Onboard mission engine — AP_Mission port (PROTOCOL.md §12) ----------
+// ---- Động cơ nhiệm vụ trên bo — chuyển thể từ AP_Mission (PROTOCOL.md §12) --
+//  ArduPilot semantics (ArduPilot/ardupilot libraries/AP_Mission +
+//  ArduCopter/mode_auto.cpp): a stored item list flown in AUTO, transferred
+//  with the MAVLink MISSION_* handshake over CRTP port 7, channel 2.
+//  Ngữ nghĩa ArduPilot (ArduPilot/ardupilot libraries/AP_Mission +
+//  ArduCopter/mode_auto.cpp): danh sách mục được lưu, bay ở chế độ AUTO, truyền
+//  bằng bắt tay MISSION_* của MAVLink qua CRTP cổng 7, kênh 2.
+#define MSN_HDR              ((CRTP_PORT_GENERIC << 4) | 2)   // 0x72
+#define MISSION_MAX_ITEMS    32
+#define MISSION_STOP_RADIUS_M 2.5f    // default acceptance radius, m
+#define MISSION_RADIUS_MIN_M  0.5f
+
+#define MSN_CMD_COUNT        0x30
+#define MSN_CMD_REQUEST      0x31
+#define MSN_CMD_ITEM         0x32
+#define MSN_CMD_ACK          0x33
+#define MSN_CMD_REQUEST_LIST 0x34
+#define MSN_CMD_SET_CURRENT  0x35
+#define MSN_CMD_CURRENT      0x36
+#define MSN_CMD_START        0x37
+
+// MAV_CMD values (ArduPilot common.xml) — the only ones the runner executes;
+// anything else is stored but skipped (PROTOCOL.md §12).
+// Giá trị MAV_CMD (common.xml của ArduPilot) — những lệnh duy nhất runner chạy;
+// lệnh khác chỉ được lưu và bỏ qua (PROTOCOL.md §12).
+#define MAV_CMD_NAV_WAYPOINT 16
+#define MAV_CMD_NAV_RTL      20
+#define MAV_CMD_NAV_LAND     21
+#define MAV_CMD_NAV_TAKEOFF  22
+#define MAV_CMD_DO_JUMP      177
+
+// MAV_MISSION result codes (common.xml) — the ACK payload.
+// Mã kết quả MAV_MISSION (common.xml) — phần dữ liệu của ACK.
+#define MAV_MISSION_ACCEPTED 0
+#define MAV_MISSION_ERROR    1
+#define MAV_MISSION_NO_SPACE 4
+#define MAV_MISSION_INVALID  5
+#define MAV_MISSION_DENIED   14
+
+// One mission item — the MAVLink MISSION_ITEM_INT packing (PROTOCOL.md §12).
+// p3/p4 arrive over MAVLink and in .waypoints files; the CRTP channel zeroes
+// them (30-byte packet ceiling, §1).
+// Một mục nhiệm vụ — dạng đóng gói MISSION_ITEM_INT của MAVLink (PROTOCOL.md
+// §12). p3/p4 đến qua MAVLink và trong tệp .waypoints; kênh CRTP đặt chúng về 0
+// (trần gói 30 byte, §1).
+typedef struct {
+  uint16_t seq;
+  uint16_t command;          // MAV_CMD
+  float    p1, p2, p3, p4;
+  int32_t  lat_e7, lon_e7;   // degrees x 1e7
+  float    alt;              // metres — stored and reported, never flown
+} MissionItem;
+
+// ---- MAVLink bridge (PROTOCOL.md §13) ------------------------------------
+// ---- Cầu nối MAVLink (PROTOCOL.md §13) -----------------------------------
+#define MAVLINK_UDP_PORT     14550   // the conventional MAVLink-over-WiFi port
+#define MAVLINK_SYSID        1
+#define MAVLINK_COMPID       1       // MAV_COMP_ID_AUTOPILOT1
+#define MAVLINK_STX_V2       0xFD
+#define MAVLINK_STX_V1       0xFE
 
 // Flight-control tuning. Hover thrust lives in the CommanderPacket domain
 // (0..65535) so the app can reuse its existing thrust mapping.
@@ -490,6 +554,8 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 #define NAV_CMD_TARGET       0x20
 #define NAV_CMD_RESET        0x21
 #define NAV_CMD_ALIGN        0x22
+#define NAV_CMD_ORIGIN       0x23     // launch latitude/longitude (§12, §13)
+                                      // vĩ độ/kinh độ điểm cất cánh
 
 // Dead-reckoning tuning.
 // Tinh chỉnh tự dẫn đường quán tính.
@@ -693,6 +759,34 @@ float    tgt_x = 0.0f, tgt_y = 0.0f;        // target offset from launch, m
 bool     tgt_valid = false;                 // the phone has sent a recent target
 uint32_t tgt_last_ms = 0;
 float    nav_kp = 1.2f;                     // deg of tilt per m of position error
+
+// --- onboard mission + MAVLink bridge (PROTOCOL.md §12, §13) ---
+// --- nhiệm vụ trên bo + cầu nối MAVLink (PROTOCOL.md §12, §13) ---
+MissionItem mission_items[MISSION_MAX_ITEMS];
+MissionItem mission_stage[MISSION_MAX_ITEMS];  // upload staging — commit on ACK
+uint16_t mission_count = 0;
+int16_t  mission_current = -1;         // seq index the runner is on, -1 = none
+bool     mission_active = false;       // the runner is flying the mission
+uint16_t mission_stage_count = 0;      // items expected in the current upload
+uint16_t mission_stage_seq = 0;        // next seq the drone wants staged
+uint16_t jump_exec_count[MISSION_MAX_ITEMS];  // DO_JUMP executions consumed
+bool     home_valid = false;           // ORIGIN received — lat/lon known
+double   home_lat = 0.0, home_lon = 0.0;
+
+// MAVLink bridge runtime (§13). The socket listens on 14550 for any ArduPilot
+// GCS; mav_gcs_ip is learned from the first packet, the same way linkSend()
+// learns the app address.
+// Runtime của cầu nối MAVLink (§13). Socket nghe ở cổng 14550 cho mọi GCS
+// ArduPilot; mav_gcs_ip học từ gói đầu tiên, giống cách linkSend() học địa chỉ app.
+WiFiUDP MavUdp;
+static bool      mav_gcs_known = false;
+static IPAddress mav_gcs_ip;
+static uint16_t  mav_gcs_port = 0;
+static uint8_t   mav_seq = 0;              // MAVLink tx sequence counter
+static uint32_t  mav_heartbeat_ms = 0;
+static uint32_t  mav_pos_ms = 0;
+static bool      mav_mission_current_dirty = true;
+static bool      mav_home_dirty = true;    // (re)send HOME_POSITION
 
 // Setpoints the flight-mode stage hands to the PID. loop() writes these and
 // never touches the PID inputs directly.
@@ -937,6 +1031,18 @@ void armUpdate(uint32_t now, bool use_crtp);
 void logUpdate();
 void motorStop();
 void pidReset();
+
+// Mission engine + MAVLink bridge — also defined further down (§12, §13).
+// Động cơ nhiệm vụ + cầu nối MAVLink — cũng định nghĩa phía dưới (§12, §13).
+void crtpHandleMission(const uint8_t *p, size_t len);
+bool missionStart();
+void missionStop();
+void missionTick(uint32_t now);
+void missionSendCurrent();
+void missionClear();
+void missionSave();
+void missionLoad();
+void mavlinkPoll();
 
 Preferences nvs;
 
@@ -1612,6 +1718,29 @@ void crtpHandleNav(const uint8_t *p, size_t len) {
                       align_alpha_deg); }
       break;
 
+    case NAV_CMD_ORIGIN:
+      // The launch latitude/longitude. Mission items and MAVLink telemetry are
+      // WGS-84 degrees, the dead reckoning is a local frame — this origin is
+      // the only thing that converts between them (§12). Pair it with ALIGN.
+      // Vĩ độ/kinh độ điểm cất cánh. Mục nhiệm vụ và telemetry MAVLink dùng độ
+      // WGS-84, tự dẫn đường dùng khung cục bộ — điểm gốc này là thứ duy nhất
+      // chuyển đổi giữa hai hệ (§12). Gửi kèm ALIGN.
+      if (len < 18) { status = 1; break; }
+      { double lat = 0.0, lon = 0.0;
+        memcpy(&lat, p + 2, 8);
+        memcpy(&lon, p + 10, 8);
+        if (!isfinite(lat) || !isfinite(lon) ||
+            lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+          status = 1;
+          break;
+        }
+        home_lat = lat;
+        home_lon = lon;
+        home_valid = true;
+        mav_home_dirty = true;   // the GCS home moves too // home của GCS cũng đổi
+        Serial.printf("[NAV] origin: lat %.7f lon %.7f\n", home_lat, home_lon); }
+      break;
+
     default:
       status = 1;
       break;
@@ -1619,6 +1748,940 @@ void crtpHandleNav(const uint8_t *p, size_t len) {
 
   uint8_t out[3] = { NAV_HDR, cmd, status };
   crtpSend(out, sizeof(out));
+}
+
+// =============================================================================
+//  ONBOARD MISSION ENGINE  (PROTOCOL.md §12 — AP_Mission port)
+//  A stored item list flown in AUTO, transferred with the MAVLink MISSION_*
+//  handshake over CRTP port 7 channel 2, and over the MAVLink bridge (§13).
+//  ĐỘNG CƠ NHIỆM VỤ TRÊN BO  (PROTOCOL.md §12 — chuyển thể từ AP_Mission)
+//  Danh sách mục được lưu, bay ở AUTO, truyền bằng bắt tay MISSION_* của
+//  MAVLink qua CRTP cổng 7 kênh 2, và qua cầu nối MAVLink (§13).
+// =============================================================================
+
+// Flat-earth conversion at the launch point. Accurate to well beyond the
+// flight radius, and the inverse is exact for the same approximation.
+// Chuyển đổi đất phẳng tại điểm cất cánh. Chính xác tới xa hơn nhiều bán kính
+// bay, và phép nghịch đảo đúng cho chính phép xấp xỉ đó.
+void missionToLocal(int32_t lat_e7, int32_t lon_e7, float *x, float *y) {
+  const float a = align_alpha_deg * DEG_TO_RAD;
+  const float ca = cosf(a), sa = sinf(a);
+  double n = ((double)lat_e7 * 1e-7 - home_lat) * 111319.49;
+  double e = ((double)lon_e7 * 1e-7 - home_lon) * 111319.49 * cos(home_lat * DEG_TO_RAD);
+  // The §6 rotation — the same matrix NAV_CMD_TARGET uses.
+  // Phép quay §6 — cùng ma trận mà NAV_CMD_TARGET dùng.
+  *x = (float)(n * ca + e * sa);
+  *y = (float)(n * sa - e * ca);
+}
+
+void localToMission(float x, float y, int32_t *lat_e7, int32_t *lon_e7) {
+  const float a = align_alpha_deg * DEG_TO_RAD;
+  const float ca = cosf(a), sa = sinf(a);
+  // The rotation above is its own inverse.
+  // Ma trận ở trên tự nghịch đảo.
+  double n = (double)x * ca + (double)y * sa;
+  double e = (double)x * sa - (double)y * ca;
+  *lat_e7 = (int32_t)llround((home_lat + n / 111319.49) * 1e7);
+  *lon_e7 = (int32_t)llround((home_lon + e / (111319.49 * cos(home_lat * DEG_TO_RAD))) * 1e7);
+}
+
+int missionIndexForSeq(uint16_t seq) {
+  for (uint16_t i = 0; i < mission_count; i++)
+    if (mission_items[i].seq == seq) return (int)i;
+  return -1;
+}
+
+void missionSendCurrent() {
+  uint16_t seq = (mission_current >= 0 && mission_current < (int)mission_count)
+               ? mission_items[mission_current].seq : 0;
+  uint8_t out[4] = { MSN_HDR, MSN_CMD_CURRENT, 0, 0 };
+  memcpy(out + 2, &seq, 2);
+  crtpSend(out, sizeof(out));
+  mav_mission_current_dirty = true;   // the GCS copy follows // bản của GCS cũng theo
+}
+
+void missionClear() {
+  mission_count = 0;
+  mission_current = -1;
+  mission_active = false;
+  memset(jump_exec_count, 0, sizeof(jump_exec_count));
+  mav_mission_current_dirty = true;
+}
+
+// Validate a staged mission before it goes live — AP_Mission's temp-write then
+// finalize. Every DO_JUMP must target an existing seq that is not itself.
+// Kiểm tra nhiệm vụ trong vùng đệm trước khi kích hoạt — kiểu ghi tạm rồi hoàn
+// tất của AP_Mission. Mọi DO_JUMP phải trỏ tới một seq có thật, không phải chính nó.
+int missionValidate(const MissionItem *items, uint16_t count) {
+  for (uint16_t i = 0; i < count; i++) {
+    if (!isfinite(items[i].p1) || !isfinite(items[i].p2) || !isfinite(items[i].alt))
+      return MAV_MISSION_INVALID;
+    if (items[i].command == MAV_CMD_DO_JUMP) {
+      uint16_t target = (uint16_t)items[i].p1;
+      if (target == items[i].seq) return MAV_MISSION_INVALID;   // self-jump
+      bool found = false;
+      for (uint16_t j = 0; j < count; j++)
+        if (items[j].seq == target) { found = true; break; }
+      if (!found) return MAV_MISSION_INVALID;
+    }
+  }
+  return MAV_MISSION_ACCEPTED;
+}
+
+// Start a staged upload of `count` items (0 = clear the mission).
+// Bắt đầu tải `count` mục vào vùng đệm (0 = xóa nhiệm vụ).
+int missionUploadBegin(uint16_t count) {
+  if (count == 0) {
+    missionClear();
+    return MAV_MISSION_ACCEPTED;
+  }
+  if (count > MISSION_MAX_ITEMS) return MAV_MISSION_NO_SPACE;
+  mission_stage_count = count;
+  mission_stage_seq = 0;
+  return MAV_MISSION_ACCEPTED;
+}
+
+// Stage one item. *done flips when the last item has just been stored and the
+// staged mission committed. A retransmitted last item (the client resends until
+// it sees the ACK) is acknowledged again instead of erroring — §12 idempotency.
+// Đưa một mục vào vùng đệm. *done bật khi mục cuối vừa được lưu và nhiệm vụ được
+// xác nhận. Mục cuối gửi lại (client gửi lại tới khi thấy ACK) được ack lần nữa
+// thay vì báo lỗi — tính idempotent của §12.
+int missionUploadItem(const MissionItem *it, bool *done) {
+  *done = false;
+  if (mission_stage_count == 0) {
+    // Retransmit of the committed mission's last item?
+    // Có phải mục cuối của nhiệm vụ đã xác nhận được gửi lại không?
+    if (mission_count > 0 && (int)it->seq + 1 == (int)mission_count &&
+        memcmp(it, &mission_items[it->seq], sizeof(MissionItem)) == 0) {
+      *done = true;
+      return MAV_MISSION_ACCEPTED;
+    }
+    return MAV_MISSION_ERROR;
+  }
+  if (it->seq != mission_stage_seq) return MAV_MISSION_INVALID;   // out of order
+  mission_stage[mission_stage_seq] = *it;
+  mission_stage_seq++;
+  if (mission_stage_seq < mission_stage_count) return MAV_MISSION_ACCEPTED;
+
+  int res = missionValidate(mission_stage, mission_stage_count);
+  if (res == MAV_MISSION_ACCEPTED) {
+    memcpy(mission_items, mission_stage, sizeof(MissionItem) * mission_stage_count);
+    mission_count = mission_stage_count;
+    mission_current = 0;
+    memset(jump_exec_count, 0, sizeof(jump_exec_count));
+    mav_mission_current_dirty = true;
+    *done = true;
+    Serial.printf("[MSN] mission uploaded: %u items\n", mission_count);
+  }
+  mission_stage_count = 0;
+  return res;
+}
+
+// Consume the items that complete without flying — DO_JUMP repeat accounting
+// and the takeoff item the AUTO ramp already flew. Returns false on a broken
+// jump chain (a jump to itself; missionValidate() rejects those at upload —
+// belt and braces).
+// Tiêu các mục hoàn thành mà không cần bay — đếm lần lặp của DO_JUMP và mục
+// cất cánh mà đoạn bám AUTO đã bay qua. Trả về false khi chuỗi nhảy hỏng (tự
+// nhảy; missionValidate() đã từ chối khi tải lên — an toàn hai lớp).
+bool missionAdvanceInstant() {
+  for (int guard = 0; guard < MISSION_MAX_ITEMS; guard++) {
+    if (mission_current < 0 || mission_current >= (int)mission_count) return true;
+    MissionItem *it = &mission_items[mission_current];
+    if (it->command == MAV_CMD_DO_JUMP) {
+      int target = missionIndexForSeq((uint16_t)it->p1);
+      if (target < 0 || target == mission_current) return false;
+      uint16_t times = (uint16_t)it->p2;    // p2 <= 0 = forever // p2 <= 0 = vĩnh viễn
+      if (it->p2 > 0.0f && jump_exec_count[mission_current] >= times) {
+        jump_exec_count[mission_current] = 0;
+        mission_current++;                  // fall through to the next item
+        continue;
+      }
+      jump_exec_count[mission_current]++;
+      mission_current = (int16_t)target;
+      missionSendCurrent();
+      continue;
+    }
+    if (it->command == MAV_CMD_NAV_TAKEOFF &&
+        (auto_state == AUTO_HOLD || auto_state == AUTO_MISSION)) {
+      mission_current++;                    // the ramp has flown already
+      missionSendCurrent();
+      continue;
+    }
+    break;
+  }
+  return true;
+}
+
+// MISSION_START — arm (through the normal checks) + AUTO + run from the current
+// item (PROTOCOL.md §12). A retransmitted start is a no-op ack, like TAKEOFF.
+// MISSION_START — kích hoạt (qua các kiểm tra bình thường) + AUTO + chạy từ mục
+// hiện tại (PROTOCOL.md §12). Lệnh gửi lại chỉ là ack không-thực-hiện, như TAKEOFF.
+bool missionStart() {
+  if (mission_count == 0) return false;
+  if (mission_active && armed && flight_mode == MODE_AUTO) return true;   // resend
+  if (mission_current < 0 || mission_current >= (int)mission_count) mission_current = 0;
+  memset(jump_exec_count, 0, sizeof(jump_exec_count));
+  if (!armed) {
+    if (!armChecksOk("MISSION_START")) return false;
+    hold_heading_deg = heading_deg;
+    navReset();                            // the launch point // điểm cất cánh
+    armed = true;
+    pidReset();
+    flight_mode = MODE_AUTO;
+    auto_state = AUTO_TAKEOFF;
+    auto_phase_start_ms = millis();
+  } else {
+    // Never cancel a landing; otherwise take the flight over.
+    // Không bao giờ hủy việc hạ cánh; còn lại thì tiếp quản chuyến bay.
+    if (flight_mode == MODE_AUTO && auto_state == AUTO_LAND) return false;
+    flight_mode = MODE_AUTO;
+    if (auto_state != AUTO_TAKEOFF) {
+      auto_state = AUTO_HOLD;              // → AUTO_MISSION on the next tick
+      auto_phase_start_ms = millis();
+    }
+  }
+  mission_active = true;
+  missionSendCurrent();
+  Serial.printf("[MSN] mission start: %u items from seq %u\n", mission_count,
+                mission_items[mission_current].seq);
+  return true;
+}
+
+void missionStop() {
+  if (mission_active) Serial.println(F("[MSN] mission stopped"));
+  mission_active = false;
+  mav_mission_current_dirty = true;
+}
+
+// One runner tick while AUTO flies a mission (auto_state == AUTO_MISSION).
+// ArduPilot semantics (mode_auto.cpp): walk the items, steer at waypoints,
+// land when the list ends. The thrust is the AUTO hold thrust — this board
+// holds a thrust level, not a height (§5); item alt is reported, never flown.
+// Một nhịp runner khi AUTO bay nhiệm vụ (auto_state == AUTO_MISSION).
+// Ngữ nghĩa ArduPilot (mode_auto.cpp): duyệt mục, lái về các waypoint, hạ cánh
+// khi hết danh sách. Lực đẩy là lực giữ của AUTO — bo này giữ mức lực đẩy, không
+// giữ độ cao (§5); alt của mục chỉ để báo, không bao giờ bay theo.
+void missionTick(uint32_t now) {
+  if (!mission_active) return;
+  if (!missionAdvanceInstant() || mission_current >= (int)mission_count) {
+    // Ran off the end (or a broken jump chain): land where we are —
+    // ArduPilot's MIS_DONE_BEHAVE = 0 default.
+    // Chạy hết danh sách (hoặc chuỗi nhảy hỏng): hạ cánh tại chỗ —
+    // mặc định MIS_DONE_BEHAVE = 0 của ArduPilot.
+    mission_active = false;
+    mav_mission_current_dirty = true;
+    flightLand();
+    return;
+  }
+  MissionItem *it = &mission_items[mission_current];
+  switch (it->command) {
+    case MAV_CMD_NAV_WAYPOINT: {
+      float x = 0.0f, y = 0.0f;
+      missionToLocal(it->lat_e7, it->lon_e7, &x, &y);
+      tgt_x = x;
+      tgt_y = y;
+      tgt_valid = true;
+      tgt_last_ms = now;
+      float rad = it->p2 > MISSION_RADIUS_MIN_M ? it->p2 : MISSION_STOP_RADIUS_M;
+      float dx = tgt_x - pos_x, dy = tgt_y - pos_y;
+      if (dx * dx + dy * dy <= rad * rad) {
+        mission_current++;                  // arrived — next item // đến nơi — mục kế
+        missionSendCurrent();
+      }
+      break;
+    }
+    case MAV_CMD_NAV_RTL:
+      // Chase the launch point, land on arrival.
+      // Bám điểm cất cánh, hạ cánh khi tới nơi.
+      tgt_x = 0.0f;
+      tgt_y = 0.0f;
+      tgt_valid = true;
+      tgt_last_ms = now;
+      if (pos_x * pos_x + pos_y * pos_y <=
+          MISSION_STOP_RADIUS_M * MISSION_STOP_RADIUS_M) {
+        mission_active = false;
+        mav_mission_current_dirty = true;
+        flightLand();
+      }
+      break;
+    case MAV_CMD_NAV_LAND:
+      mission_active = false;
+      mav_mission_current_dirty = true;
+      flightLand();
+      break;
+    default:
+      mission_current++;                    // stored but unflown (§12) // lưu nhưng không bay
+      missionSendCurrent();
+      break;
+  }
+}
+
+// The mission and the home point persist in NVS with SAVE / LOAD (§5, disarmed
+// only) and survive a reboot.
+// Nhiệm vụ và điểm home nằm trong NVS qua SAVE / LOAD (§5, chỉ khi đã disarm)
+// và sống sót qua khởi động lại.
+void missionSave() {
+  struct { double lat, lon; uint8_t valid; } home = { home_lat, home_lon, home_valid };
+  nvs.putBytes("mhome", &home, sizeof(home));
+  nvs.putUShort("mcount", mission_count);
+  if (mission_count) nvs.putBytes("msn", mission_items, sizeof(MissionItem) * mission_count);
+  else nvs.remove("msn");
+}
+
+void missionLoad() {
+  struct { double lat, lon; uint8_t valid; } home;
+  if (nvs.getBytes("mhome", &home, sizeof(home)) == sizeof(home)) {
+    home_lat = home.lat;
+    home_lon = home.lon;
+    home_valid = home.valid != 0;
+    mav_home_dirty = true;
+  }
+  uint16_t n = nvs.getUShort("mcount", 0);
+  if (n > MISSION_MAX_ITEMS) n = MISSION_MAX_ITEMS;
+  if (n && nvs.getBytes("msn", mission_items, sizeof(MissionItem) * n) ==
+           sizeof(MissionItem) * n) {
+    mission_count = n;
+    mission_current = 0;
+  } else {
+    mission_count = 0;
+    mission_current = -1;
+  }
+  mission_active = false;
+  memset(jump_exec_count, 0, sizeof(jump_exec_count));
+  mav_mission_current_dirty = true;
+}
+
+// Port 7, channel 2 — the MISSION_* handshake (PROTOCOL.md §12). The client
+// re-sends its last message every 500 ms (§2), so every path here is
+// idempotent: COUNT restarts the upload, a repeated ITEM overwrites that seq.
+// Cổng 7, kênh 2 — bắt tay MISSION_* (PROTOCOL.md §12). Client gửi lại thông
+// điệp cuối mỗi 500 ms (§2), nên mọi nhánh ở đây đều idempotent: COUNT tải lại
+// từ đầu, ITEM lặp ghi đè seq đó.
+void crtpHandleMission(const uint8_t *p, size_t len) {
+  if (len < 2) return;
+  uint8_t cmd = p[1];
+
+  switch (cmd) {
+    case MSN_CMD_COUNT: {
+      if (len < 4) return;
+      uint16_t count = 0;
+      memcpy(&count, p + 2, 2);
+      int res = missionUploadBegin(count);
+      if (res == MAV_MISSION_ACCEPTED && count > 0) {
+        uint8_t out[4] = { MSN_HDR, MSN_CMD_REQUEST, 0, 0 };
+        memcpy(out + 2, &mission_stage_seq, 2);
+        crtpSend(out, sizeof(out));
+      } else {
+        // ACCEPTED with count 0 = the mission is cleared.
+        // ACCEPTED với count 0 = nhiệm vụ đã bị xóa.
+        uint8_t out[3] = { MSN_HDR, MSN_CMD_ACK, (uint8_t)res };
+        crtpSend(out, sizeof(out));
+      }
+      break;
+    }
+
+    case MSN_CMD_ITEM: {
+      // seq u16, command u16, p1 f32, p2 f32, lat_e7 i32, lon_e7 i32, alt f32
+      if (len < 26) return;
+      MissionItem it;
+      memcpy(&it.seq,     p + 2,  2);
+      memcpy(&it.command, p + 4,  2);
+      memcpy(&it.p1,      p + 6,  4);
+      memcpy(&it.p2,      p + 10, 4);
+      it.p3 = it.p4 = 0.0f;   // the §12 wire note — 30-byte ceiling // ghi chú §12
+      memcpy(&it.lat_e7,  p + 14, 4);
+      memcpy(&it.lon_e7,  p + 18, 4);
+      memcpy(&it.alt,     p + 22, 4);
+      bool done = false;
+      int res = missionUploadItem(&it, &done);
+      if (res != MAV_MISSION_ACCEPTED) {
+        uint8_t out[3] = { MSN_HDR, MSN_CMD_ACK, (uint8_t)res };
+        crtpSend(out, sizeof(out));
+      } else if (done) {
+        uint8_t out[3] = { MSN_HDR, MSN_CMD_ACK, MAV_MISSION_ACCEPTED };
+        crtpSend(out, sizeof(out));
+      } else {
+        uint8_t out[4] = { MSN_HDR, MSN_CMD_REQUEST, 0, 0 };
+        memcpy(out + 2, &mission_stage_seq, 2);
+        crtpSend(out, sizeof(out));
+      }
+      break;
+    }
+
+    case MSN_CMD_REQUEST_LIST: {
+      uint8_t out[4] = { MSN_HDR, MSN_CMD_COUNT, 0, 0 };
+      memcpy(out + 2, &mission_count, 2);
+      crtpSend(out, sizeof(out));
+      break;
+    }
+
+    case MSN_CMD_REQUEST: {
+      if (len < 4) return;
+      uint16_t seq = 0;
+      memcpy(&seq, p + 2, 2);
+      int idx = missionIndexForSeq(seq);
+      if (idx < 0) {
+        uint8_t out[3] = { MSN_HDR, MSN_CMD_ACK, MAV_MISSION_INVALID };
+        crtpSend(out, sizeof(out));
+        return;
+      }
+      uint8_t out[26];
+      const MissionItem *it = &mission_items[idx];
+      out[0] = MSN_HDR;
+      out[1] = MSN_CMD_ITEM;
+      memcpy(out + 2,  &it->seq,     2);
+      memcpy(out + 4,  &it->command, 2);
+      memcpy(out + 6,  &it->p1,      4);
+      memcpy(out + 10, &it->p2,      4);
+      memcpy(out + 14, &it->lat_e7,  4);
+      memcpy(out + 18, &it->lon_e7,  4);
+      memcpy(out + 22, &it->alt,     4);
+      crtpSend(out, sizeof(out));
+      break;
+    }
+
+    case MSN_CMD_SET_CURRENT: {
+      uint8_t status = 0;
+      if (len < 4) {
+        status = 1;
+      } else {
+        uint16_t seq = 0;
+        memcpy(&seq, p + 2, 2);
+        int idx = missionIndexForSeq(seq);
+        if (idx < 0) {
+          status = 1;
+        } else {
+          mission_current = (int16_t)idx;
+          memset(jump_exec_count, 0, sizeof(jump_exec_count));
+          missionSendCurrent();
+        }
+      }
+      uint8_t out[3] = { MSN_HDR, MSN_CMD_SET_CURRENT, status };
+      crtpSend(out, sizeof(out));
+      break;
+    }
+
+    case MSN_CMD_START: {
+      uint8_t status = missionStart() ? 0 : 1;
+      uint8_t out[3] = { MSN_HDR, MSN_CMD_START, status };
+      crtpSend(out, sizeof(out));
+      break;
+    }
+
+    default: {
+      uint8_t out[3] = { MSN_HDR, cmd, 1 };
+      crtpSend(out, sizeof(out));
+      break;
+    }
+  }
+}
+
+// =============================================================================
+//  MAVLINK BRIDGE  (PROTOCOL.md §13 — ArduPilot GCS interop)
+//  MAVLink v2 on UDP 14550 — a second transport for the same flight commands
+//  (§5) and the same mission store (§12). sysid 1 / compid 1,
+//  MAV_TYPE_QUADROTOR (2), MAV_AUTOPILOT_GENERIC (0): claiming ARDUPILOTMEGA
+//  would make Mission Planner expect the full ArduPilot parameter set.
+//  CẦU NỐI MAVLINK  (PROTOCOL.md §13 — tương thích GCS ArduPilot)
+//  MAVLink v2 trên UDP 14550 — transport thứ hai cho cùng lệnh bay (§5) và cùng
+//  kho nhiệm vụ (§12). sysid 1 / compid 1, MAV_TYPE_QUADROTOR (2),
+//  MAV_AUTOPILOT_GENERIC (0): khai báo ARDUPILOTMEGA sẽ khiến Mission Planner
+//  đòi đủ bộ tham số ArduPilot.
+// =============================================================================
+
+// crc_extra per message id (PROTOCOL.md §13; generated from pymavlink's common
+// dialect and pinned by test/mavlink_test.cpp).
+// crc_extra theo id thông điệp (PROTOCOL.md §13; sinh từ dialect common của
+// pymavlink và được test/mavlink_test.cpp cố định).
+const uint32_t MAV_CRC_IDS[]    = { 0, 1, 30, 33, 39, 40, 41, 42, 43,
+                                    44, 45, 47, 51, 73, 76, 77, 242, 253 };
+const uint8_t  MAV_CRC_EXTRAS[] = { 50, 124, 39, 104, 254, 230, 28, 28, 132,
+                                    221, 232, 153, 196, 38, 152, 143, 104, 83 };
+
+uint8_t mavCrcExtra(uint32_t id) {
+  for (size_t i = 0; i < sizeof(MAV_CRC_IDS) / sizeof(MAV_CRC_IDS[0]); i++)
+    if (MAV_CRC_IDS[i] == id) return MAV_CRC_EXTRAS[i];
+  return 0;
+}
+
+// CRC-16/MCRF4XX, MAVLink's accumulator (seed 0xFFFF).
+uint16_t mavCrcAccumulate(uint8_t data, uint16_t crc) {
+  uint8_t tmp = data ^ (uint8_t)(crc & 0xff);
+  tmp ^= (uint8_t)(tmp << 4);
+  return (uint16_t)((crc >> 8) ^ (tmp << 8) ^ (tmp << 3) ^ (tmp >> 4));
+}
+
+// Frame a v2 packet. Trailing zeros are trimmed from the payload and the length
+// field (MAVLink 2 zero-truncation); the CRC covers every byte from the length
+// byte on — never the STX — then one final accumulate of crc_extra.
+// Đóng gói gói v2. Các byte 0 cuối bị lược khỏi payload và trường length (cắt
+// số 0 của MAVLink 2); CRC phủ mọi byte từ byte length trở đi — không bao giờ
+// STX — rồi cộng dồn thêm một lần crc_extra cuối.
+size_t mavFrame(uint32_t msgid, const uint8_t *payload, size_t len, uint8_t *out) {
+  while (len > 0 && payload[len - 1] == 0) len--;
+  size_t i = 0;
+  out[i++] = MAVLINK_STX_V2;
+  out[i++] = (uint8_t)len;
+  out[i++] = 0;                          // incompat: unsigned v2
+  out[i++] = 0;                          // compat
+  out[i++] = mav_seq++;
+  out[i++] = MAVLINK_SYSID;
+  out[i++] = MAVLINK_COMPID;
+  out[i++] = (uint8_t)(msgid & 0xFF);
+  out[i++] = (uint8_t)((msgid >> 8) & 0xFF);
+  out[i++] = (uint8_t)((msgid >> 16) & 0xFF);
+  if (len) memcpy(out + i, payload, len);
+  i += len;
+  uint16_t crc = 0xFFFF;
+  for (size_t k = 1; k < i; k++) crc = mavCrcAccumulate(out[k], crc);
+  crc = mavCrcAccumulate(mavCrcExtra(msgid), crc);
+  out[i++] = (uint8_t)(crc & 0xFF);
+  out[i++] = (uint8_t)(crc >> 8);
+  return i;
+}
+
+void mavSendTo(const IPAddress &ip, uint16_t port, uint32_t msgid,
+               const uint8_t *payload, size_t len) {
+  uint8_t buf[128];
+  if (10 + len + 2 > sizeof(buf)) return;
+  size_t n = mavFrame(msgid, payload, len, buf);
+  MavUdp.beginPacket(ip, port);
+  MavUdp.write(buf, n);
+  MavUdp.endPacket();
+}
+
+void mavSend(uint32_t msgid, const uint8_t *payload, size_t len) {
+  if (!mav_gcs_known) return;
+  mavSendTo(mav_gcs_ip, mav_gcs_port, msgid, payload, len);
+}
+
+// Compass bearing of the nose now: ALIGN gave the bearing at launch, the gyro
+// gives the rotation since. Without a mag this drifts — same as the heading
+// hold itself (§5).
+// Phương la bàn của mũi hiện tại: ALIGN cho hướng tại cất cánh, con quay cho
+// lượng quay từ đó. Không có từ kế nên giá trị trôi — giống bản thân việc giữ
+// hướng (§5).
+float mavCompassDeg() {
+  float c = align_alpha_deg + (heading_deg - heading_ref_deg);
+  c = fmodf(c, 360.0f);
+  if (c < 0.0f) c += 360.0f;
+  return c;
+}
+
+void mavSendHeartbeat() {
+  uint8_t p[9] = {0};   // custom_mode unused — the mode lives in base_mode
+  uint8_t base = 0x01;                          // MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
+  if (armed) base |= 0x80;                      // MAV_MODE_FLAG_SAFETY_ARMED
+  if (flight_mode == MODE_AUTO) base |= 0x04;   // MAV_MODE_FLAG_AUTO_ENABLED
+  else if (flight_mode != MODE_MANUAL) base |= 0x08;  // GUIDED_ENABLED
+  p[4] = 2;                                     // MAV_TYPE_QUADROTOR
+  p[5] = 0;                                     // MAV_AUTOPILOT_GENERIC
+  p[6] = base;
+  p[7] = armed ? 4 : 3;                         // MAV_STATE_ACTIVE / STANDBY
+  p[8] = 3;                                     // MAVLink protocol version
+  mavSend(0, p, sizeof(p));
+}
+
+void mavSendSysStatus() {
+  uint8_t p[19] = {0};
+  // 1S — the cell IS the battery. 3.3 V empty, 4.2 V full.
+  // 1S — pin chính là ô đó. 3.3 V hết, 4.2 V đầy.
+  uint16_t mv = (uint16_t)(vbat * 1000.0f);
+  int8_t remaining =
+      (int8_t)constrain((vbat - 3.3f) / 0.9f * 100.0f, 0.0f, 100.0f);
+  memcpy(p + 14, &mv, 2);
+  p[16] = 0xFF;                                 // current_battery i16 = -1 (unknown)
+  p[17] = 0xFF;
+  p[18] = (uint8_t)remaining;
+  mavSend(1, p, sizeof(p));
+}
+
+void mavSendAttitude(uint32_t now) {
+  uint8_t p[28] = {0};
+  uint32_t t = now;
+  // MAVLink attitude is NED — roll positive right-wing-down. This firmware
+  // calls left-wing-down +roll, so roll flips sign; pitch (nose up) and yaw
+  // carry straight over.
+  // Tư thế MAVLink theo NED — roll dương khi cánh phải hạ. Firmware này gọi
+  // roll dương khi cánh TRÁI hạ, nên roll đảo dấu; pitch (mũi ngẩng) và yaw
+  // giữ nguyên.
+  float roll  = -angle_roll_deg  * DEG_TO_RAD;
+  float pitch =  angle_pitch_deg * DEG_TO_RAD;
+  float yaw   =  mavCompassDeg() * DEG_TO_RAD;
+  memcpy(p,      &t,     4);
+  memcpy(p + 4,  &roll,  4);
+  memcpy(p + 8,  &pitch, 4);
+  memcpy(p + 12, &yaw,   4);
+  mavSend(30, p, sizeof(p));
+}
+
+void mavSendGlobalPosition(uint32_t now) {
+  uint8_t p[28] = {0};
+  int32_t lat = 0, lon = 0;
+  if (home_valid) localToMission(pos_x, pos_y, &lat, &lon);
+  int32_t alt = 0, rel = 0;                     // no altitude sensor (§5)
+  // vel_* are launch-frame; the same rotation turns them into north/east.
+  // vel_* theo khung cất cánh; phép quay tương tự đưa chúng sang bắc/đông.
+  const float a = align_alpha_deg * DEG_TO_RAD;
+  const float ca = cosf(a), sa = sinf(a);
+  int16_t vx = (int16_t)(( vel_x * ca + vel_y * sa) * 100.0f);   // cm/s north
+  int16_t vy = (int16_t)(( vel_x * sa - vel_y * ca) * 100.0f);   // cm/s east
+  int16_t vz = 0;
+  uint16_t hdg = (uint16_t)(mavCompassDeg() * 100.0f);            // cdeg, 0..35999
+  uint32_t t = now;
+  memcpy(p,      &t,   4);
+  memcpy(p + 4,  &lat, 4);
+  memcpy(p + 8,  &lon, 4);
+  memcpy(p + 12, &alt, 4);
+  memcpy(p + 16, &rel, 4);
+  memcpy(p + 20, &vx,  2);
+  memcpy(p + 22, &vy,  2);
+  memcpy(p + 24, &vz,  2);
+  memcpy(p + 26, &hdg, 2);
+  mavSend(33, p, sizeof(p));
+}
+
+void mavSendHomePosition() {
+  uint8_t p[60] = {0};
+  int32_t lat = (int32_t)llround(home_lat * 1e7);
+  int32_t lon = (int32_t)llround(home_lon * 1e7);
+  int32_t alt = 0;
+  memcpy(p,     &lat, 4);
+  memcpy(p + 4, &lon, 4);
+  memcpy(p + 8, &alt, 4);
+  // x/y/z, q[4], approach xyz: not modelled — zeros.
+  // x/y/z, q[4], approach xyz: không mô hình hóa — để 0.
+  mavSend(242, p, sizeof(p));
+  mav_home_dirty = false;
+}
+
+void mavSendStatusText(uint8_t severity, const char *text) {
+  uint8_t p[51] = {0};
+  p[0] = severity;                              // MAV_SEVERITY
+  strncpy((char *)p + 1, text, 49);
+  mavSend(253, p, sizeof(p));
+}
+
+void mavSendCommandAck(uint16_t command, uint8_t result) {
+  uint8_t p[4] = {0};
+  memcpy(p, &command, 2);
+  p[2] = result;                                // MAV_RESULT
+  mavSend(77, p, sizeof(p));
+}
+
+void mavSendMissionCount(uint16_t count) {
+  uint8_t p[5] = {0};
+  memcpy(p, &count, 2);
+  p[4] = 0;                                     // mission_type: MISSION
+  mavSend(44, p, sizeof(p));
+}
+
+void mavSendMissionRequest(uint16_t seq) {
+  uint8_t p[5] = {0};
+  memcpy(p, &seq, 2);
+  p[4] = 0;
+  mavSend(40, p, sizeof(p));                    // MISSION_REQUEST
+}
+
+void mavSendMissionItemInt(const MissionItem *it) {
+  uint8_t p[38] = {0};
+  memcpy(p,       &it->p1,      4);
+  memcpy(p + 4,   &it->p2,      4);
+  memcpy(p + 8,   &it->p3,      4);
+  memcpy(p + 12,  &it->p4,      4);
+  memcpy(p + 16,  &it->lat_e7,  4);
+  memcpy(p + 20,  &it->lon_e7,  4);
+  memcpy(p + 24,  &it->alt,     4);
+  memcpy(p + 28,  &it->seq,     2);
+  memcpy(p + 30,  &it->command, 2);
+  p[37] = 0;                                    // mission_type ext
+  mavSend(73, p, sizeof(p));
+}
+
+void mavSendMissionAck(uint8_t type) {
+  uint8_t p[4] = {0};
+  p[2] = type;                                  // MAV_MISSION_RESULT
+  mavSend(47, p, sizeof(p));
+}
+
+void mavSendMissionCurrent() {
+  uint8_t p[6] = {0};
+  uint16_t seq = (mission_current >= 0 && mission_current < (int)mission_count)
+               ? mission_items[mission_current].seq : 0;
+  uint16_t total = mission_count;
+  memcpy(p, &seq, 2);
+  memcpy(p + 2, &total, 2);                     // ext: total
+  mavSend(42, p, sizeof(p));
+  mav_mission_current_dirty = false;
+}
+
+// COMMAND_LONG (§13) — the same flight commands the CRTP port-7 channel
+// carries (§5), plus MISSION_START and GET_HOME_POSITION.
+// COMMAND_LONG (§13) — cùng các lệnh bay mà kênh CRTP cổng 7 mang (§5), cộng
+// thêm MISSION_START và GET_HOME_POSITION.
+void mavHandleCommand(uint16_t command, float param1, float param2,
+                      float param5, float param6, float param7) {
+  bool ok = true;
+  bool supported = true;
+  switch (command) {
+    case 400:   // COMPONENT_ARM_DISARM — the CRTP ARM/DISARM rules (§5)
+      if (param1 > 0.5f) {
+        if (!armed) {
+          bool from_idle = (flight_mode == MODE_MANUAL && cmd_thrust <= 500) ||
+                           (flight_mode == MODE_AUTO && auto_state == AUTO_IDLE);
+          if (!from_idle || !armChecksOk("MAV ARM")) {
+            ok = false;
+            mavSendStatusText(4, "arm refused");
+          } else {
+            armed = true;
+            pidReset();
+          }
+        }
+      } else {
+        armed = false;
+        mission_active = false;
+        motor_test_active = false;
+        motorStop();
+        pidReset();
+      }
+      break;
+
+    case 22:    // NAV_TAKEOFF — the AUTO takeoff ramp // đoạn bám cất cánh AUTO
+      if (!flightTakeoff(hover_thrust)) ok = false;
+      break;
+
+    case 21:    // NAV_LAND
+      mission_active = false;
+      flightLand();
+      break;
+
+    case 20:    // NAV_RETURN_TO_LAUNCH
+      mission_active = false;
+      flightSetMode(MODE_RTH);
+      break;
+
+    case 300:   // MISSION_START — arm + AUTO + fly the mission (§12)
+      if (!missionStart()) {
+        ok = false;
+        mavSendStatusText(4, "mission start refused");
+      }
+      break;
+
+    case 176:   // DO_SET_MODE — param2 = custom mode (our 0..4) // param2 = chế độ
+      { uint8_t mode = (uint8_t)param2;
+        if (mode > MODE_RTH || (armed && vbat_crit)) ok = false;
+        else flightSetMode(mode); }
+      break;
+
+    case 410:   // GET_HOME_POSITION — HOME_POSITION on request (§13)
+      if (home_valid) mavSendHomePosition();
+      else ok = false;
+      break;
+
+    default:
+      supported = false;
+      break;
+  }
+  // MAV_RESULT: 0 accepted, 2 denied, 3 unsupported.
+  mavSendCommandAck(command, supported ? (ok ? 0 : 2) : 3);
+  (void)param1; (void)param2; (void)param5; (void)param6; (void)param7;
+}
+
+// The §12 store over MAVLink — identical handshake, _INT packing on the wire
+// (MISSION_ITEM floats accepted too and converted).
+// Kho §12 qua MAVLink — cùng bắt tay, đóng gói _INT trên dây (MISSION_ITEM dạng
+// float cũng được chấp nhận và chuyển đổi).
+void mavHandleMission(uint32_t msgid, const uint8_t *p, size_t len) {
+  switch (msgid) {
+    case 44: {  // MISSION_COUNT
+      if (len < 4) return;
+      uint16_t count = 0;
+      memcpy(&count, p, 2);
+      int res = missionUploadBegin(count);
+      if (res == MAV_MISSION_ACCEPTED && count > 0) mavSendMissionRequest(0);
+      else mavSendMissionAck((uint8_t)res);
+      break;
+    }
+
+    case 39:    // MISSION_ITEM (float lat/lon)
+    case 73: {  // MISSION_ITEM_INT (lat/lon x 1e7)
+      MissionItem it;
+      memset(&it, 0, sizeof(it));
+      memcpy(&it.p1,     p,      4);
+      memcpy(&it.p2,     p + 4,  4);
+      memcpy(&it.p3,     p + 8,  4);
+      memcpy(&it.p4,     p + 12, 4);
+      if (msgid == 73) {
+        memcpy(&it.lat_e7, p + 16, 4);
+        memcpy(&it.lon_e7, p + 20, 4);
+      } else {
+        float latf = 0.0f, lonf = 0.0f;
+        memcpy(&latf, p + 16, 4);
+        memcpy(&lonf, p + 20, 4);
+        it.lat_e7 = (int32_t)llround((double)latf * 1e7);
+        it.lon_e7 = (int32_t)llround((double)lonf * 1e7);
+      }
+      memcpy(&it.alt,     p + 24, 4);
+      memcpy(&it.seq,     p + 28, 2);
+      memcpy(&it.command, p + 30, 2);
+      bool done = false;
+      int res = missionUploadItem(&it, &done);
+      if (res != MAV_MISSION_ACCEPTED) mavSendMissionAck((uint8_t)res);
+      else if (done) mavSendMissionAck(MAV_MISSION_ACCEPTED);
+      else mavSendMissionRequest(mission_stage_seq);
+      break;
+    }
+
+    case 40:    // MISSION_REQUEST
+    case 51: {  // MISSION_REQUEST_INT — both answered with ITEM_INT
+      if (len < 2) return;
+      uint16_t seq = 0;
+      memcpy(&seq, p, 2);
+      int idx = missionIndexForSeq(seq);
+      if (idx < 0) {
+        mavSendMissionAck(MAV_MISSION_INVALID);
+        return;
+      }
+      mavSendMissionItemInt(&mission_items[idx]);
+      break;
+    }
+
+    case 43:    // MISSION_REQUEST_LIST
+      mavSendMissionCount(mission_count);
+      break;
+
+    case 41: {  // MISSION_SET_CURRENT
+      if (len < 2) return;
+      uint16_t seq = 0;
+      memcpy(&seq, p, 2);
+      int idx = missionIndexForSeq(seq);
+      if (idx < 0) {
+        mavSendMissionAck(MAV_MISSION_INVALID);
+        return;
+      }
+      mission_current = (int16_t)idx;
+      memset(jump_exec_count, 0, sizeof(jump_exec_count));
+      missionSendCurrent();
+      break;
+    }
+
+    case 45:    // MISSION_CLEAR_ALL
+      missionClear();
+      mavSendMissionAck(MAV_MISSION_ACCEPTED);
+      break;
+
+    default:
+      break;
+  }
+}
+
+// Parse one datagram — the GCS sends one frame per packet. v1 (0xFE) and v2
+// (0xFD) both accepted; v2 signed frames are ignored. Returns true when a
+// valid frame has been handled.
+// Parse một datagram — GCS gửi mỗi gói một frame. Chấp nhận cả v1 (0xFE) lẫn
+// v2 (0xFD); frame v2 có chữ ký bị bỏ qua. Trả về true khi đã xử lý một frame hợp lệ.
+bool mavHandle(const uint8_t *b, size_t n) {
+  size_t payload_off, crc_off, msgid;
+  uint8_t len;
+  if (n >= 12 && b[0] == MAVLINK_STX_V2) {
+    len = b[1];
+    if (b[2] & 0x01) return false;             // signed frame — not us
+    payload_off = 10;
+    crc_off = 10 + len;
+    msgid = (size_t)b[7] | ((size_t)b[8] << 8) | ((size_t)b[9] << 16);
+  } else if (n >= 8 && b[0] == MAVLINK_STX_V1) {
+    len = b[1];
+    payload_off = 6;
+    crc_off = 6 + len;
+    msgid = b[5];
+  } else {
+    return false;
+  }
+  if (n < crc_off + 2) return false;
+
+  uint16_t crc = 0xFFFF;
+  for (size_t k = 1; k < crc_off; k++) crc = mavCrcAccumulate(b[k], crc);
+  crc = mavCrcAccumulate(mavCrcExtra(msgid), crc);
+  if ((uint16_t)(b[crc_off] | (b[crc_off + 1] << 8)) != crc) return false;
+
+  const uint8_t *p = b + payload_off;
+  switch (msgid) {
+    case 0:     // HEARTBEAT — presence only // chỉ để biết còn sống
+      break;
+
+    case 76: {  // COMMAND_LONG
+      if (len < 33) break;
+      float param1 = 0.0f, param2 = 0.0f, param5 = 0.0f, param6 = 0.0f, param7 = 0.0f;
+      uint16_t command = 0;
+      memcpy(&param1, p,      4);
+      memcpy(&param2, p + 4,  4);
+      memcpy(&param5, p + 16, 4);
+      memcpy(&param6, p + 20, 4);
+      memcpy(&param7, p + 24, 4);
+      memcpy(&command, p + 28, 2);
+      mavHandleCommand(command, param1, param2, param5, param6, param7);
+      break;
+    }
+
+    case 44: case 39: case 73: case 40: case 51: case 43: case 41: case 45:
+      mavHandleMission(msgid, p, len);
+      break;
+
+    default:
+      break;                                    // known but unused — ignored
+  }
+  return true;
+}
+
+// Called every loop. Drain the MAVLink socket, then keep the GCS fed:
+// 2 Hz heartbeat + system status, 5 Hz attitude + position, and the event-
+// driven HOME_POSITION / MISSION_CURRENT.
+// Gọi mỗi vòng lặp. Rút socket MAVLink, rồi cấp liệu cho GCS: heartbeat +
+// system status 2 Hz, attitude + vị trí 5 Hz, và HOME_POSITION / MISSION_CURRENT
+// theo sự kiện.
+void mavlinkPoll() {
+  int packetSize = MavUdp.parsePacket();
+  while (packetSize > 0) {
+    uint8_t buf[192];
+    int n = MavUdp.read(buf, sizeof(buf));
+    if (n > 0) {
+      if (!mav_gcs_known || MavUdp.remoteIP() != mav_gcs_ip) {
+        // Learn the GCS the way the CRTP side learns the app — last sender wins.
+        // Học GCS như phía CRTP học app — người gửi cuối thắng.
+        mav_gcs_ip = MavUdp.remoteIP();
+        mav_gcs_port = MavUdp.remotePort();
+        mav_gcs_known = true;
+        mav_home_dirty = true;
+        mav_mission_current_dirty = true;
+        Serial.printf("[MAV] GCS %s:%u\n", mav_gcs_ip.toString().c_str(), mav_gcs_port);
+      }
+      if (mavHandle(buf, (size_t)n)) {
+        // A MAVLink packet proves the GCS link alive exactly like a CRTP
+        // packet (§5) — a GCS flies a mission without ever speaking CRTP.
+        // Gói MAVLink chứng minh liên kết GCS sống y như gói CRTP (§5) —
+        // GCS bay nhiệm vụ mà không bao giờ nói CRTP.
+        crtp_last_rx_ms = millis();
+      }
+    }
+    packetSize = MavUdp.parsePacket();
+  }
+
+  if (!mav_gcs_known) return;
+  uint32_t now = millis();
+  if ((int32_t)(now - mav_heartbeat_ms) >= 500) {
+    mav_heartbeat_ms = now;
+    mavSendHeartbeat();
+    mavSendSysStatus();
+  }
+  if ((int32_t)(now - mav_pos_ms) >= 200) {
+    mav_pos_ms = now;
+    mavSendAttitude(now);
+    mavSendGlobalPosition(now);
+    if (mav_home_dirty && home_valid) mavSendHomePosition();
+    if (mav_mission_current_dirty) mavSendMissionCurrent();
+  }
 }
 
 // =============================================================================
@@ -2158,6 +3221,7 @@ void crtpDispatch(const uint8_t *p, size_t len) {
       switch (p[0] & 0x03) {
         case 0: crtpHandleFlightControl(p, len); break;   // flight control
         case 1: crtpHandleNav(p, len);          break;   // navigation
+        case 2: crtpHandleMission(p, len);      break;   // mission (§12)
         default: break;
       }
       break;
@@ -2550,6 +3614,7 @@ void cfgSave() {
   uint16_t f[3] = { hover_thrust, takeoff_ms, land_ms };
   nvs.putBytes("pid",  g, sizeof(g));
   nvs.putBytes("fcfg", f, sizeof(f));
+  missionSave();          // mission + home origin too (§12) // thêm nhiệm vụ + điểm gốc
   Serial.println(F("[CFG] gains + flight config saved to NVS"));
 }
 
@@ -2568,6 +3633,7 @@ void cfgLoad() {
     land_ms    = f[2];
     Serial.println(F("[CFG] flight config loaded from NVS"));
   }
+  missionLoad();          // mission + home origin (§12) // nhiệm vụ + điểm gốc
   paramSanitizeAll();
 }
 
@@ -2575,6 +3641,8 @@ void flightSetMode(uint8_t mode) {
   if (mode > MODE_RTH) return;
   if (mode != MODE_AUTO) auto_state = AUTO_IDLE;   // FOLLOW/RTH are not a sequence
                                                    // FOLLOW/RTH không phải một chuỗi
+  if (mode != MODE_AUTO) missionStop();   // leaving AUTO stops the runner (§12)
+                                          // rời AUTO là dừng runner (§12)
   if (mode == MODE_HOLD) hold_heading_deg = heading_deg;   // lock where we are
                                                            // khóa hướng theo vị trí hiện tại
   flight_mode = mode;
@@ -2589,7 +3657,8 @@ bool flightTakeoff(uint16_t thrust) {
   // được khởi động lại đoạn bám từ 0 khi đang lên hoặc đang hover --
   // làm vậy sẽ làm rơi drone. Hãy coi như đã hoàn tất.
   if (armed && flight_mode == MODE_AUTO &&
-      (auto_state == AUTO_TAKEOFF || auto_state == AUTO_HOLD)) return true;
+      (auto_state == AUTO_TAKEOFF || auto_state == AUTO_HOLD ||
+       auto_state == AUTO_MISSION)) return true;
   // Flying in another mode: a ramp from zero thrust is never what is wanted.
   // Đang bay ở chế độ khác: một đoạn bám từ lực đẩy 0 không bao giờ là điều muốn.
   bool spinning = motor_rf > 1000 || motor_rr > 1000 || motor_lr > 1000 || motor_lf > 1000;
@@ -2608,6 +3677,7 @@ bool flightTakeoff(uint16_t thrust) {
 }
 
 void flightLand() {
+  missionStop();          // landing ends any mission (§12) // hạ cánh kết thúc nhiệm vụ
   if (flight_mode != MODE_AUTO) {
     flight_mode = MODE_AUTO;
     hold_heading_deg = heading_deg;
@@ -2623,6 +3693,7 @@ void flightEmergency() {
   armed = false;
   motor_test_active = false;   // EMERGENCY cuts a bench test too
                                // EMERGENCY cũng cắt cả thử bàn
+  missionStop();               // and any mission // và mọi nhiệm vụ
   motorStop();
   pidReset();
   flight_mode = MODE_MANUAL;
@@ -2657,6 +3728,18 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
         }
         case AUTO_HOLD:
           thrust = (float)hover_thrust;
+          // A started mission (§12) takes over from plain hover.
+          // Nhiệm vụ đã bắt đầu (§12) tiếp quản từ trạng thái lơ lửng.
+          if (mission_active) {
+            auto_state = AUTO_MISSION;
+            auto_phase_start_ms = now;
+            Serial.println(F("[MSN] mission legs"));
+          }
+          break;
+        case AUTO_MISSION:
+          thrust = (float)hover_thrust;
+          missionTick(now);       // sets tgt_* — navSetpoints() chases them below
+                                  // đặt tgt_* — navSetpoints() bám theo ở dưới
           break;
         case AUTO_LAND: {
           float t = (float)(now - auto_phase_start_ms) / (float)(land_ms ? land_ms : 1);
@@ -2700,7 +3783,10 @@ void flightSetpoints(uint32_t now, bool use_crtp, bool sbus_ok) {
     // làm việc trong khung thân, nên drone trượt về phía mục tiêu bất kể nó đang
     // quay mặt hướng nào; điện thoại vẫn có thể ra lệnh hướng riêng nếu muốn mũi
     // chỉ về phía người lái.
-    if (flight_mode == MODE_FOLLOW || flight_mode == MODE_RTH) {
+    // A mission leg steers exactly like FOLLOW/RTH — missionTick() owns tgt_*.
+    // Chân nhiệm vụ lái y như FOLLOW/RTH — missionTick() làm chủ tgt_*.
+    if (flight_mode == MODE_FOLLOW || flight_mode == MODE_RTH ||
+        (flight_mode == MODE_AUTO && auto_state == AUTO_MISSION)) {
       if (flight_mode == MODE_RTH) { tgt_x = 0.0f; tgt_y = 0.0f; tgt_valid = true; }
       navSetpoints();
     }
@@ -2978,6 +4064,8 @@ void setup() {
   nvs.getString("ssid", sta_ssid, sizeof(sta_ssid));
   nvs.getString("pass", sta_pass, sizeof(sta_pass));
   linkInit();
+  MavUdp.begin(MAVLINK_UDP_PORT);   // ArduPilot GCS socket (§13)
+                                    // socket GCS ArduPilot (§13)
 
   mpuCalibrateGyro();
   batteryUpdate();
@@ -2987,6 +4075,7 @@ void setup() {
   Serial.println(F("            throttle LOW + yaw LEFT 1 s to disarm."));
   Serial.println(F("[ARM] CRTP : thrust at 0, then up, arms; thrust back to 0 disarms."));
   Serial.println(F("[MODE] manual | hold | auto(takeoff->hover->land) over CRTP port 7."));
+  Serial.println(F("[MAV ] MAVLink v2 on UDP 14550 — Mission Planner / QGC / MAVProxy."));
   Serial.println(F("[NOTE] IMU only — hold keeps a thrust level, not an altitude."));
   Serial.println(F("=================================================="));
 
@@ -3002,6 +4091,7 @@ void loop() {
   // ---- receivers ----
   sbusPoll();
   if (link_ready) linkPoll();
+  mavlinkPoll();          // MAVLink GCS socket (§13) // socket GCS MAVLink
 
   // Ages are compared SIGNED. `now` is read before the receivers are polled, so
   // a packet handled this very loop can carry a timestamp 1 ms newer than `now`.
@@ -3037,6 +4127,8 @@ void loop() {
   // ---- failsafe ----
   if (!rx_ok && armed) {
     armed = false;
+    missionStop();          // a dead link ends a mission too (§12)
+                            // mất liên kết cũng kết thúc nhiệm vụ (§12)
     motorStop();
     pidReset();
     flight_mode = MODE_MANUAL;

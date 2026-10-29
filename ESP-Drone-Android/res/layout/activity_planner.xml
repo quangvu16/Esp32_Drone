@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plan screen (portrait): the Mission Planner Flight Plan port (PROTOCOL.md §12).
+     Strings are hardcoded on purpose: strings.xml is owned by the stock app and
+     must not grow entries for this screen. -->
+<!-- Màn Plan (portrait): bản chuyển thể Flight Plan của Mission Planner
+     (PROTOCOL.md mục 12). Chuỗi được ghi cứng là chủ đích: strings.xml thuộc về
+     app gốc và không được thêm mục cho màn hình này. -->
+<!-- Portrait organization: header + status on top, the map takes the remaining
+     height as the primary surface, the row editor appears under it when a grid
+     row is selected, then the item tools, the grid, and the transfer commands
+     at the bottom where thumbs reach. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/planner_header"
+        layout="@layout/view_fly_header" />
+
+    <TextView
+        android:id="@+id/planner_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:text="status: idle"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <!-- The map is the primary surface: tapping it adds a waypoint there. -->
+    <!-- Bản đồ là bề mặt chính: chạm vào nó thêm một waypoint tại đó. -->
+    <se.bitcraze.crazyfliecontrol2.gpsnav.MissionMapView
+        android:id="@+id/planner_map"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Row editor (the Mission Planner grid cells): shown while a row is
+         selected. Fields commit when they lose focus, the command commits
+         when it is picked. -->
+    <!-- Dải sửa dòng (các ô lưới của Mission Planner): hiện khi có dòng được
+         chọn. Trường ghi nhận khi mất focus, lệnh ghi nhận khi được chọn. -->
+    <LinearLayout
+        android:id="@+id/planner_edit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Spinner
+                android:id="@+id/planner_cmd"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="6dp"
+                android:paddingEnd="2dp"
+                android:text="P1"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/planner_p1"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:inputType="numberDecimal|numberSigned"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingEnd="2dp"
+                android:text="P2"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/planner_p2"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:inputType="numberDecimal|numberSigned"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="6dp"
+                android:paddingEnd="2dp"
+                android:text="P3"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/planner_p3"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:inputType="numberDecimal|numberSigned"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="6dp"
+                android:paddingEnd="2dp"
+                android:text="P4"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/planner_p4"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:inputType="numberDecimal|numberSigned"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingEnd="2dp"
+                android:text="Lat"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/planner_lat"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:inputType="numberDecimal|numberSigned"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="6dp"
+                android:paddingEnd="2dp"
+                android:text="Lng"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/planner_lon"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:inputType="numberDecimal|numberSigned"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Item tools: label and tools share one row. Del / up / down / Load /
+         Save are icon-only with a contentDescription + tooltip, like the
+         routine tools on the Mission screen. -->
+    <!-- Công cụ mục: nhãn và công cụ chung một hàng. Xóa / lên / xuống / Nạp /
+         Lưu là chỉ-có-icon kèm contentDescription + tooltip, giống các công cụ
+         thường ngày ở màn Mission. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:paddingStart="2dp"
+            android:paddingEnd="8dp"
+            android:text="Mission"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/planner_wp_up"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:contentDescription="Move item up"
+            android:src="@drawable/ic_btn_up"
+            android:tooltipText="Move item up" />
+
+        <ImageButton
+            android:id="@+id/planner_wp_down"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:contentDescription="Move item down"
+            android:src="@drawable/ic_btn_down"
+            android:tooltipText="Move item down" />
+
+        <ImageButton
+            android:id="@+id/planner_wp_remove"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:contentDescription="Delete selected item"
+            android:src="@drawable/ic_btn_delete"
+            android:tooltipText="Delete selected item" />
+
+        <ImageButton
+            android:id="@+id/planner_load"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:contentDescription="Load mission file"
+            android:src="@drawable/ic_btn_open"
+            android:tooltipText="Load mission file" />
+
+        <ImageButton
+            android:id="@+id/planner_save"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:contentDescription="Save mission file"
+            android:src="@drawable/ic_btn_save"
+            android:tooltipText="Save mission file" />
+    </LinearLayout>
+
+    <!-- The grid: # / Command / P1-P4 / Lat / Lng / Alt, one row per item. -->
+    <!-- Lưới: # / Lệnh / P1-P4 / Vĩ độ / Kinh độ / Độ cao, mỗi dòng một mục. -->
+    <ListView
+        android:id="@+id/planner_grid"
+        android:layout_width="match_parent"
+        android:layout_height="130dp"
+        android:choiceMode="singleChoice" />
+
+    <!-- Add / altitude: the default altitude box is Mission Planner's "Alt";
+         Set applies it to the selected row. -->
+    <!-- Thêm / độ cao: ô độ cao mặc định là "Alt" của Mission Planner; Set ghi
+         nó vào dòng đang chọn. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/planner_add"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Add WP"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_goto"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="8dp"
+            android:paddingEnd="2dp"
+            android:text="Alt"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/planner_alt"
+            android:layout_width="64dp"
+            android:layout_height="48dp"
+            android:inputType="numberDecimal|numberSigned"
+            android:text="3.0"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/planner_alt_set"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Set"
+            android:textAllCaps="false"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Transfer: Read/Write in Mission Planner's words — the MISSION_* handshake
+         of PROTOCOL.md §12 over CRTP port 7 channel 2. Start flies the stored
+         mission (it arms first), so it carries an icon AND a label. -->
+    <!-- Truyền: Read/Write theo cách gọi của Mission Planner — bắt tay MISSION_*
+         của PROTOCOL.md mục 12 trên CRTP port 7 kênh 2. Start bay nhiệm vụ đã lưu
+         (nó arm trước), nên mang cả icon lẫn nhãn. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/planner_upload"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Upload"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_up"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+
+        <Button
+            android:id="@+id/planner_download"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Download"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_down"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+
+        <Button
+            android:id="@+id/planner_start"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Start"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_btn_mission"
+            app:iconGravity="textStart"
+            app:iconPadding="4dp"
+            app:iconSize="18dp" />
+    </LinearLayout>
+</LinearLayout>

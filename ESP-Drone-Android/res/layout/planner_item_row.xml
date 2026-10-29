@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One mission-item grid row: the Mission Planner Flight Plan grid columns
+     (# / Command / P1-P4 / Lat / Lng / Alt) stacked for a phone screen.
+     Strings are hardcoded on purpose: strings.xml is owned by the stock app. -->
+<!-- Một dòng lưới mục nhiệm vụ: các cột lưới Flight Plan của Mission Planner
+     (# / Lệnh / P1-P4 / Vĩ độ / Kinh độ / Độ cao) xếp chồng cho màn hình điện thoại. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="6dp"
+    android:paddingTop="3dp"
+    android:paddingEnd="6dp"
+    android:paddingBottom="3dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/planner_row_seq"
+            android:layout_width="34dp"
+            android:layout_height="wrap_content"
+            android:text="#0"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/planner_row_cmd"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="WAYPOINT"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/planner_row_alt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="alt 0.0" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/planner_row_params"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="monospace"
+        android:text="P1 0.0  P2 0.0  P3 0.0  P4 0.0"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/planner_row_pos"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="monospace"
+        android:text="0.00000000, 0.00000000"
+        android:textSize="12sp" />
+</LinearLayout>

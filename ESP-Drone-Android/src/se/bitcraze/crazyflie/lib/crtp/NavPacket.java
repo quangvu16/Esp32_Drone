@@ -56,6 +56,7 @@ public class NavPacket extends CrtpPacket {
     public static final int CMD_TARGET = 0x20;
     public static final int CMD_RESET = 0x21;
     public static final int CMD_ALIGN = 0x22;
+    public static final int CMD_ORIGIN = 0x23;
 
     private final int mCmd;
     private final byte[] mArgs;
@@ -86,6 +87,22 @@ public class NavPacket extends CrtpPacket {
         ByteBuffer buffer = ByteBuffer.allocate(4).order(BYTE_ORDER);
         buffer.putFloat(alphaDegrees);
         return new NavPacket(CMD_ALIGN, buffer.array());
+    }
+
+    /**
+     * Launch latitude/longitude in WGS-84 degrees — the only bridge between the
+     * dead-reckoned local frame and mission/telemetry coordinates (PROTOCOL.md §12).
+     * Send it with ALIGN before flying a mission with latitude/longitude items.
+     * <p>
+     * Vĩ độ/kinh độ điểm cất cánh theo WGS-84 — cầu nối duy nhất giữa khung cục bộ
+     * tự dẫn đường và tọa độ nhiệm vụ/telemetry (PROTOCOL.md mục 12). Gửi kèm ALIGN
+     * trước khi bay nhiệm vụ có mục vĩ độ/kinh độ.
+     */
+    public static NavPacket origin(double latitude, double longitude) {
+        ByteBuffer buffer = ByteBuffer.allocate(16).order(BYTE_ORDER);
+        buffer.putDouble(latitude);
+        buffer.putDouble(longitude);
+        return new NavPacket(CMD_ORIGIN, buffer.array());
     }
 
     @Override

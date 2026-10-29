@@ -1,10 +1,10 @@
 #!/bin/sh
-# Runs the frame and yaw-rotation tests against the formulas in the sketch.
+# Runs the host tests against the formulas in the sketch.
 #
-# Both .cpp files copy the rotations verbatim out of ../Esp32_drone.ino, which
-# means they would silently go stale if those lines ever changed. So before
-# building anything, check the copied lines are still in the sketch and fail
-# loudly if not.
+# The .cpp files copy their math and framing verbatim out of ../Esp32_drone.ino,
+# which means they would silently go stale if those lines ever changed. So
+# before building anything, check the copied lines are still in the sketch and
+# fail loudly if not.
 set -e
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -19,7 +19,7 @@ fi
 check() {
     if ! grep -qF "$1" "$sketch"; then
         echo "STALE TEST: '$1' is no longer in Esp32_drone.ino" >&2
-        echo "            the tests copy the rotation math verbatim;" >&2
+        echo "            the tests copy the math and framing verbatim;" >&2
         echo "            re-sync test/*.cpp with the sketch before trusting them." >&2
         exit 1
     fi
@@ -59,6 +59,28 @@ check 'if (footer != 0x00 && (footer & 0x0F) != 0x04) return false;'
 check 'if (f[23] & 0x08) return false;'
 check 'if (f[23] & 0x04) return false;'
 
+# The mission engine math, copied by mission_test.cpp.
+echo "--- checking the mission engine ---"
+check '*x = (float)(n * ca + e * sa);'
+check '*y = (float)(n * sa - e * ca);'
+check 'double n = (double)x * ca + (double)y * sa;'
+check 'double e = (double)x * sa - (double)y * ca;'
+check 'if (target == items[i].seq) return MAV_MISSION_INVALID;'
+check 'uint16_t times = (uint16_t)it->p2;'
+check 'jump_exec_count[mission_current]++;'
+check 'mission_current = (int16_t)target;'
+
+# The MAVLink framing and CRC, copied by mavlink_test.cpp.
+echo "--- checking the MAVLink bridge ---"
+check 'MAV_CRC_IDS[]'
+check 'MAV_CRC_EXTRAS[]'
+check 'tmp ^= (uint8_t)(tmp << 4);'
+check 'return (uint16_t)((crc >> 8) ^ (tmp << 8) ^ (tmp << 3) ^ (tmp >> 4));'
+check 'while (len > 0 && payload[len - 1] == 0) len--;'
+check 'for (size_t k = 1; k < i; k++) crc = mavCrcAccumulate(out[k], crc);'
+check 'crc = mavCrcAccumulate(mavCrcExtra(msgid), crc);'
+check 'if ((uint16_t)(b[crc_off] | (b[crc_off + 1] << 8)) != crc) return false;'
+
 # The nav accelerometer scale must match the range mpuInit() configures.
 # It once said +-2 g (16384) while the sensor ran at +-8 g -- a 4x error.
 echo "--- checking accelerometer scale ---"
@@ -95,6 +117,8 @@ echo "ok   NAV_HEADING_SIGN = $sign"
 "$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/logcfg_test" "$here/logcfg_test.cpp" -lm
 "$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/level_test"  "$here/level_test.cpp"  -lm
 "$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/sbus_test"   "$here/sbus_test.cpp"   -lm
+"$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/mission_test" "$here/mission_test.cpp" -lm
+"$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/mavlink_test" "$here/mavlink_test.cpp" -lm
 
 echo
 echo "--- frame_test: does the target rotation match the dead reckoning? ---"
@@ -111,3 +135,9 @@ echo "--- level_test: does self-level pull back toward the target? ---"
 echo
 echo "--- sbus_test: are failsafe / lost frames rejected? ---"
 "$out/sbus_test"
+echo
+echo "--- mission_test: conversion, DO_JUMP accounting, jump chains ---"
+"$out/mission_test"
+echo
+echo "--- mavlink_test: framing, crc_extra, golden frames ---"
+"$out/mavlink_test"

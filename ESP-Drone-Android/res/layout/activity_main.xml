@@ -41,6 +41,15 @@
                 android:textStyle="bold"
                 app:backgroundTint="@color/fly_surface" />
 
+            <!-- Plan: the Mission Planner flight-plan screen — edit and transfer missions. -->
+            <!-- Plan: màn hình lập kế hoạch bay kiểu Mission Planner — sửa và truyền nhiệm vụ. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tab_plan"
+                style="@style/Fly.Button.Segment"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Plan" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/tab_mission"
                 style="@style/Fly.Button.Segment"

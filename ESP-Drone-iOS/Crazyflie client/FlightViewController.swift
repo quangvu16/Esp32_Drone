@@ -311,10 +311,14 @@ extension UIButton {
 
 // MARK: - Shared screen header (redesign stage 3)
 
-/// The five sections every screen's header offers.
-/// Năm khu mà header của mọi màn hình đều có.
+/// The six sections every screen's header offers. The order is the flight
+/// story: Fly (Flight Data), Plan (Flight Plan, the Mission Planner screen),
+/// Mission (fly the plan), then the tools.
+/// Sáu khu mà header của mọi màn hình đều có. Thứ tự là câu chuyện bay: Fly
+/// (Flight Data), Plan (Flight Plan, màn hình Mission Planner), Mission (bay
+/// kế hoạch), rồi các công cụ.
 enum AppSection: Int {
-    case fly = 0, mission, indoor, tune, setup
+    case fly = 0, plan, mission, indoor, tune, setup
 }
 
 /// Puts the shared header into a pop-up screen's navigation bar: status on the left
@@ -345,7 +349,7 @@ final class SectionHeader: NSObject {
     /// Được gọi sau khi màn hình này đã đóng, kèm khu cần mở.
     var onSwitch: ((AppSection) -> Void)?
 
-    private let sections = UISegmentedControl(items: ["Fly", "Mission", "Indoor", "Tune", "Setup"])
+    private let sections = UISegmentedControl(items: ["Fly", "Plan", "Mission", "Indoor", "Tune", "Setup"])
     private let statusLabel = UILabel()
     private let cutButton = UIButton(type: .system)
     private var cutPrimed = false

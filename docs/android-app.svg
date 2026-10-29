@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1180" width="1280" height="1180" role="img" aria-labelledby="ttl desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1520" width="1280" height="1520" role="img" aria-labelledby="ttl desc">
   <title id="ttl">ESP-Drone Android app</title>
-  <desc id="desc">Screen map of the ESP-Drone Android client: the landscape flight screen with twin joysticks and the flight-mode panel, the GPS mission screen with read-only zones, the Indoor Map annotation editor and the PID tuning screen.</desc>
+  <desc id="desc">Screen map of the ESP-Drone Android client: the landscape flight screen with twin joysticks and the flight-mode panel, the GPS mission screen with read-only zones, the Plan (Mission Planner Flight Plan) screen, the Indoor Map annotation editor and the PID tuning screen.</desc>
 
   <defs>
     <style>
@@ -28,7 +28,7 @@
     </style>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1280" height="1180"/>
+  <rect class="bg" x="0" y="0" width="1280" height="1520"/>
 
   <!-- ============================ header ============================ -->
   <text class="h1" x="40" y="44">Android app — ESP-Drone</text>
@@ -49,16 +49,18 @@
   <text class="chip" x="186" y="168">UDP 192.168.43.42</text>
   <text class="lbl" x="340" y="168">3.98 V</text>
   <text class="lbl" x="412" y="168">Link 98%</text>
-  <rect class="btn" x="520" y="152" width="42" height="24" rx="6"/>
-  <text class="lbl" x="541" y="168" text-anchor="middle">Fly</text>
-  <rect class="btn" x="566" y="152" width="64" height="24" rx="6"/>
-  <text class="lbl" x="598" y="168" text-anchor="middle">Mission</text>
-  <rect class="btn" x="634" y="152" width="58" height="24" rx="6"/>
-  <text class="lbl" x="663" y="168" text-anchor="middle">Indoor</text>
-  <rect class="btn" x="696" y="152" width="50" height="24" rx="6"/>
-  <text class="lbl" x="721" y="168" text-anchor="middle">Tune</text>
-  <rect class="btn" x="750" y="152" width="54" height="24" rx="6"/>
-  <text class="lbl" x="777" y="168" text-anchor="middle">Setup</text>
+  <rect class="btn" x="500" y="152" width="40" height="24" rx="6"/>
+  <text class="lbl" x="520" y="168" text-anchor="middle">Fly</text>
+  <rect class="btn" x="544" y="152" width="46" height="24" rx="6"/>
+  <text class="lbl" x="567" y="168" text-anchor="middle">Plan</text>
+  <rect class="btn" x="594" y="152" width="62" height="24" rx="6"/>
+  <text class="lbl" x="625" y="168" text-anchor="middle">Mission</text>
+  <rect class="btn" x="660" y="152" width="56" height="24" rx="6"/>
+  <text class="lbl" x="688" y="168" text-anchor="middle">Indoor</text>
+  <rect class="btn" x="720" y="152" width="46" height="24" rx="6"/>
+  <text class="lbl" x="743" y="168" text-anchor="middle">Tune</text>
+  <rect class="btn" x="770" y="152" width="52" height="24" rx="6"/>
+  <text class="lbl" x="796" y="168" text-anchor="middle">Setup</text>
 
   <!-- body 184–436 -->
   <!-- left joystick -->
@@ -239,11 +241,12 @@
   <!-- header -->
   <rect class="panel" x="52" y="922" width="796" height="32" rx="8"/>
   <text class="lbl" x="68" y="943">Indoor Map</text>
-  <rect class="btn" x="520" y="928" width="42" height="20" rx="5"/><text class="lblm" x="541" y="942" text-anchor="middle">Fly</text>
-  <rect class="btn" x="566" y="928" width="58" height="20" rx="5"/><text class="lblm" x="595" y="942" text-anchor="middle">Mission</text>
-  <rect class="btn-pri" x="628" y="928" width="54" height="20" rx="5"/><text class="lblw" x="655" y="942" text-anchor="middle">Indoor</text>
-  <rect class="btn" x="686" y="928" width="46" height="20" rx="5"/><text class="lblm" x="709" y="942" text-anchor="middle">Tune</text>
-  <rect class="btn" x="736" y="928" width="50" height="20" rx="5"/><text class="lblm" x="761" y="942" text-anchor="middle">Setup</text>
+  <rect class="btn" x="500" y="928" width="38" height="20" rx="5"/><text class="lblm" x="519" y="942" text-anchor="middle">Fly</text>
+  <rect class="btn" x="542" y="928" width="42" height="20" rx="5"/><text class="lblm" x="563" y="942" text-anchor="middle">Plan</text>
+  <rect class="btn" x="588" y="928" width="58" height="20" rx="5"/><text class="lblm" x="617" y="942" text-anchor="middle">Mission</text>
+  <rect class="btn-pri" x="650" y="928" width="52" height="20" rx="5"/><text class="lblw" x="676" y="942" text-anchor="middle">Indoor</text>
+  <rect class="btn" x="706" y="928" width="42" height="20" rx="5"/><text class="lblm" x="727" y="942" text-anchor="middle">Tune</text>
+  <rect class="btn" x="752" y="928" width="48" height="20" rx="5"/><text class="lblm" x="776" y="942" text-anchor="middle">Setup</text>
 
   <!-- map -->
   <rect class="panel" x="64" y="962" width="470" height="172" rx="6"/>
@@ -302,4 +305,86 @@
   <text class="lblm" x="908" y="1088">Shapes snap to 5° and whole metres on release.</text>
   <text class="lblm" x="908" y="1112">The plan is shared with the Mission screen (NavStore),</text>
   <text class="lblm" x="908" y="1132">so the zones edited here are the zones the runner flies.</text>
+
+  <!-- ============================ plan screen ============================ -->
+  <text class="h2" x="40" y="1214">Plan screen (Mission Planner Flight Plan)</text>
+  <text class="lblm" x="420" y="1214">gpsnav/PlannerActivity · the onboard mission editor</text>
+
+  <rect class="bezel" x="40" y="1228" width="820" height="270" rx="18"/>
+  <rect class="screen" x="52" y="1240" width="796" height="246" rx="8"/>
+
+  <!-- header -->
+  <rect class="panel" x="52" y="1240" width="796" height="32" rx="8"/>
+  <text class="lbl" x="68" y="1261">Plan</text>
+  <rect class="btn" x="500" y="1246" width="38" height="20" rx="5"/><text class="lblm" x="519" y="1260" text-anchor="middle">Fly</text>
+  <rect class="btn-pri" x="542" y="1246" width="42" height="20" rx="5"/><text class="lblw" x="563" y="1260" text-anchor="middle">Plan</text>
+  <rect class="btn" x="588" y="1246" width="58" height="20" rx="5"/><text class="lblm" x="617" y="1260" text-anchor="middle">Mission</text>
+  <rect class="btn" x="650" y="1246" width="52" height="20" rx="5"/><text class="lblm" x="676" y="1260" text-anchor="middle">Indoor</text>
+  <rect class="btn" x="706" y="1246" width="42" height="20" rx="5"/><text class="lblm" x="727" y="1260" text-anchor="middle">Tune</text>
+  <rect class="btn" x="752" y="1246" width="48" height="20" rx="5"/><text class="lblm" x="776" y="1260" text-anchor="middle">Setup</text>
+
+  <!-- map -->
+  <rect class="panel" x="64" y="1282" width="330" height="192" rx="6"/>
+  <rect x="72" y="1290" width="314" height="176" rx="4" fill="#e6f2e6" stroke="#d0d7de"/>
+  <path d="M 120 1440 L 180 1390 L 260 1360 L 330 1320" fill="none" stroke="#0969da" stroke-width="2.5"/>
+  <circle cx="120" cy="1440" r="7" fill="#1a7f37"/>
+  <text class="chip" x="132" y="1444" fill="#1a7f37">home</text>
+  <circle cx="180" cy="1390" r="7" fill="#0969da"/>
+  <text class="chip" x="192" y="1394">WP1</text>
+  <circle cx="260" cy="1360" r="7" fill="#bc4c00"/>
+  <text class="chip" x="272" y="1350" fill="#bc4c00">WP2 ▸ selected</text>
+  <circle cx="330" cy="1320" r="7" fill="#0969da"/>
+  <text class="chip" x="300" y="1312">WP3</text>
+  <text class="lblm" x="84" y="1308">MissionMapView</text>
+  <text class="lblm" x="84" y="1462">tap = add waypoint · keep-out zones refuse the tap</text>
+
+  <!-- grid -->
+  <rect class="panel" x="406" y="1282" width="428" height="106" rx="6"/>
+  <text class="tag" x="416" y="1298">GRID — Mission Planner columns</text>
+  <text class="mono" x="416" y="1318">#  Command    P1..P4        Lat, Lon        Alt</text>
+  <text class="mono" x="416" y="1336">0  TAKEOFF    0 2.5 0 0     10.762622, 106.660172   30</text>
+  <rect x="410" y="1342" width="420" height="18" rx="3" fill="#fff8c5" stroke="#bc4c00"/>
+  <text class="mono" x="416" y="1355" fill="#bc4c00">1  WAYPOINT   0 2.5 0 0     10.762700, 106.660200   25.5</text>
+  <text class="mono" x="416" y="1374">2  DO_JUMP    1 3 0 0       0.000000, 0.000000      0</text>
+
+  <!-- edit strip -->
+  <rect class="panel" x="406" y="1396" width="428" height="34" rx="6"/>
+  <rect class="btn" x="414" y="1402" width="90" height="22" rx="5"/><text class="lblm" x="459" y="1417" text-anchor="middle">WAYPOINT ▾</text>
+  <text class="mono" x="514" y="1417">P1 0  P2 2.5  P3 0  P4 0</text>
+  <text class="mono" x="690" y="1417">10.762700, 106.660200</text>
+
+  <!-- tools + add + transfer -->
+  <rect class="btn" x="406" y="1438" width="28" height="22" rx="5"/><text class="lblm" x="420" y="1453" text-anchor="middle">▲</text>
+  <rect class="btn" x="438" y="1438" width="28" height="22" rx="5"/><text class="lblm" x="452" y="1453" text-anchor="middle">▼</text>
+  <rect class="btn" x="470" y="1438" width="28" height="22" rx="5"/><text class="lblm" x="484" y="1453" text-anchor="middle">🗑</text>
+  <rect class="btn" x="502" y="1438" width="28" height="22" rx="5"/><text class="lblm" x="516" y="1453" text-anchor="middle">📁</text>
+  <rect class="btn" x="534" y="1438" width="28" height="22" rx="5"/><text class="lblm" x="548" y="1453" text-anchor="middle">💾</text>
+  <rect class="btn" x="572" y="1438" width="62" height="22" rx="5"/><text class="lblm" x="603" y="1453" text-anchor="middle">Add WP</text>
+  <text class="lblm" x="642" y="1453">Alt</text>
+  <rect class="btn" x="664" y="1438" width="38" height="22" rx="5"/><text class="mono" x="683" y="1453" text-anchor="middle">3.0</text>
+  <rect class="btn" x="706" y="1438" width="36" height="22" rx="5"/><text class="lblm" x="724" y="1453" text-anchor="middle">Set</text>
+  <rect class="btn" x="750" y="1438" width="28" height="22" rx="5"/><text class="lblm" x="764" y="1453" text-anchor="middle">⇪</text>
+  <rect class="btn" x="782" y="1438" width="28" height="22" rx="5"/><text class="lblm" x="796" y="1453" text-anchor="middle">⇩</text>
+  <rect class="btn-pri" x="814" y="1438" width="20" height="22" rx="5"/><text class="lblw" x="824" y="1453" text-anchor="middle">▶</text>
+
+  <!-- right notes -->
+  <rect class="card" x="890" y="1210" width="350" height="288" rx="10"/>
+  <text class="h2" x="908" y="1236">Read · Write · Start</text>
+  <line class="rule" x1="908" y1="1246" x2="1222" y2="1246"/>
+  <text class="lblm" x="908" y="1270">Upload ⇪</text>
+  <text class="lbl" x="1004" y="1270">write the plan to the drone</text>
+  <text class="lblm" x="908" y="1294">Download ⇩</text>
+  <text class="lbl" x="1004" y="1294">read the stored plan back</text>
+  <text class="lblm" x="908" y="1318">Start ▶</text>
+  <text class="lbl" x="1004" y="1318">arms and flies it onboard</text>
+  <text class="lblm" x="908" y="1348">📁 💾</text>
+  <text class="lbl" x="1004" y="1348">Mission Planner .waypoints</text>
+  <text class="lblm" x="908" y="1372">QGC WPL 110</text>
+  <text class="lbl" x="1020" y="1372">plans move between the two</text>
+  <text class="lblm" x="908" y="1402">CRTP port 7 ch 2</text>
+  <text class="lbl" x="1020" y="1402">MISSION_* handshake</text>
+  <text class="lblm" x="908" y="1426">MAVLink UDP 14550</text>
+  <text class="lbl" x="1036" y="1426">Mission Planner / QGC too</text>
+  <text class="lblm" x="908" y="1456">Home → flight origin: the app sends it before</text>
+  <text class="lblm" x="908" y="1476">Upload / Start — the drone has no GPS.</text>
 </svg>

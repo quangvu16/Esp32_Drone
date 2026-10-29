@@ -283,11 +283,12 @@ the arming checks beyond "must be disarmed".
 |---|---|---|
 | 0 | MANUAL | pilot commands tilt angles / yaw rate / thrust directly |
 | 1 | HOLD | attitude level, heading locked at entry, thrust = hover_thrust |
-| 2 | AUTO | takeoff ramp → hold → land ramp → disarm |
+| 2 | AUTO | takeoff ramp → fly the uploaded mission (§12) or hold → land ramp → disarm |
 | 3 | FOLLOW | tilt toward the phone's GPS-derived target offset |
 | 4 | RTH | like FOLLOW but the target is the launch point |
 
-`flight.auto_state` (log id 12): 0 idle, 1 takeoff, 2 hold, 3 land.
+`flight.auto_state` (log id 12): 0 idle, 1 takeoff, 2 hold, 3 land, 4 mission
+leg (§12 — same thrust as hold, plus waypoint steering).
 
 **Arming:** in MANUAL the drone auto-arms when thrust rises above 1000 *after*
 thrust has been seen at ≤ 500 since the CommanderPacket stream started (a phone
@@ -308,7 +309,9 @@ to MANUAL when, for 500 ms:
   commander stream is the setpoint, so other traffic does not count;
 - HOLD/AUTO/FOLLOW/RTH: no **CRTP packet of any kind** arrives and there is no
   valid SBUS. Keep resending an idempotent command (SET_MODE, LAND) at least
-  every 500 ms.
+  every 500 ms. A valid **MAVLink** frame (§13) counts as link alive just like
+  a CRTP packet, so a Mission Planner GCS can fly a mission without any CRTP
+  traffic.
 
 SBUS frames flagged *failsafe* or *frame lost* by the receiver (byte 23) are
 ignored, so a receiver in failsafe also runs this timeout out.
@@ -324,9 +327,11 @@ magnetometer. So:
 
 - HOLD keeps a **thrust level**, not an altitude. Hover height drifts as the
   battery sags. Say so; do not draw an altitude hold.
-- AUTO is a **takeoff → hover → land** sequence, not waypoint flight.
-- FOLLOW / RTH use accelerometer dead reckoning. It drifts — metres within a
-  minute. Label it approximate.
+- AUTO flies the **uploaded mission** (§12) when one is started — takeoff,
+  waypoints, land — or a plain takeoff → hover → land otherwise. Waypoint
+  legs steer by dead reckoning, exactly like FOLLOW.
+- FOLLOW / RTH / mission legs use accelerometer dead reckoning. It drifts —
+  metres within a minute. Label it approximate.
 
 ---
 
@@ -346,6 +351,7 @@ reply   : <0x71><cmd><status uint8>
 | 0x20 | TARGET | `float north_m`, `float east_m` | target offset from launch |
 | 0x21 | RESET | — | zero the dead-reckoned position |
 | 0x22 | ALIGN | `float alpha_deg` | compass bearing of the nose at launch; also zeroes the position and starts a new launch frame |
+| 0x23 | ORIGIN | `double lat`, `double lon` | launch **latitude/longitude** for mission items and telemetry (§12, §13). Pair it with `ALIGN` — it sets no angle and zeroes nothing. |
 
 Send `ALIGN` once when the pilot arms/launches. The drone rotates north/east
 offsets into its own frame using that angle, which is the one frame
@@ -521,6 +527,8 @@ Reverse it to turn the drone's reported position back into a lat/lon.
 ## 10. GPS mission navigation (phone side)
 
 The **phone** runs the mission; the **drone** chases one offset at a time.
+(Or hand the whole mission over — the drone can fly it onboard, §12, which is
+what the Planner page does.)
 That split matters: the drone has no GPS and no compass, so it cannot evaluate a
 mission, but it does not need to. Everything below is a phone-side state machine
 that ends in a `TARGET` packet.
@@ -753,3 +761,163 @@ both apps must tolerate safely should go here as text.
 
 The firmware never sends an empty console packet — the Android resend-queue
 matcher indexes into the payload without a bounds check.
+
+---
+
+## 12. Onboard mission engine (port 7, channel 2) — **firmware extension**
+
+An ArduPilot-style mission stored **on the drone** and flown in AUTO. The
+semantics are ported from `ArduPilot/ardupilot` — `libraries/AP_Mission` +
+`ArduCopter/mode_auto.cpp` for the item execution, the `MISSION_*` handshake
+of the MAVLink mission protocol for the transfer.
+
+A mission is a list of **items** — the same rows a Mission Planner
+`.waypoints` file (`QGC WPL 110`) holds:
+
+```
+item = seq uint16, command uint16, p1..p4 float32, lat, lon (deg), alt float32 (m)
+```
+
+Commands are MAV_CMD values (ArduPilot `common.xml`):
+
+| cmd | Name | Behaviour when the runner reaches it |
+|---|---|---|
+| 16 | NAV_WAYPOINT | fly to (lat, lon) — `p2` = acceptance radius, m (default 2.5, floor 0.5) |
+| 20 | NAV_RETURN_TO_LAUNCH | fly to the launch point, then land |
+| 21 | NAV_LAND | land where it is |
+| 22 | NAV_TAKEOFF | the AUTO takeoff ramp (no movement; normally item 0) |
+| 177 | DO_JUMP | jump to the item whose seq is `p1`; `p2` = repeat count, `0` or `-1` = forever |
+
+Any other command is **stored but skipped** when flying (so a round trip
+through a file or another planner stays lossless). `alt` is stored and
+reported but not flown — the drone holds a thrust level, not a height (§5).
+
+### Transfer (CRTP port 7, channel 2, header `0x72`)
+
+| cmd | Name | payload | dir | meaning |
+|---|---|---|---|---|
+| 0x30 | MISSION_COUNT | `uint16 count` | app → drone | start an upload of `count` items; `0` clears the mission |
+| 0x31 | MISSION_REQUEST | `uint16 seq` | drone → app | "send item seq" |
+| 0x32 | MISSION_ITEM | `uint16 seq, uint16 command, float p1, float p2, int32 lat_e7, int32 lon_e7, float alt` | app → drone | deliver one item |
+| 0x33 | MISSION_ACK | `uint8 type` | drone → app | MAV_MISSION_* values: 0 accepted, 1 error, 4 no space, 5 invalid, 14 denied |
+| 0x34 | MISSION_REQUEST_LIST | — | app → drone | start a download |
+| 0x35 | MISSION_SET_CURRENT | `uint16 seq` | app → drone | make `seq` the current item |
+| 0x36 | MISSION_CURRENT | `uint16 seq` | drone → app | telemetry, sent when the current item changes |
+| 0x37 | MISSION_START | — | app → drone | arm (normal checks) + AUTO + fly the mission from the current item; reply `<0x72><0x37><status uint8>` |
+
+Upload handshake — identical to MAVLink's mission protocol:
+
+```
+app → MISSION_COUNT n
+drone → MISSION_REQUEST 0        (or MISSION_ACK 4 when n > 32)
+app → MISSION_ITEM 0
+…
+drone → MISSION_REQUEST n-1
+app → MISSION_ITEM n-1
+drone → MISSION_ACK 0            the mission is live
+```
+
+Download handshake:
+
+```
+app → MISSION_REQUEST_LIST
+drone → MISSION_COUNT n
+app → MISSION_REQUEST 0 …        drone answers each with MISSION_ITEM
+```
+
+Reliability: the app re-sends its last mission message every **500 ms** until
+the expected reply arrives. Every handler is idempotent — a repeated
+`MISSION_COUNT` restarts the upload, a repeated `MISSION_ITEM` overwrites that
+seq — matching the resend-queue rules of §2.
+
+Wire note: the CRTP item carries **p1 and p2 only**; p3/p4 are zeroed on this
+channel (CRTP packets are ≤ 30 bytes, §1). The full four params survive in
+`.waypoints` files and over MAVLink (§13). Lat/lon travel as int32 degrees
+×1e7 — the MAVLink `MISSION_ITEM_INT` packing.
+
+### Flying it
+
+`MISSION_START` runs the AUTO takeoff ramp (or the item-0 `NAV_TAKEOFF`),
+then walks the items in order, one `flight.auto_state` = 4 (mission leg) at a
+time:
+
+- **NAV_WAYPOINT** — chase (lat, lon) with `navSetpoints()` (§6). Arrival
+  when within `p2` metres of it, then advance to the next item.
+- **DO_JUMP** — move to seq `p1`, counting repeats: `p2 > 0` = that many
+  jumps in total, `p2 ≤ 0` = forever.
+- **NAV_LAND** — the AUTO land ramp, then disarm.
+- **NAV_RETURN_TO_LAUNCH** — chase `(0, 0)`, land on arrival.
+- **NAV_TAKEOFF** — the ramp; advance when the climb is done.
+- **after the last item** — land in place (ArduPilot's
+  `MIS_DONE_BEHAVE = 0` default).
+
+While a mission flies, the §5 failsafe keeps applying: any CRTP or MAVLink
+packet counts as link alive in AUTO — ping with `SET_MODE 2` or a
+`MISSION_CURRENT` read at least every 500 ms. (Unlike ArduPilot, link loss
+ends the flight — this board's position is dead reckoning, not GPS, so a
+disconnected mission is a fly-away risk, not a feature.) `SET_MODE` to anything else, `LAND`,
+`EMERGENCY` and low battery all stop the mission as they stop any other
+flight.
+
+### Home / origin
+
+Waypoints are lat/lon; the drone's position is metres in the launch frame
+(§6). The app therefore sends the launch position once at launch time:
+
+- **0x23 ORIGIN** `double lat, double lon` — the lat/lon the offsets are
+  relative to (§6). Set it together with `ALIGN`.
+
+Conversion both ways (flat earth — right to well beyond the flight radius):
+
+```
+north = (lat − lat0) · 111319.49
+east  = (lon − lon0) · 111319.49 · cos(lat0)      and the inverse
+```
+
+then the §6 rotation maps (north, east) into the launch frame and back.
+
+The mission and the origin persist in NVS with `SAVE` / `LOAD` (§5,
+disarmed only) and survive a reboot.
+
+---
+
+## 13. MAVLink bridge (UDP 14550) — ArduPilot GCS interop
+
+The firmware speaks **MAVLink v2** on its own UDP socket — port **14550**,
+the conventional MAVLink-over-WiFi port — so ArduPilot ground stations
+(Mission Planner, QGroundControl, MAVProxy) connect to the drone directly
+and plan missions with their normal tools. It is a second transport for the
+same flight commands (§5) and the same mission engine (§12); the CRTP link
+keeps its low-latency control role for the apps.
+
+Vehicle identity: `sysid 1`, `compid 1` (`MAV_COMP_ID_AUTOPILOT1`),
+`MAV_TYPE_QUADROTOR` (2), `MAV_AUTOPILOT_GENERIC` (0) — this board is not an
+ArduPilot board, and claiming `ARDUPILOTMEGA` would make Mission Planner
+expect the full ArduPilot parameter set.
+
+| dir | message | id | notes |
+|---|---|---|---|
+| tx | HEARTBEAT | 0 | 2 Hz — type 2, autopilot 0, `MAV_MODE_FLAG_SAFETY_ARMED` when armed, `MAV_STATE_ACTIVE` |
+| tx | SYS_STATUS | 1 | battery mV / remaining from the cell voltage |
+| tx | ATTITUDE | 30 | 5 Hz — roll/pitch/yaw from the IMU |
+| tx | GLOBAL_POSITION_INT | 33 | 5 Hz — lat/lon from `pos_x,pos_y` + origin, `hdg` from `heading_deg` |
+| tx | HOME_POSITION | 242 | on request / when origin changes |
+| tx | MISSION_CURRENT | 42 | when the current item changes |
+| tx | MISSION_COUNT / MISSION_ITEM_INT / MISSION_ACK | 44 / 73 / 47 | the §12 handshake, `_INT` packing |
+| tx | COMMAND_ACK | 77 | per received COMMAND_LONG |
+| tx | STATUSTEXT | 253 | arming refusals, mission events |
+| rx | COMMAND_LONG | 76 | `COMPONENT_ARM_DISARM` 400, `NAV_TAKEOFF` 22, `NAV_LAND` 21, `NAV_RETURN_TO_LAUNCH` 20, `MISSION_START` 300, `DO_SET_MODE` 176 |
+| rx | MISSION_COUNT / MISSION_ITEM_INT / MISSION_ITEM / MISSION_REQUEST / MISSION_REQUEST_INT / MISSION_REQUEST_LIST / MISSION_SET_CURRENT / MISSION_CLEAR_ALL | 44 / 73 / 39 / 40 / 51 / 43 / 41 / 45 | same store as §12 |
+
+Checksums are standard CRC-16/MCRF4XX with each message's `crc_extra`
+(HEARTBEAT 50, SYS_STATUS 124, ATTITUDE 39, GLOBAL_POSITION_INT 104,
+MISSION_ITEM 254, MISSION_ITEM_INT 38, MISSION_REQUEST 230,
+MISSION_REQUEST_INT 196, MISSION_REQUEST_LIST 132, MISSION_COUNT 221,
+MISSION_ACK 153, MISSION_SET_CURRENT 28, MISSION_CURRENT 28,
+MISSION_CLEAR_ALL 232, COMMAND_LONG 152, COMMAND_ACK 143, STATUSTEXT 83,
+HOME_POSITION 104).
+The table is generated from pymavlink's `common` dialect and pinned by
+`Esp32_drone/test/`.
+
+Both a MAVLink GCS and an app can hold the mission at once — they write the
+same store, and the last upload wins.

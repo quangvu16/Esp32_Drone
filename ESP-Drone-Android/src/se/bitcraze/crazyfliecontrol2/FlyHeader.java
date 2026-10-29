@@ -20,6 +20,7 @@ import java.util.Locale;
 import se.bitcraze.crazyfliecontrol.prefs.PreferencesActivity;
 import se.bitcraze.crazyfliecontrol2.gpsnav.GpsNavActivity;
 import se.bitcraze.crazyfliecontrol2.gpsnav.IndoorMapActivity;
+import se.bitcraze.crazyfliecontrol2.gpsnav.PlannerActivity;
 import se.bitcraze.crazyfliecontrol2.tune.TuneActivity;
 
 /**
@@ -47,11 +48,16 @@ import se.bitcraze.crazyfliecontrol2.tune.TuneActivity;
  */
 public final class FlyHeader {
 
+    // The tab order is the flight story: Fly (Flight Data), Plan (Flight Plan,
+    // the Mission Planner screen), Mission (fly the plan), then the tools.
+    // Thứ tự tab là câu chuyện bay: Fly (Flight Data), Plan (Flight Plan, màn
+    // Mission Planner), Mission (bay kế hoạch), rồi các công cụ.
     public static final int FLY = 0;
-    public static final int MISSION = 1;
-    public static final int INDOOR = 2;
-    public static final int TUNE = 3;
-    public static final int SETUP = 4;
+    public static final int PLAN = 1;
+    public static final int MISSION = 2;
+    public static final int INDOOR = 3;
+    public static final int TUNE = 4;
+    public static final int SETUP = 5;
 
     private static final String[] MODE_NAMES = {"MANUAL", "HOLD", "AUTO", "FOLLOW", "RTH"};
     private static final long POLL_MS = 500;
@@ -98,8 +104,8 @@ public final class FlyHeader {
         mArmedChip = (TextView) header.findViewById(R.id.hdr_armed_chip);
         mCut = (MaterialButton) header.findViewById(R.id.hdr_cut_motors);
 
-        int[] ids = {R.id.hdr_tab_fly, R.id.hdr_tab_mission, R.id.hdr_tab_indoor,
-                R.id.hdr_tab_tune, R.id.hdr_tab_setup};
+        int[] ids = {R.id.hdr_tab_fly, R.id.hdr_tab_plan, R.id.hdr_tab_mission,
+                R.id.hdr_tab_indoor, R.id.hdr_tab_tune, R.id.hdr_tab_setup};
         int surface = color(R.color.fly_surface);
         for (int i = 0; i < ids.length; i++) {
             final int section = i;
@@ -158,6 +164,10 @@ public final class FlyHeader {
         }
         switch (section) {
             case FLY:
+                mActivity.finish();
+                break;
+            case PLAN:
+                mActivity.startActivity(new Intent(mActivity, PlannerActivity.class));
                 mActivity.finish();
                 break;
             case MISSION:
