@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.espressif.espdrone.android"
     android:versionCode="19"
     android:versionName="0.7.3" >
@@ -12,11 +13,23 @@
         android:name="android.hardware.bluetooth_le"
         android:required="false"/>
 
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <!-- SPP and BLE scanning on Android 12+; maxSdk keeps the legacy grants for older devices -->
+    <!-- Legacy grants stop at Android 11: from 12 (API 31) the runtime
+         BLUETOOTH_SCAN / BLUETOOTH_CONNECT pair replaces them.
+         Quyền cũ chỉ tới Android 11: từ bản 12 (API 31) cặp quyền chạy
+         BLUETOOTH_SCAN / BLUETOOTH_CONNECT thay thế chúng. -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <!-- SPP and BLE scanning on Android 12+; neverForLocation keeps the scan
+         free of location permission (the drone advertises no scan data we
+         derive location from). -->
+    <!-- Quét SPP và BLE trên Android 12+; neverForLocation để phép quét không
+         cần quyền vị trí (drone không quảng bá dữ liệu nào để suy ra vị trí). -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />

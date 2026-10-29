@@ -29,9 +29,11 @@ package se.bitcraze.crazyfliecontrol.prefs;
 
 import java.io.IOException;
 
+import se.bitcraze.crazyflie.lib.crtp.FlightControlPacket;
 import se.bitcraze.crazyflie.lib.crazyradio.ConnectionData;
 import se.bitcraze.crazyflie.lib.crazyradio.Crazyradio;
 import se.bitcraze.crazyfliecontrol.prefs.SelectConnectionDialogFragment.SelectCrazyflieDialogListener;
+import se.bitcraze.crazyfliecontrol2.DroneSession;
 import se.bitcraze.crazyfliecontrol2.UsbLinkAndroid;
 import android.annotation.TargetApi;
 import android.app.ActionBar;
@@ -39,6 +41,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.ActivityInfo;
@@ -48,6 +51,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
+import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceActivity;
@@ -82,11 +86,43 @@ public class PreferencesActivity extends PreferenceActivity {
     public static final String KEY_PREF_LINK_HOST = "pref_link_host";
     public static final String KEY_PREF_LINK_DEVICE_PORT = "pref_link_device_port";
     public static final String KEY_PREF_LINK_APP_PORT = "pref_link_app_port";
+    public static final String KEY_PREF_LINK_SWITCH = "pref_link_switch";
 
     public static final String LINK_METHOD_SOFTAP = "softap";
     public static final String LINK_METHOD_STATION = "station";
     public static final String LINK_METHOD_BT_SPP = "bt_spp";
     public static final String LINK_METHOD_BLE = "ble";
+    // Coexistence profiles (PROTOCOL.md section 8, LINK 4/5/6). The app picks
+    // one side: WiFi UDP for 4/5, SPP for 6 (BLE is free for another client).
+    // Các hồ sơ chung sống (PROTOCOL.md mục 8, LINK 4/5/6). App chọn một phía:
+    // WiFi UDP cho 4/5, SPP cho 6 (BLE nhàn cho client khác).
+    public static final String LINK_METHOD_WIFI_AP_BLE = "wifi_ap_ble";
+    public static final String LINK_METHOD_WIFI_STA_BLE = "wifi_sta_ble";
+    public static final String LINK_METHOD_BT_DUAL = "bt_dual";
+
+    // The firmware NVS `link` profile number for a connection method — what
+    // FC_CMD_LINK must carry for the drone to end up serving this method
+    // (PROTOCOL.md section 8).
+    // Số hồ sơ `link` NVS của firmware cho một phương thức kết nối — thứ mà
+    // FC_CMD_LINK phải mang để drone phục vụ đúng phương thức đó
+    // (PROTOCOL.md mục 8).
+    public static int linkModeFor(String method) {
+        if (LINK_METHOD_STATION.equals(method)) {
+            return 1;
+        } else if (LINK_METHOD_BT_SPP.equals(method)) {
+            return 2;
+        } else if (LINK_METHOD_BLE.equals(method)) {
+            return 3;
+        } else if (LINK_METHOD_WIFI_AP_BLE.equals(method)) {
+            return 4;
+        } else if (LINK_METHOD_WIFI_STA_BLE.equals(method)) {
+            return 5;
+        } else if (LINK_METHOD_BT_DUAL.equals(method)) {
+            return 6;
+        }
+        return 0; // softap — the firmware default
+                  // softap — mặc định của firmware
+    }
 
     public static final String KEY_PREF_MODE = "pref_mode";
     public static final String KEY_PREF_DEADZONE = "pref_deadzone";
@@ -235,6 +271,17 @@ public class PreferencesActivity extends PreferenceActivity {
             setInitialSummaryAndReturnDefaultValue(KEY_PREF_LINK_HOST, R.string.preferences_link_host_default);
             setInitialSummaryAndReturnDefaultValue(KEY_PREF_LINK_DEVICE_PORT, R.string.preferences_link_device_port_default);
             setInitialSummaryAndReturnDefaultValue(KEY_PREF_LINK_APP_PORT, R.string.preferences_link_app_port_default);
+
+            // Explicit, confirmed FC_CMD_LINK — see the preference XML note.
+            // FC_CMD_LINK tường minh có xác nhận — xem ghi chú trong XML thiết lập.
+            findPreference(KEY_PREF_LINK_SWITCH).setOnPreferenceClickListener(new OnPreferenceClickListener() {
+
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    confirmLinkSwitch();
+                    return true;
+                }
+            });
 
             // Connection settings
             // Thiết lập kết nối
@@ -670,6 +717,42 @@ public class PreferencesActivity extends PreferenceActivity {
         public void onPause() {
             getPreferenceScreen().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
             super.onPause();
+        }
+
+        // Sending LINK reboots the board, so this always confirms first — a
+        // blind send could kill a pilot's live link on a coexistence profile.
+        // The command rides the live connection (FC_CMD_LINK 0x10), so there
+        // is nothing to send when no drone is linked.
+        // Gửi LINK sẽ khởi động lại bo mạch, nên bước này luôn xác nhận trước
+        // — gửi mù có thể cắt link đang dùng của người lái trên hồ sơ chung
+        // sống. Lệnh đi trên kết nối đang mở (FC_CMD_LINK 0x10), nên khi chưa
+        // nối với drone nào thì không có gì để gửi.
+        private void confirmLinkSwitch() {
+            final se.bitcraze.crazyflie.lib.crazyflie.Crazyflie crazyflie = DroneSession.get();
+            if (crazyflie == null) {
+                Toast.makeText(getActivity(), R.string.preferences_link_switch_noconn, Toast.LENGTH_LONG).show();
+                return;
+            }
+            String method = mSharedPreferences.getString(KEY_PREF_LINK_METHOD, LINK_METHOD_SOFTAP);
+            final int mode = linkModeFor(method);
+            Preference methodPref = findPreference(KEY_PREF_LINK_METHOD);
+            CharSequence entry = (methodPref instanceof ListPreference)
+                    ? ((ListPreference) methodPref).getEntry() : null;
+            String label = entry != null ? entry.toString() : method;
+            new AlertDialog.Builder(getActivity())
+                    .setTitle(R.string.preferences_link_switch_confirm)
+                    .setMessage(getString(R.string.preferences_link_switch_message, label, mode))
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.preferences_link_switch, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            crazyflie.sendPacket(FlightControlPacket.link(mode));
+                            Toast.makeText(getActivity(),
+                                    "LINK " + mode + " sent — the drone reboots in about 1.5 s.",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .show();
         }
 
         private void radioScan() {

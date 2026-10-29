@@ -158,18 +158,22 @@ public class TuneActivity extends AppCompatActivity {
     // ---- bench motor test (PROTOCOL.md §5, FC_CMD_MOTOR_TEST 0x0C) ----
     // The firmware holds the test only while the GUI re-sends within MOTOR_TEST_TIMEOUT_MS
     // (300 ms), so a dropped link or a closed screen stops the motors by itself. We re-send
-    // at 200 ms for margin. Disarmed only — the firmware refuses it while armed.
+    // at 150 ms: tighter than 200 so the watchdog stays fed over BLE's slower round trips,
+    // still leaving half the timeout as margin. Disarmed only — the firmware refuses it
+    // while armed.
     // ---- thử động cơ trên bàn (PROTOCOL.md §5, FC_CMD_MOTOR_TEST 0x0C) ----
     // Firmware chỉ giữ thử trong khi GUI gửi lại trong MOTOR_TEST_TIMEOUT_MS (300 ms), nên
-    // mất liên kết hay đóng màn hình là động cơ tự dừng. Chúng ta gửi lại mỗi 200 ms cho dư
-    // biên. Chỉ khi chưa armed — firmware từ chối khi đang armed.
-    private static final int MOTOR_TEST_PERIOD_MS = 200;
+    // mất liên kết hay đóng màn hình là động cơ tự dừng. Chúng ta gửi lại mỗi 150 ms: chặt
+    // hơn 200 để watchdog luôn được nạp qua các vòng BLE chậm hơn, vẫn còn một nửa thời gian
+    // chờ làm dư biên. Chỉ khi chưa armed — firmware từ chối khi đang armed.
+    private static final int MOTOR_TEST_PERIOD_MS = 150;
     private static final int MOTOR_THRUST_FLOOR = FlightControlPacket.MOTOR_THRUST_MIN;   // 1000 µs
     private static final int MOTOR_THRUST_RANGE = FlightControlPacket.MOTOR_THRUST_MAX
             - FlightControlPacket.MOTOR_THRUST_MIN;                                       // 1000 µs span
 
     private Button mMotorStartBtn;
     private TextView mMotorStatus;
+    private EditText mMotorSpeedField;
     private final SeekBar[] mMotorSliders = new SeekBar[4];
     private final TextView[] mMotorValues = new TextView[4];
     private volatile boolean mMotorTestRunning;
@@ -1228,7 +1232,7 @@ public class TuneActivity extends AppCompatActivity {
 
         TextView note = new TextView(this);
         note.setText("Props off or restrained. Spins m1..m4 directly with the PID bypassed, "
-                + "disarmed only. The link re-sends every 200 ms — closing this screen or "
+                + "disarmed only. The link re-sends every 150 ms — closing this screen or "
                 + "losing the link stops the motors.");
         note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         note.setTextColor(0xFF606870);
@@ -1275,6 +1279,39 @@ public class TuneActivity extends AppCompatActivity {
             panel.addView(row, rowLp);
         }
 
+        // Speed + Run all: one tap spins all four motors at the same µs — one
+        // enable=1 packet carries four speeds (MOTOR_TEST, PROTOCOL.md §5).
+        // Speed + Run all: một chạm quay cả bốn motor ở cùng µs — một gói
+        // enable=1 mang bốn tốc độ (MOTOR_TEST, PROTOCOL.md mục 5).
+        LinearLayout allRow = new LinearLayout(this);
+        allRow.setOrientation(LinearLayout.HORIZONTAL);
+        allRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView speedLabel = new TextView(this);
+        speedLabel.setText("Speed");
+        speedLabel.setTypeface(Typeface.MONOSPACE);
+        speedLabel.setWidth(dp(32));
+        allRow.addView(speedLabel);
+
+        mMotorSpeedField = numberField("1200");
+        mMotorSpeedField.setInputType(InputType.TYPE_CLASS_NUMBER);
+        allRow.addView(mMotorSpeedField, smallFieldParams());
+
+        Button runAllBtn = new Button(this);
+        runAllBtn.setText("Run all");
+        runAllBtn.setAllCaps(false);
+        runAllBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                runAllMotors();
+            }
+        });
+        allRow.addView(runAllBtn);
+
+        LinearLayout.LayoutParams allLp = matchWrap();
+        allLp.topMargin = dp(4);
+        panel.addView(allRow, allLp);
+
         mMotorStartBtn = new Button(this);
         mMotorStartBtn.setText("Start test");
         mMotorStartBtn.setAllCaps(false);
@@ -1315,6 +1352,34 @@ public class TuneActivity extends AppCompatActivity {
         mMotorStartBtn.setText("Stop test");
         mMotorStatus.setText("Running — re-sending every " + MOTOR_TEST_PERIOD_MS + " ms");
         mMotorTestTick.run();
+    }
+
+    /** Run all four motors at once at the Speed box value (MOTOR_TEST, PROTOCOL.md §5). */
+    /** Chạy cả bốn motor cùng lúc ở giá trị hộp Speed (MOTOR_TEST, PROTOCOL.md mục 5). */
+    private void runAllMotors() {
+        int speed;
+        try {
+            speed = Integer.parseInt(mMotorSpeedField.getText().toString().trim());
+        } catch (NumberFormatException e) {
+            mMotorStatus.setText("Speed: not a number");
+            return;
+        }
+        speed = Math.max(MOTOR_THRUST_FLOOR,
+                Math.min(MOTOR_THRUST_FLOOR + MOTOR_THRUST_RANGE, speed));
+        for (int i = 0; i < 4; i++) {
+            mMotorSliders[i].setProgress(speed - MOTOR_THRUST_FLOOR);
+        }
+        if (!mMotorTestRunning) {
+            // toggleMotorTest() carries the armed guard and starts the re-send loop.
+            // toggleMotorTest() mang bước kiểm tra armed và khởi động vòng gửi lại.
+            toggleMotorTest();
+            if (!mMotorTestRunning) {
+                return; // refused (armed) — the refusal message stays on the status line.
+                        // bị từ chối (armed) — thông báo từ chối giữ nguyên trên dòng trạng thái.
+            }
+        }
+        mMotorStatus.setText("All motors at " + speed + " µs — re-sending every "
+                + MOTOR_TEST_PERIOD_MS + " ms");
     }
 
     /** Halt the re-send loop and tell the firmware to stop (enable=0). */

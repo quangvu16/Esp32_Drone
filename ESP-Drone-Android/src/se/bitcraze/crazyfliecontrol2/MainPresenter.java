@@ -1,5 +1,6 @@
 package se.bitcraze.crazyfliecontrol2;
 
+import android.bluetooth.BluetoothDevice;
 import android.util.Log;
 
 import java.io.File;
@@ -294,20 +295,40 @@ public class MainPresenter {
     }
 
     public void connectBtSpp(File cacheDir) {
+        connectBtSpp(cacheDir, null);
+    }
+
+    /**
+     * @param device the picker's choice; null falls back to the name search
+     * @param device thiết bị trình chọn chọn; null thì tìm theo tên
+     */
+    public void connectBtSpp(File cacheDir, BluetoothDevice device) {
         Log.d(LOG_TAG, "connectBtSpp()");
         disconnect();
         mDriver = null;
-        mDriver = new BtSppLink(mainActivity);
+        BtSppLink sppLink = new BtSppLink(mainActivity);
+        sppLink.setTarget(device);
+        mDriver = sppLink;
         connect(cacheDir, null);
     }
 
     public void connectBle(boolean writeWithResponse, File mCacheDir) {
+        connectBle(writeWithResponse, mCacheDir, null);
+    }
+
+    /**
+     * @param device the picker's choice; null falls back to the name scan
+     * @param device thiết bị trình chọn chọn; null thì quét theo tên
+     */
+    public void connectBle(boolean writeWithResponse, File mCacheDir, BluetoothDevice device) {
         Log.d(LOG_TAG, "connectBle()");
         // ensure previous link is disconnected
         // đảm bảo liên kết trước đó đã được ngắt
         disconnect();
         mDriver = null;
-        mDriver = new BleLink(mainActivity, writeWithResponse);
+        BleLink bleLink = new BleLink(mainActivity, writeWithResponse);
+        bleLink.setTarget(device);
+        mDriver = bleLink;
         connect(mCacheDir, null);
     }
 

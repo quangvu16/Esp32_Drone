@@ -87,10 +87,13 @@ public class BleLink extends CrtpDriver {
 
     private static final String CF_DEVICE_NAME = "Crazyflie";
     private static final String CF_LOADER_DEVICE_NAME = "Crazyflie Loader";
-    // The ESP32 firmware advertises under its own name (bleInit(WIFI_AP_SSID)), so a
-    // scan filtered on the stock Crazyflie name would never see it.
-    // Firmware ESP32 quảng bá dưới tên riêng (bleInit(WIFI_AP_SSID)), nên một
-    // phép quét lọc theo tên Crazyflie gốc sẽ không bao giờ thấy được nó.
+    // The ESP32 firmware advertises under its own name (BT_DEVICE_NAME in the
+    // sketch), so a scan filtered on the stock Crazyflie name would never see it.
+    // "ESP-Drone" is kept as a legacy name for boards not yet re-flashed.
+    // Firmware ESP32 quảng bá dưới tên riêng (BT_DEVICE_NAME trong sketch), nên
+    // một phép quét lọc theo tên Crazyflie gốc sẽ không bao giờ thấy được nó.
+    // "ESP-Drone" được giữ làm tên cũ cho board chưa nạp lại firmware.
+    private static final String ESP32_DEVICE_NAME = "ESP32_Done";
     private static final String ESP_DRONE_DEVICE_NAME = "ESP-Drone";
 
     private static final String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
@@ -117,6 +120,18 @@ public class BleLink extends CrtpDriver {
         mContext = ctx;
         mWriteWithAnswer = writeWithAnswer;
         this.mInQueue = new LinkedBlockingQueue<CrtpPacket>();
+    }
+
+    // The device the pilot picked in the picker. When set, connect() goes
+    // straight to it — a name scan would be a step backwards: two drones can
+    // advertise the same name, an address cannot be ambiguous.
+    // Thiết bị người lái chọn trong trình chọn. Khi có, connect() kết nối thẳng
+    // tới nó — quét tên là một bước lùi: hai drone có thể trùng tên quảng bá,
+    // còn địa chỉ thì không thể mập mờ.
+    private BluetoothDevice mTarget;
+
+    public void setTarget(BluetoothDevice device) {
+        mTarget = device;
     }
 
     private BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
@@ -183,6 +198,9 @@ public class BleLink extends CrtpDriver {
             super.onCharacteristicWrite(gatt, characteristic, status);
             //mLogger.debug("On write called for char: " + characteristic.getUuid().toString());
             mWritten  = true;
+            // Send the next queued segment (a split datagram's tail).
+            // Gửi đoạn xếp hàng kế tiếp (phần đuôi của datagram chia đôi).
+            pumpWrites();
         }
 
         @Override
@@ -190,6 +208,7 @@ public class BleLink extends CrtpDriver {
             super.onDescriptorWrite(gatt, descriptor, status);
             mLogger.debug("On write called for descriptor: " + descriptor.getUuid().toString());
             mWritten = true;
+            pumpWrites();
         }
 
         @Override
@@ -237,10 +256,12 @@ public class BleLink extends CrtpDriver {
         return Math.max(0, Math.min(value, 100));
     }
 
-    /** The ESP32 firmware advertises as "ESP-Drone"; the stock Crazyflie as "Crazyflie". */
-    /** Firmware ESP32 quảng bá dưới tên "ESP-Drone"; Crazyflie gốc dưới tên "Crazyflie". */
-    private static boolean isDroneDeviceName(String name) {
-        return CF_DEVICE_NAME.equals(name) || ESP_DRONE_DEVICE_NAME.equals(name);
+    /** The ESP32 firmware advertises as "ESP32_Done" ("ESP-Drone" before the rename); the stock Crazyflie as "Crazyflie". */
+    /** Firmware ESP32 quảng bá dưới tên "ESP32_Done" (trước đổi tên là "ESP-Drone"); Crazyflie gốc dưới tên "Crazyflie". */
+    // Public for the device picker, which sorts drone-like names to the top.
+    // Public cho trình chọn thiết bị, vốn xếp tên giống drone lên đầu.
+    public static boolean isDroneDeviceName(String name) {
+        return CF_DEVICE_NAME.equals(name) || ESP32_DEVICE_NAME.equals(name) || ESP_DRONE_DEVICE_NAME.equals(name);
     }
 
     private TimerTask rssiTask = new TimerTask() {
@@ -283,11 +304,12 @@ public class BleLink extends CrtpDriver {
         // Filtered scan
         // Quét có bộ lọc
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            // Filters are ORed: either the stock Crazyflie or the ESP32 firmware will do.
-            // Các bộ lọc được OR với nhau: Crazyflie gốc hoặc firmware ESP32 đều được.
+            // Filters are ORed: the stock Crazyflie, the ESP32 firmware's new name, or its legacy name will do.
+            // Các bộ lọc được OR với nhau: Crazyflie gốc, tên mới của firmware ESP32, hoặc tên cũ đều được.
             ScanFilter cfFilter = new ScanFilter.Builder().setDeviceName(CF_DEVICE_NAME).build();
-            ScanFilter espFilter = new ScanFilter.Builder().setDeviceName(ESP_DRONE_DEVICE_NAME).build();
-            mBluetoothLeScanner.startScan(Arrays.asList(cfFilter, espFilter), new ScanSettings.Builder().build(), mScanCallback21);
+            ScanFilter espFilter = new ScanFilter.Builder().setDeviceName(ESP32_DEVICE_NAME).build();
+            ScanFilter legacyFilter = new ScanFilter.Builder().setDeviceName(ESP_DRONE_DEVICE_NAME).build();
+            mBluetoothLeScanner.startScan(Arrays.asList(cfFilter, espFilter, legacyFilter), new ScanSettings.Builder().build(), mScanCallback21);
         } else {
             mBluetoothAdapter.startLeScan(mScanCallback18);
         }
@@ -330,6 +352,21 @@ public class BleLink extends CrtpDriver {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             mContext.startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
             throw new IllegalArgumentException("Bluetooth needs to be started");
+        }
+
+        if (mTarget != null) {
+            // The picker chose this device: connect to it as-is.
+            // Trình chọn đã chọn thiết bị này: kết nối thẳng với nó.
+            state = State.CONNECTING;
+            notifyConnectionRequested();
+            mDevice = mTarget;
+            mContext.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mTarget.connectGatt(mContext, false, mGattCallback);
+                }
+            });
+            return;
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -387,6 +424,12 @@ public class BleLink extends CrtpDriver {
                         }
                     }, 100);
                     mConnected = false;
+                    // Half-assembled segments must not survive a reconnect.
+                    // Nửa gói đang lắp dở không được sống qua một lần kết nối lại.
+                    resetReassembly();
+                    synchronized (mWriteQueue) {
+                        mWriteQueue.clear();
+                    }
                     stopScan();
                     if (mScannTimer != null) {
                         mScannTimer.cancel();
@@ -496,11 +539,29 @@ public class BleLink extends CrtpDriver {
         }
     }
 
-    private byte[] tempByteArray = new byte[32];
+    // CRTP_MAX_SIZE mirrors the firmware's ceiling (PROTOCOL.md §8): a BLE
+    // datagram is 1..30 CRTP bytes, so reassembly stops there too.
+    // CRTP_MAX_SIZE theo trần của firmware (PROTOCOL.md §8): một datagram BLE
+    // là 1..30 byte CRTP, nên bước lắp ráp cũng dừng ở đó.
+    private static final int CRTP_MAX_SIZE = 30;
+    private byte[] tempByteArray = new byte[CRTP_MAX_SIZE];
     private int tempPid = -1;
     private int tempFilled = -1;
+    private int tempTotal = -1;
+
+    // Drops any half-assembled datagram. Called on disconnect and on framing
+    // errors so state can never leak into the next connection.
+    // Gọi khi ngắt và khi lỗi đóng khung để trạng thái không rò sang kết nối sau.
+    private void resetReassembly() {
+        tempPid = -1;
+        tempFilled = -1;
+        tempTotal = -1;
+    }
 
     private CrtpPacket unpack (byte[] packet) {
+        if (packet.length < 2) {
+            return null;
+        }
         ControlByte header = new ControlByte(packet);
         int total = header.getTotalLength();
         int body = packet.length - 1;
@@ -516,25 +577,81 @@ public class BleLink extends CrtpDriver {
             // trường này lưu total-1 nên đọc ra 19, còn một lần ghi 20 byte không
             // thể mang 20 byte CRTP kèm byte điều khiển. Giống với BleSegCb của firmware.
             if (total <= body) {
-                System.arraycopy(packet, 1, tempByteArray, 0, body);
-                return new CrtpPacket(tempByteArray);
+                // The length field is authoritative: dispatch exactly what was
+                // announced (bleRxSeg), so padding can never reach the parser.
+                // Trường độ dài là nguồn quyết định: xử lý đúng số đã báo
+                // (bleRxSeg), để phần đệm không bao giờ lọt vào bộ phân tích.
+                return new CrtpPacket(Arrays.copyOfRange(packet, 1, 1 + total));
+            }
+            if (total > CRTP_MAX_SIZE) {
+                mLogger.debug("Bluetooth link: Error while receiving long data: length exceeds " + CRTP_MAX_SIZE);
+                return null;
             }
             System.arraycopy(packet, 1, tempByteArray, 0, body);
             tempPid = header.getPid();
             tempFilled = body;
+            tempTotal = total;
         } else {
-            if (header.getPid() == tempPid && tempFilled > 0) {
-                int copy = Math.min(body, tempByteArray.length - tempFilled);
-                System.arraycopy(packet, 1, tempByteArray, tempFilled, copy);
-                tempFilled += copy;
-                return new CrtpPacket(tempByteArray);
+            if (header.getPid() == tempPid && tempFilled > 0
+                    && tempFilled + body <= CRTP_MAX_SIZE) {
+                System.arraycopy(packet, 1, tempByteArray, tempFilled, body);
+                tempFilled += body;
+                if (tempFilled >= tempTotal) {
+                    // Completed: dispatch the announced total and drop the
+                    // state so a stray continuation starts over (bleRxSeg).
+                    // Hoàn tất: xử lý đúng tổng đã báo và xoá trạng thái để một
+                    // đoạn lạc bắt đầu lại từ đầu (bleRxSeg).
+                    CrtpPacket out = new CrtpPacket(Arrays.copyOf(tempByteArray, tempTotal));
+                    tempPid = -1;
+                    tempFilled = -1;
+                    tempTotal = -1;
+                    return out;
+                }
             } else {
                 tempPid = -1;
-                tempFilled = 0;
+                tempFilled = -1;
+                tempTotal = -1;
                 mLogger.debug("Bluetooth link: Error while receiving long data: PID does not match!");
             }
         }
         return null;
+    }
+
+    // Serialize GATT writes: the stack accepts one write at a time, and a
+    // split datagram's segments must land in order or the whole datagram is
+    // lost (PROTOCOL.md §8). A write that arrives while one is outstanding is
+    // queued and pumped from onCharacteristicWrite instead of being silently
+    // dropped — which is what the old mWritten gate did to second segments.
+    // Tuần tự hoá các lần ghi GATT: ngăn xếp chỉ nhận một lần ghi tại một thời
+    // điểm, và các đoạn của datagram chia đôi phải đến đúng thứ tự nếu không
+    // cả datagram sẽ mất (PROTOCOL.md mục 8). Lần ghi đến khi đang có lần ghi
+    // dở sẽ được xếp hàng và bơm ra từ onCharacteristicWrite thay vì bị bỏ
+    // lặng lẽ — đó là những gì cổng mWritten cũ làm với đoạn thứ hai.
+    private final java.util.ArrayDeque<SendBlePacket> mWriteQueue =
+            new java.util.ArrayDeque<SendBlePacket>();
+
+    private void enqueueWrite(SendBlePacket packet) {
+        synchronized (mWriteQueue) {
+            mWriteQueue.add(packet);
+        }
+        pumpWrites();
+    }
+
+    // Issues the next queued write when the link is idle. One per call: the
+    // completion callback pumps the next.
+    // Ghi lần xếp hàng kế tiếp khi link rảnh. Mỗi lần gọi một cái: callback
+    // hoàn tất sẽ bơm cái tiếp theo.
+    private void pumpWrites() {
+        synchronized (mWriteQueue) {
+            if (!mConnected || !mWritten) {
+                return;
+            }
+            SendBlePacket next = mWriteQueue.poll();
+            if (next == null) {
+                return;
+            }
+            next.writeNow();
+        }
     }
 
     private class SendBlePacket implements Runnable {
@@ -557,25 +674,32 @@ public class BleLink extends CrtpDriver {
         }
 
         public void run() {
+            enqueueWrite(this);
+        }
+
+        // Actually touches the characteristic. Only pumpWrites() calls this,
+        // and only while mWritten says the previous write has completed.
+        // Thực sự đụng vào characteristic. Chỉ pumpWrites() gọi nó, và chỉ khi
+        // mWritten cho biết lần ghi trước đã xong.
+        void writeNow() {
             if (characteristic == null) {
                 mLogger.debug("characteristic is null!!");
                 return;
             }
-            if(mConnected && mWritten) {
-                if (mWriteWithAnswer) {
-                    characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-                    mWritten = false;
-                } else {
-                    characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-                    mWritten = true;
-                }
-                characteristic.setValue(ba);
-                if (mGatt != null) {
-                    mGatt.writeCharacteristic(characteristic);
-                } else {
-                    mLogger.debug("mGatt is null!!");
-                }
+            if (mGatt == null) {
+                mLogger.debug("mGatt is null!!");
+                return;
             }
+            characteristic.setWriteType(mWriteWithAnswer
+                    ? BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    : BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+            // Gate on completion for both write types: the stack still accepts
+            // only one write at a time, response or not.
+            // Chờ hoàn tất cho cả hai kiểu ghi: ngăn xếp vẫn chỉ nhận một lần
+            // ghi tại một thời điểm, có phản hồi hay không.
+            mWritten = false;
+            characteristic.setValue(ba);
+            mGatt.writeCharacteristic(characteristic);
         }
     }
 

@@ -47,6 +47,14 @@
             android:selectable="false"
             android:summary="@string/preferences_link_note"
             android:title="" />
+
+        <!-- Explicit, confirmed FC_CMD_LINK (0x10). Never automatic on apply:
+             blindly sending it would reboot a board whose profile the pilot
+             did not mean to change. -->
+        <Preference
+            android:key="pref_link_switch"
+            android:summary="@string/preferences_link_switch_summary"
+            android:title="@string/preferences_link_switch" />
     </PreferenceScreen>
 
     <!-- Connection settings -->

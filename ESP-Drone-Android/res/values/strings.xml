@@ -36,6 +36,11 @@
     <string name="preferences_link_app_port">UDP port (drone to phone)</string>
     <string name="preferences_link_app_port_default">2399</string>
     <string name="preferences_link_note">Hold keeps a thrust level, not an altitude: this board has no barometer. AUTO is takeoff-hover-land, not waypoints. FOLLOW/RTH use accelerometer dead reckoning and drift.</string>
+    <string name="preferences_link_switch">Switch drone to this profile</string>
+    <string name="preferences_link_switch_summary">Sends FC_CMD_LINK over the live connection. The drone stores the profile and reboots in about 1.5 s. Refused while armed.</string>
+    <string name="preferences_link_switch_confirm">Switch drone link profile?</string>
+    <string name="preferences_link_switch_message">The drone will switch to \"%1$s\" (LINK %2$d) and reboot in about 1.5 seconds. Any open connection will drop. This is refused while the drone is armed.</string>
+    <string name="preferences_link_switch_noconn">Connect to the drone first — the command rides the live link.</string>
     <string name="preferences_category_radio">Crazyradio settings</string>
     <string name="preferences_radio_channel">Radio channel</string>
     <string name="preferences_radio_channel_summary">Set the radio channel</string>

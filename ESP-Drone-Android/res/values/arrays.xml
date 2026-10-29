@@ -48,13 +48,17 @@
         <item>sound.effect:10</item>
     </string-array>
 
-    <!-- Transport picker. Values match the firmware's NVS `link` profiles for the
-         ones the drone can be put into; the phone-side ones only pick a driver. -->
+    <!-- Transport picker. Values match the firmware's NVS `link` profiles 0..6
+         (PROTOCOL.md section 8); each entry names the side the app uses on the
+         coexistence profiles. -->
     <string-array name="connectionMethodEntries">
         <item>WiFi SoftAP (drone hosts ESP-Drone)</item>
         <item>WiFi Station (drone joins your network)</item>
         <item>Bluetooth Classic (SPP)</item>
         <item>Bluetooth LE (GATT)</item>
+        <item>WiFi SoftAP + BLE (uses the WiFi side)</item>
+        <item>WiFi Station + BLE (uses the WiFi side)</item>
+        <item>Bluetooth SPP + BLE (uses the SPP side)</item>
     </string-array>
 
     <string-array name="connectionMethodValues">
@@ -62,5 +66,8 @@
         <item>station</item>
         <item>bt_spp</item>
         <item>ble</item>
+        <item>wifi_ap_ble</item>
+        <item>wifi_sta_ble</item>
+        <item>bt_dual</item>
     </string-array>
 </resources>

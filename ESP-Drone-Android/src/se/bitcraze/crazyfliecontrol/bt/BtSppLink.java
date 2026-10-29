@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.os.Build;
@@ -80,13 +81,16 @@ public class BtSppLink extends CrtpDriver {
     /** UUID chuẩn của Serial Port Profile — BluetoothSerial của firmware dùng đúng UUID này. */
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
-    /** Matches the firmware's WiFi AP SSID and the BLE advertised name. */
-    /** Khớp với SSID WiFi AP của firmware và tên quảng bá BLE. */
-    private static final String DRONE_DEVICE_NAME = "ESP-Drone";
+    /** Matches the firmware's Bluetooth name (BT_DEVICE_NAME — SPP and BLE alike). */
+    /** Khớp với tên Bluetooth của firmware (BT_DEVICE_NAME — dùng chung cho SPP và BLE). */
+    private static final String DRONE_DEVICE_NAME = "ESP32_Done";
+    /** Legacy name used before the rename; boards not yet re-flashed still pair as this. */
+    /** Tên cũ trước khi đổi tên; board chưa nạp lại firmware vẫn ghép cặp dưới tên này. */
+    private static final String LEGACY_DEVICE_NAME = "ESP-Drone";
 
-    /** CRTP_MAX_SIZE (30) + header already included + 1 checksum byte. */
-    /** CRTP_MAX_SIZE (30) + header đã được tính sẵn + 1 byte checksum. */
-    private static final int MAX_FRAME = 32;
+    /** 30 CRTP bytes (header included) + 1 checksum byte — matches the firmware's BT_FRAME_MAX (CRTP_MAX_SIZE + 1). */
+    /** 30 byte CRTP (kể cả header) + 1 byte checksum — khớp BT_FRAME_MAX của firmware (CRTP_MAX_SIZE + 1). */
+    private static final int MAX_FRAME = 31;
 
     private final Context mContext;
     private final BlockingQueue<CrtpPacket> mInQueue;
@@ -102,41 +106,68 @@ public class BtSppLink extends CrtpDriver {
         this.mInQueue = new LinkedBlockingQueue<CrtpPacket>();
     }
 
+    // The device the pilot picked in the picker. When set, connect() uses it
+    // instead of the name search among bonded devices.
+    // Thiết bị người lái chọn trong trình chọn. Khi có, connect() dùng nó thay
+    // cho phép tìm theo tên trong các thiết bị đã ghép đôi.
+    private BluetoothDevice mTarget;
+
+    public void setTarget(BluetoothDevice device) {
+        mTarget = device;
+    }
+
     @Override
     public void connect() throws IOException {
         if (mConnected) {
             throw new IllegalStateException("Connection already started");
         }
-        mAdapter = BluetoothAdapter.getDefaultAdapter();
+        BluetoothManager manager = (BluetoothManager) mContext.getSystemService(Context.BLUETOOTH_SERVICE);
+        mAdapter = manager != null ? manager.getAdapter() : null;
         if (mAdapter == null || !mAdapter.isEnabled()) {
             notifyConnectionFailed("Bluetooth needs to be enabled");
             return;
         }
         notifyConnectionRequested();
 
-        BluetoothDevice device = findDroneDevice();
-        if (device == null) {
-            notifyConnectionFailed("No paired \"" + DRONE_DEVICE_NAME + "\" found. Pair it in system settings first.");
-            return;
-        }
-        try {
-            // Cancel discovery first: it slows the RFCOMM handshake to a crawl and can
-            // make the first few packets after connect time out.
-            // Hủy discovery trước: nó làm bắt tay RFCOMM chậm rì và có thể
-            // khiến vài gói tin đầu tiên sau khi kết nối bị hết thời gian chờ.
-            mAdapter.cancelDiscovery();
-            mSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
-            mSocket.connect();
-            mReceiveThread = new ReceiveThread(mSocket);
-            mReceiveThread.start();
-            mPostThread = new PostThread(mSocket);
-            mPostThread.start();
-            mConnected = true;
-            notifyConnected();
-        } catch (IOException e) {
-            closeSocket();
-            notifyConnectionFailed("SPP connect failed: " + e.getMessage());
-        }
+        // The RFCOMM handshake blocks for seconds — never run it on the UI
+        // thread (the caller may be a button handler). Everything that can
+        // throw SecurityException (Android 12+ BLUETOOTH_CONNECT) stays in the
+        // same try so a missing permission reports instead of crashing.
+        // Bắt tay RFCOMM chặn vài giây — không bao giờ chạy nó trên luồng UI
+        // (người gọi có thể là trình xử lý nút bấm). Mọi thứ có thể ném
+        // SecurityException (BLUETOOTH_CONNECT trên Android 12+) nằm cùng một
+        // try để thiếu quyền được báo cáo thay vì gây crash.
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    BluetoothDevice device = mTarget != null ? mTarget : findDroneDevice();
+                    if (device == null) {
+                        notifyConnectionFailed("No paired \"" + DRONE_DEVICE_NAME + "\" found. Pair it in system settings first.");
+                        return;
+                    }
+                    // Cancel discovery first: it slows the RFCOMM handshake to a crawl and can
+                    // make the first few packets after connect time out.
+                    // Hủy discovery trước: nó làm bắt tay RFCOMM chậm rì và có thể
+                    // khiến vài gói tin đầu tiên sau khi kết nối bị hết thời gian chờ.
+                    mAdapter.cancelDiscovery();
+                    mSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
+                    mSocket.connect();
+                    mReceiveThread = new ReceiveThread(mSocket);
+                    mReceiveThread.start();
+                    mPostThread = new PostThread(mSocket);
+                    mPostThread.start();
+                    mConnected = true;
+                    notifyConnected();
+                } catch (IOException e) {
+                    closeSocket();
+                    notifyConnectionFailed("SPP connect failed: " + e.getMessage());
+                } catch (SecurityException e) {
+                    closeSocket();
+                    notifyConnectionFailed("Bluetooth permission missing: " + e.getMessage());
+                }
+            }
+        }, "spp-connect").start();
     }
 
     /**
@@ -156,7 +187,7 @@ public class BtSppLink extends CrtpDriver {
         }
         List<BluetoothDevice> all = new ArrayList<BluetoothDevice>(bonded);
         for (BluetoothDevice d : all) {
-            if (DRONE_DEVICE_NAME.equals(d.getName())) {
+            if (DRONE_DEVICE_NAME.equals(d.getName()) || LEGACY_DEVICE_NAME.equals(d.getName())) {
                 return d;
             }
         }
@@ -308,7 +339,13 @@ public class BtSppLink extends CrtpDriver {
             while (acc.size() >= 2) {
                 int len = findFrame(acc);
                 if (len <= 0) {
-                    if (acc.size() > MAX_FRAME) {
+                    // >= MAX_FRAME: a full frame would already have matched, so
+                    // the head byte is junk — drop it and resync (firmware
+                    // btFrameLen returns -1 under the same condition).
+                    // >= MAX_FRAME: một khung đầy đáng lẽ đã khớp, nên byte đầu
+                    // là rác — loại nó và đồng bộ lại (btFrameLen của firmware
+                    // trả -1 trong đúng điều kiện này).
+                    if (acc.size() >= MAX_FRAME) {
                         acc.remove(0);
                         continue;
                     }

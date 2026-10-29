@@ -28,8 +28,14 @@
 package se.bitcraze.crazyfliecontrol2;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 import se.bitcraze.crazyflie.lib.crazyradio.Crazyradio;
 import se.bitcraze.crazyflie.lib.crtp.FlightControlPacket;
@@ -37,12 +43,20 @@ import se.bitcraze.crazyfliecontrol.controller.Controls;
 import se.bitcraze.crazyfliecontrol.controller.GamepadController;
 import se.bitcraze.crazyfliecontrol.controller.GyroscopeController;
 import se.bitcraze.crazyfliecontrol.controller.IController;
+import se.bitcraze.crazyfliecontrol.ble.BleLink;
 import se.bitcraze.crazyfliecontrol.controller.TouchController;
 import se.bitcraze.crazyfliecontrol.prefs.PreferencesActivity;
 
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.AlertDialog;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -95,6 +109,10 @@ public class MainActivity extends EspActivity {
 
     private static final String LOG_TAG = "CrazyflieControl";
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 42;
+    private static final int MY_PERMISSIONS_REQUEST_BT = 43;
+    // Continuation for an in-flight permission request (see requestPermissions).
+    // Phần việc tiếp theo cho một yêu cầu quyền đang chờ (xem requestPermissions).
+    private Runnable mPendingPermissionAction;
 
     private JoystickView mJoystickViewLeft;
     private JoystickView mJoystickViewRight;
@@ -453,11 +471,20 @@ public class MainActivity extends EspActivity {
                             connectCrazyradio();
                         } else if (PreferencesActivity.LINK_METHOD_BLE.equals(method)) {
                             connectBlePreChecks();
+                        } else if (PreferencesActivity.LINK_METHOD_BT_SPP.equals(method)
+                                || PreferencesActivity.LINK_METHOD_BT_DUAL.equals(method)) {
+                            connectBtSppPreChecks();
                         } else {
                             connect();
                         }
                     }
-                } catch (IllegalStateException e) {
+                    // SecurityException: a Bluetooth permission the runtime
+                    // check missed (or a revoked one) — say so instead of
+                    // crashing in the adapter code below.
+                    // SecurityException: quyền Bluetooth mà bước kiểm tra runtime
+                    // đã lỡ (hoặc bị thu hồi) — báo rõ thay vì crash trong đoạn
+                    // adapter phía dưới.
+                } catch (IllegalStateException | SecurityException e) {
                     Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
                 }
             }
@@ -495,27 +522,117 @@ public class MainActivity extends EspActivity {
             Toast.makeText(this,  "Device does not support Bluetooth LE. Please use a Crazyradio to connect to the Crazyflie instead.", Toast.LENGTH_LONG).show();
             return;
         }
-        // Since Android version 6, ACCESS_COARSE_LOCATION is required for Bluetooth scanning
-        // Từ Android 6 trở đi, quét Bluetooth cần quyền ACCESS_COARSE_LOCATION
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Log.e(LOG_TAG, "Android version >= 6 requires ACCESS_COARSE_LOCATION permissions for Bluetooth scanning.");
-            requestPermissions(Manifest.permission.ACCESS_FINE_LOCATION, MY_PERMISSIONS_REQUEST_LOCATION);
+        // Android 12+ (API 31): BLUETOOTH_SCAN + BLUETOOTH_CONNECT are the
+        // runtime pair. With neverForLocation on SCAN no location permission
+        // is needed. Android 6..11 need the location permission for scanning.
+        // Android 12+ (API 31): BLUETOOTH_SCAN + BLUETOOTH_CONNECT là cặp quyền
+        // chạy. Với neverForLocation trên SCAN thì không cần quyền vị trí.
+        // Android 6..11 cần quyền vị trí để quét.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Permission first: even reading the radio state can throw without
+            // BLUETOOTH_CONNECT on Android 12+.
+            // Quyền trước: ngay cả việc đọc trạng thái radio cũng có thể ném lỗi
+            // khi thiếu BLUETOOTH_CONNECT trên Android 12+.
+            requestPermissions(new String[]{
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT},
+                MY_PERMISSIONS_REQUEST_BT,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isBluetoothEnabled()) {
+                            connect();
+                        }
+                    }
+                });
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (isBluetoothEnabled()) {
+                Log.e(LOG_TAG, "Android version >= 6 requires ACCESS_COARSE_LOCATION permissions for Bluetooth scanning.");
+                requestPermissions(Manifest.permission.ACCESS_FINE_LOCATION, MY_PERMISSIONS_REQUEST_LOCATION);
+            }
         } else {
-            connect();
+            if (isBluetoothEnabled()) {
+                connect();
+            }
         }
+    }
+
+    // SPP connects to a known adapter address and never scans, so it only
+    // needs BLUETOOTH_CONNECT on Android 12+ (and the radio on).
+    // SPP kết nối tới địa chỉ adapter đã biết và không quét, nên chỉ cần
+    // BLUETOOTH_CONNECT trên Android 12+ (và radio phải bật).
+    private void connectBtSppPreChecks() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Permission first — see connectBlePreChecks.
+            // Quyền trước — xem connectBlePreChecks.
+            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},
+                MY_PERMISSIONS_REQUEST_BT,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isBluetoothEnabled()) {
+                            connect();
+                        }
+                    }
+                });
+        } else {
+            if (isBluetoothEnabled()) {
+                connect();
+            }
+        }
+    }
+
+    // Shared radio check for both Bluetooth transports. A missing adapter is
+    // permanent; a disabled one is actionable, so offer the settings screen.
+    // Kiểm tra radio dùng chung cho cả hai tầng Bluetooth. Adapter không có là
+    // lỗi vĩnh viễn; adapter tắt thì sửa được, nên mở màn hình cài đặt.
+    private boolean isBluetoothEnabled() {
+        BluetoothAdapter adapter = getBluetoothAdapter();
+        if (adapter == null) {
+            Toast.makeText(this, "This device has no Bluetooth adapter.", Toast.LENGTH_LONG).show();
+            return false;
+        }
+        if (!adapter.isEnabled()) {
+            Toast.makeText(this, "Bluetooth is off — turn it on and connect again.", Toast.LENGTH_LONG).show();
+            try {
+                startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+            } catch (ActivityNotFoundException e) {
+                Log.w(LOG_TAG, "No Bluetooth settings screen: " + e.getMessage());
+            }
+            return false;
+        }
+        return true;
+    }
+
+    // Context#getSystemService instead of the deprecated
+    // BluetoothAdapter.getDefaultAdapter() (API 31 removed the warnings; the
+    // old path also has no clean "no adapter" answer).
+    // Context#getSystemService thay cho BluetoothAdapter.getDefaultAdapter()
+    // đã lỗi thời (API 31 bỏ cảnh báo; đường cũ cũng không trả lời gọn khi
+    // không có adapter).
+    private BluetoothAdapter getBluetoothAdapter() {
+        BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
+        return manager != null ? manager.getAdapter() : null;
     }
 
     private void connect() {
         // Dispatch on the transport the pilot picked. SoftAP is the default because
-        // it needs no infrastructure: the drone hosts the network itself.
+        // it needs no infrastructure: the drone hosts the network itself. The
+        // coexistence profiles (4/5/6) pick the side this app can use: WiFi UDP
+        // for 4/5, SPP for 6.
         // Chuyển tiếp theo tầng truyền mà người lái chọn. SoftAP là mặc định vì
-        // không cần hạ tầng sẵn có: chính drone tự phát mạng.
+        // không cần hạ tầng sẵn có: chính drone tự phát mạng. Các hồ sơ chung
+        // sống (4/5/6) chọn phía mà app này dùng được: WiFi UDP cho 4/5, SPP
+        // cho 6.
         String method = mPreferences.getString(PreferencesActivity.KEY_PREF_LINK_METHOD,
                 PreferencesActivity.LINK_METHOD_SOFTAP);
         if (PreferencesActivity.LINK_METHOD_STATION.equals(method)
-                || PreferencesActivity.LINK_METHOD_SOFTAP.equals(method)) {
+                || PreferencesActivity.LINK_METHOD_SOFTAP.equals(method)
+                || PreferencesActivity.LINK_METHOD_WIFI_AP_BLE.equals(method)
+                || PreferencesActivity.LINK_METHOD_WIFI_STA_BLE.equals(method)) {
             connectUDP();
-        } else if (PreferencesActivity.LINK_METHOD_BT_SPP.equals(method)) {
+        } else if (PreferencesActivity.LINK_METHOD_BT_SPP.equals(method)
+                || PreferencesActivity.LINK_METHOD_BT_DUAL.equals(method)) {
             connectBtSpp();
         } else if (PreferencesActivity.LINK_METHOD_BLE.equals(method)) {
             connectBle();
@@ -524,14 +641,146 @@ public class MainActivity extends EspActivity {
         }
     }
 
+    // ------------------------------------------------------------ device picker
+    // The transport alone does not say WHERE to connect: the pilot picks the
+    // drone from what the radio can see (BLE) or has paired (SPP), and the app
+    // connects to that exact device — no name scan, so two drones advertising
+    // the same name stay apart.
+    // Tầng truyền không nói được KẾT NỐI Ở ĐÂU: người lái chọn drone từ những
+    // gì radio thấy được (BLE) hoặc đã ghép đôi (SPP), rồi app kết nối đúng
+    // thiết bị đó — không quét tên, nên hai drone trùng tên quảng bá vẫn
+    // phân biệt được.
+
+    private ScanCallback mPickerScan;
+
     private void connectBle() {
-        boolean writeWithResponse = mPreferences.getBoolean(PreferencesActivity.KEY_PREF_BLATENCY_BOOL, false);
+        final boolean writeWithResponse = mPreferences.getBoolean(PreferencesActivity.KEY_PREF_BLATENCY_BOOL, false);
         Log.d(LOG_TAG, "Using bluetooth write with response - " + writeWithResponse);
-        mPresenter.connectBle(writeWithResponse, mCacheDir);
+        // A short unfiltered scan feeds the list; the old filtered name scan
+        // would hide exactly the drones whose name the pilot changed.
+        // Một lượt quét ngắn không lọc cấp dữ liệu cho danh sách; phép quét lọc
+        // theo tên ngày trước lại giấu đúng những drone mà người lái đã đổi tên.
+        final Map<String, ScanResult> found = new LinkedHashMap<String, ScanResult>();
+        BluetoothAdapter adapter = getBluetoothAdapter();
+        BluetoothLeScanner scanner = adapter != null ? adapter.getBluetoothLeScanner() : null;
+        if (scanner == null) {
+            Toast.makeText(this, "Bluetooth is off — turn it on and connect again.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(this, "Scanning for Bluetooth devices…", Toast.LENGTH_SHORT).show();
+        mPickerScan = new ScanCallback() {
+            @Override
+            public void onScanResult(int callbackType, ScanResult result) {
+                if (result != null && result.getDevice() != null) {
+                    synchronized (found) {
+                        found.put(result.getDevice().getAddress(), result);
+                    }
+                }
+            }
+        };
+        scanner.startScan(mPickerScan);
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                stopPickerScan();
+                List<ScanResult> results;
+                synchronized (found) {
+                    results = new ArrayList<ScanResult>(found.values());
+                }
+                showBleDeviceList(results, writeWithResponse);
+            }
+        }, 4000);
+    }
+
+    private void showBleDeviceList(List<ScanResult> results, final boolean writeWithResponse) {
+        if (results.isEmpty()) {
+            Toast.makeText(this, "No Bluetooth devices found.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        // Drone-like names first, then strongest signal.
+        // Tên giống drone lên trước, sau đó là tín hiệu mạnh nhất.
+        Collections.sort(results, new Comparator<ScanResult>() {
+            @Override
+            public int compare(ScanResult a, ScanResult b) {
+                boolean da = BleLink.isDroneDeviceName(a.getDevice().getName());
+                boolean db = BleLink.isDroneDeviceName(b.getDevice().getName());
+                if (da != db) {
+                    return da ? -1 : 1;
+                }
+                return b.getRssi() - a.getRssi();
+            }
+        });
+        final List<ScanResult> sorted = results;
+        CharSequence[] labels = new CharSequence[sorted.size()];
+        for (int i = 0; i < sorted.size(); i++) {
+            ScanResult r = sorted.get(i);
+            String name = r.getDevice().getName();
+            labels[i] = (name != null ? name : "(no name)") + "   " + r.getDevice().getAddress()
+                    + "   " + r.getRssi() + " dBm";
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Bluetooth devices")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mPresenter.connectBle(writeWithResponse, mCacheDir, sorted.get(which).getDevice());
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void connectBtSpp() {
-        mPresenter.connectBtSpp(mCacheDir);
+        // SPP has no scan — the list is the already-paired devices.
+        // SPP không có quét — danh sách là các thiết bị đã ghép đôi.
+        Set<BluetoothDevice> bonded = getBluetoothAdapter().getBondedDevices();
+        if (bonded == null || bonded.isEmpty()) {
+            Toast.makeText(this, "No paired Bluetooth devices — pair the drone in system settings first.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        final List<BluetoothDevice> all = new ArrayList<BluetoothDevice>(bonded);
+        Collections.sort(all, new Comparator<BluetoothDevice>() {
+            @Override
+            public int compare(BluetoothDevice a, BluetoothDevice b) {
+                boolean da = BleLink.isDroneDeviceName(a.getName());
+                boolean db = BleLink.isDroneDeviceName(b.getName());
+                if (da != db) {
+                    return da ? -1 : 1;
+                }
+                return String.valueOf(a.getName()).compareTo(String.valueOf(b.getName()));
+            }
+        });
+        CharSequence[] labels = new CharSequence[all.size()];
+        for (int i = 0; i < all.size(); i++) {
+            BluetoothDevice d = all.get(i);
+            labels[i] = (d.getName() != null ? d.getName() : "(no name)") + "   " + d.getAddress();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Paired Bluetooth devices")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mPresenter.connectBtSpp(mCacheDir, all.get(which));
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void stopPickerScan() {
+        if (mPickerScan == null) {
+            return;
+        }
+        BluetoothAdapter adapter = getBluetoothAdapter();
+        BluetoothLeScanner scanner = adapter != null ? adapter.getBluetoothLeScanner() : null;
+        try {
+            if (scanner != null) {
+                scanner.stopScan(mPickerScan);
+            }
+        } catch (IllegalStateException ise) {
+            Log.w(LOG_TAG, "stopPickerScan: " + ise.getMessage());
+        }
+        mPickerScan = null;
     }
 
     private void connectUDP() {
@@ -578,43 +827,69 @@ public class MainActivity extends EspActivity {
     }
 
     private void requestPermissions(String permission, int request) {
-        if (ContextCompat.checkSelfPermission(MainActivity.this, permission) != PackageManager.PERMISSION_GRANTED) {
-            // Permission is not granted. Should we show an explanation?
-            // Chưa được cấp quyền. Có nên hiển thị lời giải thích không?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, permission)) {
-                // Show an explanation to the user *asynchronously* -- don't block this thread waiting for the user's response!
-                // After the user sees the explanation, try again to request the permission.
-                // Hiển thị lời giải thích cho người dùng một cách *bất đồng bộ* -- đừng chặn luồng này để chờ người dùng trả lời!
-                // Sau khi người dùng xem lời giải thích, thử yêu cầu quyền lại.
-                Log.d(LOG_TAG, "ACCESS_COARSE_LOCATION permission request has been denied.");
-                //Toast.makeText(this,  "Android version >= 6 requires ACCESS_COARSE_LOCATION permissions for Bluetooth scanning.", Toast.LENGTH_LONG).show();
-                ActivityCompat.requestPermissions(MainActivity.this, new String[]{permission}, request);
-            } else {
-                ActivityCompat.requestPermissions(MainActivity.this, new String[]{permission}, request);
+        // The legacy location path keeps its "then check location settings" step.
+        // Đường vị trí cũ giữ bước "kiểm tra cài đặt vị trí" sau khi cấp quyền.
+        requestPermissions(new String[]{permission}, request, new Runnable() {
+            @Override
+            public void run() {
+                checkLocationSettings();
             }
-        } else {
-            // Permission has already been granted
-            // Quyền đã được cấp từ trước
-            checkLocationSettings();
+        });
+    }
+
+    // Requests every permission still missing; runs onGranted immediately when
+    // all are already granted, or on the next onRequestPermissionsResult.
+    // Yêu cầu mọi quyền còn thiếu; chạy onGranted ngay khi tất cả đã được cấp,
+    // hoặc trong lần onRequestPermissionsResult kế tiếp.
+    private void requestPermissions(final String[] wanted, final int request, final Runnable onGranted) {
+        java.util.List<String> missing = new java.util.ArrayList<String>();
+        for (String permission : wanted) {
+            if (ContextCompat.checkSelfPermission(MainActivity.this, permission) != PackageManager.PERMISSION_GRANTED) {
+                missing.add(permission);
+            }
         }
+        if (missing.isEmpty()) {
+            onGranted.run();
+            return;
+        }
+        // Keep the callback runnable for the result handler.
+        // Giữ lại runnable cho hàm xử lý kết quả.
+        mPendingPermissionAction = onGranted;
+        ActivityCompat.requestPermissions(MainActivity.this,
+                missing.toArray(new String[0]), request);
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
-                // Nếu yêu cầu bị huỷ, mảng kết quả sẽ rỗng.
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // permission was granted, yay! Do the contacts-related task you need to do.
-                    // quyền đã được cấp! Thực hiện công việc cần quyền này.
+        boolean granted = grantResults.length > 0;
+        for (int result : grantResults) {
+            if (result != PackageManager.PERMISSION_GRANTED) {
+                granted = false;
+                break;
+            }
+        }
+        if (requestCode == MY_PERMISSIONS_REQUEST_LOCATION
+                || requestCode == MY_PERMISSIONS_REQUEST_BT) {
+            if (granted) {
+                // Run whatever the pre-check wanted to do once the grant lands.
+                // Chạy việc mà bước kiểm tra trước muốn làm sau khi quyền được cấp.
+                Runnable action = mPendingPermissionAction;
+                mPendingPermissionAction = null;
+                if (action != null) {
+                    action.run();
+                } else if (requestCode == MY_PERMISSIONS_REQUEST_LOCATION) {
                     checkLocationSettings();
                 } else {
-                    // permission denied, boo! Disable the functionality that depends on this permission.
-                    // quyền bị từ chối! Tắt các chức năng phụ thuộc vào quyền này.
-                    Log.d(LOG_TAG, "ACCESS_COARSE_LOCATION permission request has been denied.");
-                    Toast.makeText(this,  "Android version >= 6 requires ACCESS_COARSE_LOCATION permissions for Bluetooth scanning.", Toast.LENGTH_LONG).show();
+                    connect();
                 }
+            } else {
+                // Permission denied, boo! Disable the functionality that depends on this permission.
+                // Quyền bị từ chối! Tắt các chức năng phụ thuộc vào quyền này.
+                Log.d(LOG_TAG, "Bluetooth permission request has been denied.");
+                Toast.makeText(this, requestCode == MY_PERMISSIONS_REQUEST_BT
+                        ? "Bluetooth permission is required to connect."
+                        : "Android version >= 6 requires ACCESS_COARSE_LOCATION permissions for Bluetooth scanning.",
+                        Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -1088,6 +1363,12 @@ public class MainActivity extends EspActivity {
             return "Bluetooth Classic";
         } else if (PreferencesActivity.LINK_METHOD_BLE.equals(method)) {
             return "Bluetooth LE";
+        } else if (PreferencesActivity.LINK_METHOD_WIFI_AP_BLE.equals(method)) {
+            return "Wi-Fi hotspot + BLE";
+        } else if (PreferencesActivity.LINK_METHOD_WIFI_STA_BLE.equals(method)) {
+            return "Wi-Fi network + BLE";
+        } else if (PreferencesActivity.LINK_METHOD_BT_DUAL.equals(method)) {
+            return "Bluetooth SPP + BLE";
         }
         return "Wi-Fi hotspot";
     }
