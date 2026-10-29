@@ -1,0 +1,377 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="28 1013 852 355" width="852" height="355" role="img" aria-labelledby="ttl desc">
+  <title id="ttl">ESP-Drone Python tuner GUI — the Plan window</title>
+  <desc id="desc">The Plan window: the plan plot in metres about home, the mission grid with the Mission Planner columns, the row editor strip, the altitude and item tools, the typed home latitude and longitude, and Upload, Download and Start with the status line.</desc>
+
+  <defs>
+    <style>
+      .bg      { fill: #f6f8fa; }
+      .h1      { font: 700 26px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .h2      { font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .sub     { font: 400 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lbl     { font: 500 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #1f2328; }
+      .lblm    { font: 400 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #57606a; }
+      .lblw    { font: 600 13px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #ffffff; }
+      .mono    { font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .chip    { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #0969da; }
+      .win     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .winbar  { fill: #eaeef2; stroke: #8c959f; stroke-width: 1.5; }
+      .panel   { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .card    { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn     { fill: #ffffff; stroke: #8c959f; stroke-width: 1.5; }
+      .btn-pri { fill: #1a7f37; stroke: #1a7f37; stroke-width: 1.5; }
+      .btn-dan { fill: #cf222e; stroke: #cf222e; stroke-width: 1.5; }
+      .btn-warn{ fill: #bc4c00; stroke: #bc4c00; stroke-width: 1.5; }
+      .field   { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1.5; }
+      .rule    { stroke: #d0d7de; stroke-width: 1; }
+      .tag     { font: 600 11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: #bc4c00; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="1400"/>
+
+  <!-- ============================ header ============================ -->
+  <text class="h1" x="40" y="44">Python tuner GUI — ESP-Drone</text>
+  <text class="sub" x="40" y="70">Bench tool · tools/pid-tune/tuner_gui.py · tkinter + matplotlib · run it from a laptop on the drone's network</text>
+  <line class="rule" x1="40" y1="88" x2="1240" y2="88"/>
+
+  <!-- ============================ window ============================ -->
+  <text class="h2" x="40" y="118">Drone Tuner — roll</text>
+  <text class="lblm" x="230" y="118">tuner_gui.py · one window, one axis at a time · left = controls, right = live charts</text>
+
+  <rect class="win" x="40" y="132" width="820" height="880" rx="10"/>
+  <rect class="winbar" x="40" y="132" width="820" height="30" rx="10"/>
+  <text class="lbl" x="56" y="152">Drone Tuner — roll</text>
+  <circle cx="820" cy="147" r="5" fill="#8c959f"/>
+  <circle cx="838" cy="147" r="5" fill="#8c959f"/>
+  <circle cx="856" cy="147" r="5" fill="#8c959f"/>
+
+  <!-- link -->
+  <rect class="panel" x="56" y="176" width="300" height="104" rx="6"/>
+  <text class="lbl" x="68" y="196">Link</text>
+  <text class="chip" x="68" y="216">192.168.43.42</text>
+  <text class="lblm" x="68" y="241">Axis</text>
+  <rect class="btn-pri" x="112" y="228" width="56" height="22" rx="6"/>
+  <text class="lblw" x="140" y="243" text-anchor="middle">Roll</text>
+  <rect class="btn" x="172" y="228" width="56" height="22" rx="6"/>
+  <text class="lbl" x="200" y="243" text-anchor="middle">Pitch</text>
+  <rect class="btn" x="232" y="228" width="48" height="22" rx="6"/>
+  <text class="lbl" x="256" y="243" text-anchor="middle">Yaw</text>
+  <rect class="btn" x="68" y="252" width="88" height="22" rx="6"/>
+  <text class="lbl" x="112" y="267" text-anchor="middle">Reconnect</text>
+
+  <!-- gains -->
+  <rect class="panel" x="56" y="288" width="300" height="142" rx="6"/>
+  <text class="lbl" x="68" y="308">Gains</text>
+  <text class="mono" x="68" y="333">pid.roll_kp</text>
+  <rect class="field" x="154" y="318" width="52" height="20" rx="4"/><text class="mono" x="180" y="333" text-anchor="middle">1.30</text>
+  <rect class="btn" x="214" y="318" width="22" height="20" rx="4"/><text class="lbl" x="225" y="333" text-anchor="middle">−</text>
+  <rect class="btn" x="242" y="318" width="22" height="20" rx="4"/><text class="lbl" x="253" y="333" text-anchor="middle">+</text>
+  <rect class="btn" x="270" y="318" width="36" height="20" rx="4"/><text class="lbl" x="288" y="333" text-anchor="middle">Set</text>
+  <text class="mono" x="68" y="361">pid.roll_ki</text>
+  <rect class="field" x="154" y="346" width="52" height="20" rx="4"/><text class="mono" x="180" y="361" text-anchor="middle">0.040</text>
+  <rect class="btn" x="214" y="346" width="22" height="20" rx="4"/><text class="lbl" x="225" y="361" text-anchor="middle">−</text>
+  <rect class="btn" x="242" y="346" width="22" height="20" rx="4"/><text class="lbl" x="253" y="361" text-anchor="middle">+</text>
+  <rect class="btn" x="270" y="346" width="36" height="20" rx="4"/><text class="lbl" x="288" y="361" text-anchor="middle">Set</text>
+  <text class="mono" x="68" y="389">pid.roll_kd</text>
+  <rect class="field" x="154" y="374" width="52" height="20" rx="4"/><text class="mono" x="180" y="389" text-anchor="middle">18.0</text>
+  <rect class="btn" x="214" y="374" width="22" height="20" rx="4"/><text class="lbl" x="225" y="389" text-anchor="middle">−</text>
+  <rect class="btn" x="242" y="374" width="22" height="20" rx="4"/><text class="lbl" x="253" y="389" text-anchor="middle">+</text>
+  <rect class="btn" x="270" y="374" width="36" height="20" rx="4"/><text class="lbl" x="288" y="389" text-anchor="middle">Set</text>
+  <rect class="btn" x="68" y="402" width="48" height="20" rx="4"/><text class="lblm" x="92" y="417" text-anchor="middle">Get</text>
+  <rect class="btn" x="120" y="402" width="48" height="20" rx="4"/><text class="lblm" x="144" y="417" text-anchor="middle">Save</text>
+  <rect class="btn" x="172" y="402" width="48" height="20" rx="4"/><text class="lblm" x="196" y="417" text-anchor="middle">Load</text>
+  <rect class="btn" x="224" y="402" width="64" height="20" rx="4"/><text class="lblm" x="256" y="417" text-anchor="middle">Defaults</text>
+
+  <!-- drone -->
+  <rect class="panel" x="56" y="438" width="300" height="112" rx="6"/>
+  <text class="lbl" x="68" y="458">Drone</text>
+  <rect class="btn-pri" x="68" y="468" width="64" height="24" rx="6"/>
+  <text class="lblw" x="100" y="485" text-anchor="middle">ARM</text>
+  <rect class="btn" x="138" y="468" width="72" height="24" rx="6"/>
+  <text class="lbl" x="174" y="485" text-anchor="middle">DISARM</text>
+  <rect class="btn-dan" x="216" y="468" width="94" height="24" rx="6"/>
+  <text class="lblw" x="263" y="485" text-anchor="middle">EMERGENCY</text>
+  <text class="lblm" x="68" y="513">Log Hz</text>
+  <rect class="field" x="122" y="499" width="40" height="20" rx="4"/><text class="mono" x="142" y="514" text-anchor="middle">20</text>
+  <text class="lblm" x="68" y="537">Window s</text>
+  <rect class="field" x="122" y="523" width="40" height="20" rx="4"/><text class="mono" x="142" y="538" text-anchor="middle">10</text>
+  <rect class="btn" x="180" y="499" width="56" height="20" rx="4"/><text class="lblm" x="208" y="514" text-anchor="middle">Pause</text>
+  <rect class="btn" x="180" y="523" width="88" height="20" rx="4"/><text class="lblm" x="224" y="538" text-anchor="middle">Record CSV</text>
+
+  <!-- motor test -->
+  <rect class="panel" x="56" y="558" width="300" height="186" rx="6"/>
+  <text class="tag" x="68" y="578">MOTOR TEST</text>
+  <text class="lblm" x="152" y="578">disarmed only — props clear</text>
+  <text class="lblm" x="68" y="602">Speed</text>
+  <rect class="field" x="122" y="588" width="52" height="20" rx="4"/><text class="mono" x="148" y="603" text-anchor="middle">1200</text>
+  <text class="lblm" x="182" y="603">1000…1500 step 50</text>
+
+  <text class="lbl" x="68" y="626">M1</text>
+  <rect class="btn-pri" x="112" y="612" width="56" height="22" rx="6"/><text class="lblw" x="140" y="627" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="612" width="56" height="22" rx="6"/><text class="lbl" x="202" y="627" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="652">M2</text>
+  <rect class="btn-pri" x="112" y="638" width="56" height="22" rx="6"/><text class="lblw" x="140" y="653" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="638" width="56" height="22" rx="6"/><text class="lbl" x="202" y="653" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="678">M3</text>
+  <rect class="btn-pri" x="112" y="664" width="56" height="22" rx="6"/><text class="lblw" x="140" y="679" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="664" width="56" height="22" rx="6"/><text class="lbl" x="202" y="679" text-anchor="middle">Stop</text>
+  <text class="lbl" x="68" y="704">M4</text>
+  <rect class="btn-pri" x="112" y="690" width="56" height="22" rx="6"/><text class="lblw" x="140" y="705" text-anchor="middle">Run</text>
+  <rect class="btn" x="174" y="690" width="56" height="22" rx="6"/><text class="lbl" x="202" y="705" text-anchor="middle">Stop</text>
+  <rect class="btn-dan" x="68" y="716" width="110" height="22" rx="6"/>
+  <text class="lblw" x="123" y="731" text-anchor="middle">STOP ALL</text>
+  <text class="lblm" x="188" y="731">150 ms keepalive</text>
+
+  <!-- auto-tune -->
+  <rect class="panel" x="56" y="752" width="300" height="206" rx="6"/>
+  <text class="lbl" x="68" y="772">Auto-tune</text>
+  <rect class="field" x="136" y="758" width="170" height="20" rx="4"/>
+  <text class="mono" x="221" y="773" text-anchor="middle">ML (Bayesian)</text>
+  <rect class="btn" x="68" y="786" width="12" height="12" rx="2"/><text class="lblm" x="86" y="796">roll</text>
+  <rect class="btn" x="130" y="786" width="12" height="12" rx="2"/><text class="lblm" x="148" y="796">pitch</text>
+  <rect class="btn" x="202" y="786" width="12" height="12" rx="2"/><text class="lblm" x="220" y="796">yaw</text>
+  <rect class="btn" x="68" y="812" width="12" height="12" rx="2"/><text class="lblm" x="86" y="822">learn from past trials (logs)</text>
+  <text class="lblm" x="68" y="848">Trials</text>
+  <rect class="field" x="116" y="834" width="44" height="20" rx="4"/><text class="mono" x="138" y="849" text-anchor="middle">20</text>
+  <text class="lblm" x="172" y="848">Trial s</text>
+  <rect class="field" x="222" y="834" width="44" height="20" rx="4"/><text class="mono" x="244" y="849" text-anchor="middle">6.0</text>
+  <text class="lblm" x="68" y="876">Range x</text>
+  <rect class="field" x="116" y="862" width="44" height="20" rx="4"/><text class="mono" x="138" y="877" text-anchor="middle">2.0</text>
+  <rect class="btn-warn" x="68" y="890" width="120" height="22" rx="6"/>
+  <text class="lblw" x="128" y="905" text-anchor="middle">Start auto-tune</text>
+  <rect class="btn" x="196" y="890" width="64" height="22" rx="6"/>
+  <text class="lbl" x="228" y="905" text-anchor="middle">Model</text>
+  <text class="lblm" x="68" y="928">Gaussian process + expected improvement.</text>
+  <text class="lblm" x="68" y="944">Fewest trials; the default. Props spin — strap down.</text>
+
+  <!-- stats + status (bottom of the left column) -->
+  <text class="mono" x="68" y="976">rms 0.42°   p95 1.10°   rate 3.1 °/s</text>
+  <text class="lblm" x="68" y="998">window statistics · connected · logging 20 Hz</text>
+
+  <!-- ============================ charts ============================ -->
+  <rect class="panel" x="376" y="176" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="196">Angle · deg</text>
+  <rect x="700" y="186" width="9" height="9" fill="#0969da"/>
+  <text class="chip" x="713" y="194">stabilizer</text>
+  <polyline points="392,296 430,282 468,288 506,262 544,272 582,248 620,258 658,236 696,246 734,228 772,238 810,222"
+            fill="none" stroke="#0969da" stroke-width="2"/>
+
+  <rect class="panel" x="376" y="334" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="354">Rate · deg/s</text>
+  <rect x="700" y="344" width="9" height="9" fill="#bc4c00"/>
+  <text class="chip" x="713" y="352">rate</text>
+  <polyline points="392,452 430,430 468,442 506,410 544,424 582,398 620,412 658,388 696,402 734,380 772,392 810,372"
+            fill="none" stroke="#bc4c00" stroke-width="2"/>
+
+  <rect class="panel" x="376" y="492" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="512">PID terms · P / I / D</text>
+  <rect x="620" y="502" width="9" height="9" fill="#1a7f37"/>
+  <text class="chip" x="633" y="510">P</text>
+  <rect x="660" y="502" width="9" height="9" fill="#8250df"/>
+  <text class="chip" x="673" y="510">I</text>
+  <rect x="700" y="502" width="9" height="9" fill="#bc4c00"/>
+  <text class="chip" x="713" y="510">D</text>
+  <polyline points="392,610 430,584 468,596 506,566 544,578 582,552 620,564 658,542 696,554 734,534 772,544 810,528"
+            fill="none" stroke="#1a7f37" stroke-width="2"/>
+  <polyline points="392,624 430,620 468,616 506,612 544,608 582,604 620,600 658,596 696,592 734,588 772,584 810,580"
+            fill="none" stroke="#8250df" stroke-width="1.5"/>
+  <polyline points="392,600 430,606 468,594 506,602 544,590 582,598 620,588 658,594 696,586 734,592 772,584 810,588"
+            fill="none" stroke="#bc4c00" stroke-width="1.5"/>
+
+  <rect class="panel" x="376" y="650" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="670">Controller · output</text>
+  <rect x="700" y="660" width="9" height="9" fill="#0969da"/>
+  <text class="chip" x="713" y="668">output</text>
+  <polyline points="392,770 430,748 468,758 506,730 544,742 582,718 620,730 658,708 696,720 734,700 772,710 810,694"
+            fill="none" stroke="#0969da" stroke-width="2"/>
+
+  <rect class="panel" x="376" y="808" width="468" height="150" rx="6"/>
+  <text class="lblm" x="388" y="828">Motor m1 · µs</text>
+  <rect x="700" y="818" width="9" height="9" fill="#cf222e"/>
+  <text class="chip" x="713" y="826">m1</text>
+  <line x1="392" y1="846" x2="828" y2="846" stroke="#8c959f" stroke-width="1" stroke-dasharray="5 4"/>
+  <line x1="392" y1="938" x2="828" y2="938" stroke="#8c959f" stroke-width="1" stroke-dasharray="5 4"/>
+  <polyline points="392,920 430,918 468,922 506,910 544,916 582,906 620,912 658,902 696,908 734,898 772,904 810,896"
+            fill="none" stroke="#cf222e" stroke-width="2"/>
+  <text class="lblm" x="600" y="843">1990 sat</text>
+  <text class="lblm" x="600" y="953">1010 sat</text>
+
+  <text class="lblm" x="376" y="978">live · Log Hz 20 · shared x-axis · Window s 10 · Pause and Record CSV sit in the Drone panel</text>
+
+  <!-- ============================ right column ============================ -->
+  <rect class="card" x="890" y="132" width="350" height="250" rx="10"/>
+  <text class="h2" x="908" y="158">Motor test panel</text>
+  <line class="rule" x1="908" y1="168" x2="1222" y2="168"/>
+  <text class="lbl" x="908" y="192">Run / Stop per motor</text>
+  <text class="lblm" x="908" y="210">Run drives only that motor; the rest idle</text>
+  <text class="lbl" x="908" y="234">Speed</text>
+  <text class="lblm" x="908" y="252">shared by all four · 1000 = idle · max 1500</text>
+  <text class="lbl" x="908" y="276">STOP ALL</text>
+  <text class="lblm" x="908" y="294">sends motor_test off at once</text>
+  <text class="lbl" x="908" y="318">Keepalive</text>
+  <text class="lblm" x="908" y="336">re-sent every 150 ms while a motor runs</text>
+  <text class="lblm" x="908" y="360">firmware stops the test after 300 ms of silence</text>
+
+  <rect class="card" x="890" y="398" width="350" height="214" rx="10"/>
+  <text class="h2" x="908" y="424">Safety</text>
+  <line class="rule" x1="908" y1="434" x2="1222" y2="434"/>
+  <text class="lbl" x="908" y="458">Disarmed only</text>
+  <text class="lblm" x="908" y="476">the firmware refuses the test while armed</text>
+  <text class="lbl" x="908" y="500">Props clear</text>
+  <text class="lblm" x="908" y="518">a stalled or loaded prop can cut skin</text>
+  <text class="lbl" x="908" y="542">Closes cleanly</text>
+  <text class="lblm" x="908" y="560">closing the window sends motor_test off</text>
+  <text class="lbl" x="908" y="584">EMERGENCY</text>
+  <text class="lblm" x="908" y="602">also ends the test and disarms</text>
+
+  <rect class="card" x="890" y="628" width="350" height="288" rx="10"/>
+  <text class="h2" x="908" y="654">Files</text>
+  <line class="rule" x1="908" y1="664" x2="1222" y2="664"/>
+  <text class="lblm" x="908" y="688">tools/pid-tune/tuner_gui.py</text>
+  <text class="lblm" x="908" y="712">tools/pid-tune/drone.py</text>
+  <text class="lblm" x="908" y="736">tools/pid-tune/planner.py</text>
+  <text class="lblm" x="908" y="760">tools/pid-tune/planner_test.py</text>
+  <text class="lblm" x="908" y="784">tools/pid-tune/ml_tune.py</text>
+  <text class="lblm" x="908" y="808">tools/pid-tune/selftest.py</text>
+  <text class="lbl" x="908" y="840">cd tools/pid-tune</text>
+  <text class="lbl" x="908" y="862">python tuner_gui.py</text>
+  <text class="lblm" x="908" y="886">optional: --host 192.168.43.42 --axis roll</text>
+  <text class="lblm" x="908" y="906">see tools/pid-tune/README.md</text>
+
+  <rect class="card" x="890" y="932" width="350" height="428" rx="10"/>
+  <text class="h2" x="908" y="958">Mission plan</text>
+  <line class="rule" x1="908" y1="968" x2="1222" y2="968"/>
+  <text class="lbl" x="908" y="992">Open plan window</text>
+  <text class="lblm" x="908" y="1010">Mission plan panel → the Plan screen on the laptop</text>
+  <text class="lbl" x="908" y="1034">Plan plot</text>
+  <text class="lblm" x="908" y="1052">click adds a waypoint · metres about home</text>
+  <text class="lbl" x="908" y="1076">Grid + row editor</text>
+  <text class="lblm" x="908" y="1094">Set row — or leaving a box — commits the row</text>
+  <text class="lbl" x="908" y="1118">Alt · Add WP · ↑ ↓ Del</text>
+  <text class="lblm" x="908" y="1136">altitude for new WPs · reorder · remove</text>
+  <text class="lbl" x="908" y="1160">Home lat / lon</text>
+  <text class="lblm" x="908" y="1178">the launch origin, typed in (a laptop has no GPS)</text>
+  <text class="lbl" x="908" y="1202">Load / Save</text>
+  <text class="lblm" x="908" y="1220">.waypoints — QGC WPL 110, Mission Planner's format</text>
+  <text class="lbl" x="908" y="1244">Upload / Download / Start</text>
+  <text class="lblm" x="908" y="1262">the mission stored in the drone's memory</text>
+  <text class="lbl" x="908" y="1286">Same wire as the apps</text>
+  <text class="lblm" x="908" y="1304">port 7 channel 2 · resend every 500 ms, 10 tries</text>
+  <text class="lbl" x="908" y="1328">Keep-out zones</text>
+  <text class="lblm" x="908" y="1346">not checked here — the PC has no map database</text>
+
+  <!-- ============================ plan window ============================ -->
+  <text class="h2" x="40" y="1024">Plan — mission</text>
+  <text class="lblm" x="180" y="1024">the Plan screen of the apps, on the bench laptop</text>
+
+  <rect class="win" x="40" y="1028" width="820" height="332" rx="10"/>
+  <rect class="winbar" x="40" y="1028" width="820" height="30" rx="10"/>
+  <text class="lbl" x="56" y="1048">Plan — mission</text>
+  <circle cx="820" cy="1043" r="5" fill="#8c959f"/>
+  <circle cx="838" cy="1043" r="5" fill="#8c959f"/>
+  <circle cx="856" cy="1043" r="5" fill="#8c959f"/>
+
+  <!-- plan plot -->
+  <rect class="panel" x="56" y="1068" width="300" height="160" rx="6"/>
+  <text class="lblm" x="68" y="1088">plan (m about home)</text>
+  <polyline points="96,1198 152,1156 208,1172 264,1128 320,1110"
+            fill="none" stroke="#8c959f" stroke-width="1.5"/>
+  <circle cx="96" cy="1198" r="4" fill="#0969da"/>
+  <circle cx="152" cy="1156" r="4" fill="#0969da"/>
+  <circle cx="208" cy="1172" r="5" fill="#cf222e"/>
+  <circle cx="264" cy="1128" r="4" fill="#0969da"/>
+  <circle cx="320" cy="1110" r="4" fill="#0969da"/>
+  <text class="lbl" x="72" y="1216" fill="#bc4c00">★</text>
+  <text class="lblm" x="302" y="1222">east m</text>
+  <text class="lblm" x="62" y="1104">north m</text>
+
+  <!-- mission grid -->
+  <rect class="panel" x="372" y="1068" width="472" height="160" rx="6"/>
+  <text class="lblm" x="382" y="1088">#</text>
+  <text class="lblm" x="404" y="1088">Command</text>
+  <text class="lblm" x="508" y="1088">P1</text>
+  <text class="lblm" x="542" y="1088">P2</text>
+  <text class="lblm" x="576" y="1088">P3</text>
+  <text class="lblm" x="610" y="1088">P4</text>
+  <text class="lblm" x="648" y="1088">Lat</text>
+  <text class="lblm" x="730" y="1088">Lon</text>
+  <text class="lblm" x="812" y="1088">Alt</text>
+  <line class="rule" x1="382" y1="1094" x2="838" y2="1094"/>
+  <rect x="376" y="1148" width="464" height="22" fill="#ddf4ff"/>
+  <text class="mono" x="382" y="1114">1</text>
+  <text class="mono" x="404" y="1114">TAKEOFF</text>
+  <text class="mono" x="508" y="1114">0</text>
+  <text class="mono" x="542" y="1114">2.5</text>
+  <text class="mono" x="576" y="1114">0</text>
+  <text class="mono" x="610" y="1114">0</text>
+  <text class="mono" x="648" y="1114">10.7626220</text>
+  <text class="mono" x="730" y="1114">106.6601720</text>
+  <text class="mono" x="812" y="1114">30</text>
+  <text class="mono" x="382" y="1138">2</text>
+  <text class="mono" x="404" y="1138">WAYPOINT</text>
+  <text class="mono" x="508" y="1138">0</text>
+  <text class="mono" x="542" y="1138">2.5</text>
+  <text class="mono" x="576" y="1138">0</text>
+  <text class="mono" x="610" y="1138">0</text>
+  <text class="mono" x="648" y="1138">10.7627000</text>
+  <text class="mono" x="730" y="1138">106.6602000</text>
+  <text class="mono" x="812" y="1138">25.5</text>
+  <text class="mono" x="382" y="1162">3</text>
+  <text class="mono" x="404" y="1162">WAYPOINT</text>
+  <text class="mono" x="508" y="1162">0</text>
+  <text class="mono" x="542" y="1162">2.5</text>
+  <text class="mono" x="576" y="1162">0</text>
+  <text class="mono" x="610" y="1162">0</text>
+  <text class="mono" x="648" y="1162">10.7635220</text>
+  <text class="mono" x="730" y="1162">106.6611720</text>
+  <text class="mono" x="812" y="1162">12.5</text>
+  <text class="mono" x="382" y="1186">4</text>
+  <text class="mono" x="404" y="1186">DO_JUMP</text>
+  <text class="mono" x="508" y="1186">1</text>
+  <text class="mono" x="542" y="1186">3</text>
+  <text class="mono" x="576" y="1186">0</text>
+  <text class="mono" x="610" y="1186">0</text>
+  <text class="mono" x="648" y="1186">0.0000000</text>
+  <text class="mono" x="730" y="1186">0.0000000</text>
+  <text class="mono" x="812" y="1186">0</text>
+
+  <!-- row editor -->
+  <text class="lblm" x="56" y="1256">Command</text>
+  <rect class="field" x="122" y="1242" width="110" height="20" rx="4"/>
+  <text class="mono" x="177" y="1257" text-anchor="middle">WAYPOINT</text>
+  <text class="lblm" x="240" y="1256">P1</text>
+  <rect class="field" x="258" y="1242" width="48" height="20" rx="4"/><text class="mono" x="282" y="1257" text-anchor="middle">0</text>
+  <text class="lblm" x="314" y="1256">P2</text>
+  <rect class="field" x="332" y="1242" width="48" height="20" rx="4"/><text class="mono" x="356" y="1257" text-anchor="middle">2.5</text>
+  <text class="lblm" x="388" y="1256">P3</text>
+  <rect class="field" x="406" y="1242" width="48" height="20" rx="4"/><text class="mono" x="430" y="1257" text-anchor="middle">0</text>
+  <text class="lblm" x="462" y="1256">P4</text>
+  <rect class="field" x="480" y="1242" width="48" height="20" rx="4"/><text class="mono" x="504" y="1257" text-anchor="middle">0</text>
+  <rect class="btn" x="540" y="1242" width="64" height="20" rx="4"/><text class="lblm" x="572" y="1257" text-anchor="middle">Set row</text>
+  <text class="lblm" x="616" y="1256">Lat</text>
+  <rect class="field" x="636" y="1242" width="90" height="20" rx="4"/><text class="mono" x="681" y="1257" text-anchor="middle">10.7635220</text>
+  <text class="lblm" x="734" y="1256">Lng</text>
+  <rect class="field" x="756" y="1242" width="88" height="20" rx="4"/><text class="mono" x="800" y="1257" text-anchor="middle">106.6611720</text>
+
+  <!-- tools + home + transfer -->
+  <text class="lblm" x="56" y="1288">Alt</text>
+  <rect class="field" x="84" y="1274" width="44" height="20" rx="4"/><text class="mono" x="106" y="1289" text-anchor="middle">3</text>
+  <rect class="btn" x="136" y="1274" width="60" height="20" rx="4"/><text class="lblm" x="166" y="1289" text-anchor="middle">Set alt</text>
+  <rect class="btn" x="202" y="1274" width="64" height="20" rx="4"/><text class="lblm" x="234" y="1289" text-anchor="middle">Add WP</text>
+  <rect class="btn" x="272" y="1274" width="40" height="20" rx="4"/><text class="lblm" x="292" y="1289" text-anchor="middle">Up</text>
+  <rect class="btn" x="318" y="1274" width="48" height="20" rx="4"/><text class="lblm" x="342" y="1289" text-anchor="middle">Down</text>
+  <rect class="btn" x="372" y="1274" width="40" height="20" rx="4"/><text class="lblm" x="392" y="1289" text-anchor="middle">Del</text>
+  <rect class="btn" x="418" y="1274" width="48" height="20" rx="4"/><text class="lblm" x="442" y="1289" text-anchor="middle">Load</text>
+  <rect class="btn" x="472" y="1274" width="48" height="20" rx="4"/><text class="lblm" x="496" y="1289" text-anchor="middle">Save</text>
+
+  <text class="lblm" x="56" y="1320">Home lat</text>
+  <rect class="field" x="118" y="1306" width="80" height="20" rx="4"/><text class="mono" x="158" y="1321" text-anchor="middle">10.762622</text>
+  <text class="lblm" x="206" y="1320">lon</text>
+  <rect class="field" x="232" y="1306" width="80" height="20" rx="4"/><text class="mono" x="272" y="1321" text-anchor="middle">106.660172</text>
+  <text class="lblm" x="324" y="1321">(launch origin — sent before Upload / Start)</text>
+
+  <rect class="btn-pri" x="56" y="1332" width="64" height="22" rx="6"/><text class="lblw" x="88" y="1347" text-anchor="middle">Upload</text>
+  <rect class="btn" x="126" y="1332" width="80" height="22" rx="6"/><text class="lbl" x="166" y="1347" text-anchor="middle">Download</text>
+  <rect class="btn-warn" x="212" y="1332" width="56" height="22" rx="6"/><text class="lblw" x="240" y="1347" text-anchor="middle">Start</text>
+  <text class="lblm" x="280" y="1347">4 items · home 10.762622, 106.660172</text>
+</svg>

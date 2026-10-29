@@ -261,8 +261,8 @@
   <text class="lblm" x="908" y="1346">not checked here — the PC has no map database</text>
 
   <!-- ============================ plan window ============================ -->
-  <text class="h2" x="40" y="1018">Plan — mission</text>
-  <text class="lblm" x="180" y="1018">the Plan screen of the apps, on the bench laptop</text>
+  <text class="h2" x="40" y="1024">Plan — mission</text>
+  <text class="lblm" x="180" y="1024">the Plan screen of the apps, on the bench laptop</text>
 
   <rect class="win" x="40" y="1028" width="820" height="332" rx="10"/>
   <rect class="winbar" x="40" y="1028" width="820" height="30" rx="10"/>

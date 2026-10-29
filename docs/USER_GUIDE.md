@@ -390,7 +390,9 @@ row lists every shape ("Keep-out 1", "Corridor 1", …) and every waypoint
 ("WP 1", …) — tap a tile to select and centre the map on it.
 
 The screen maps of both apps: [android-app.svg](android-app.svg) ·
-[ios-app.svg](ios-app.svg).
+[ios-app.svg](ios-app.svg). Every screen and control of the Android app, the
+iOS app and the Python tuner — settings, files and defaults included — is in
+the **[app guide](APP_GUIDE.md)** ([Tiếng Việt](APP_GUIDE.vi.md)).
 
 ---
 

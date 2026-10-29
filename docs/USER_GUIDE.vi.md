@@ -413,7 +413,9 @@ Chuyển sang **Select**, rồi chạm vào hình. Hình sẽ mang các tay cầ
 đồ vào đó.
 
 Sơ đồ màn hình của hai ứng dụng: [android-app.svg](android-app.svg) ·
-[ios-app.svg](ios-app.svg).
+[ios-app.svg](ios-app.svg). Mọi màn hình và nút bấm của app Android, app iOS và
+Python tuner — kể cả cài đặt, tệp và giá trị mặc định — nằm trong
+**[hướng dẫn ứng dụng](APP_GUIDE.vi.md)** ([English](APP_GUIDE.md)).
 
 ---
 
