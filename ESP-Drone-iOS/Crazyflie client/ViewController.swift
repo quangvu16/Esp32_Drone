@@ -314,13 +314,22 @@ final class ViewController: UIViewController {
         tabs.layoutMargins = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
         tabs.backgroundColor = Fly.track
         tabs.layer.cornerRadius = 10
-        for (index, title) in ["Fly", "Plan", "Mission", "Indoor", "Tune", "Setup"].enumerated() {
+        // Each chip is icon AND word — Apple's own picker style, so the nav
+        // reads at a glance instead of being six words in a row.
+        // Mỗi chip là biểu tượng CÙNG chữ — theo kiểu picker của Apple, để thanh
+        // điều hướng nhận ra ngay thay vì sáu chữ liền nhau.
+        for (index, (title, symbol)) in [("Fly", "paperplane.fill"),
+                                         ("Plan", "map"),
+                                         ("Mission", "location.fill"),
+                                         ("Indoor", "square.grid.2x2.fill"),
+                                         ("Tune", "slider.horizontal.3"),
+                                         ("Setup", "gearshape")].enumerated() {
             let b = UIButton(type: .system)
             var config = UIButton.Configuration.plain()
             config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)
             b.configuration = config
             let selected = index == 0
-            b.applyLabel(title, symbol: nil,
+            b.applyLabel(title, symbol: symbol,
                          font: .systemFont(ofSize: 14, weight: selected ? .semibold : .medium),
                          color: selected ? Fly.ink : Fly.muted)
             b.backgroundColor = selected ? Fly.surface : .clear

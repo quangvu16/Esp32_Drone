@@ -650,7 +650,7 @@ final class PlannerViewController: UIViewController, MissionTransferListener {
         altField.widthAnchor.constraint(equalToConstant: 60).isActive = true
 
         let setButton = UIButton(type: .system)
-        setButton.applyLabel("Set", symbol: nil,
+        setButton.applyLabel("Set", symbol: "checkmark",
                              font: .systemFont(ofSize: 13, weight: .semibold))
         setButton.addTarget(self, action: #selector(onSetAlt), for: .touchUpInside)
 

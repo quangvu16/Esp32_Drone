@@ -121,8 +121,8 @@ final class ConnectionViewController: UIViewController, UITableViewDataSource, U
         deviceTable.heightAnchor.constraint(equalToConstant: 150).isActive = true
         stack.addArrangedSubview(deviceTable)
 
-        connectDeviceButton.setTitle("Connect to selected device", for: .normal)
-        connectDeviceButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+        connectDeviceButton.applyLabel("Connect to selected device", symbol: "link",
+                                       font: .systemFont(ofSize: 15, weight: .semibold))
         connectDeviceButton.addTarget(self, action: #selector(connectPicked), for: .touchUpInside)
         stack.addArrangedSubview(connectDeviceButton)
 
@@ -131,8 +131,9 @@ final class ConnectionViewController: UIViewController, UITableViewDataSource, U
         bleNoteLabel.textColor = .secondaryLabel
         stack.addArrangedSubview(bleNoteLabel)
 
-        switchProfileButton.setTitle("Switch drone to this profile", for: .normal)
-        switchProfileButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+        switchProfileButton.applyLabel("Switch drone to this profile",
+                                       symbol: "arrow.triangle.2.circlepath",
+                                       font: .systemFont(ofSize: 15, weight: .semibold))
         switchProfileButton.addTarget(self, action: #selector(switchProfileTapped), for: .touchUpInside)
         stack.addArrangedSubview(switchProfileButton)
 

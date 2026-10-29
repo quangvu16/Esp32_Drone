@@ -258,7 +258,7 @@ final class PidTuneViewController: UIViewController {
         // 13 pt để "Restore defaults" còn nguyên trong một phần ba chiều ngang máy dọc.
         saveButton.applyLabel("Save gains", symbol: "tray.and.arrow.down", font: .systemFont(ofSize: 13))
         loadButton.applyLabel("Load gains", symbol: "tray.and.arrow.up", font: .systemFont(ofSize: 13))
-        defaultsButton.applyLabel("Restore defaults", symbol: nil, font: .systemFont(ofSize: 13))
+        defaultsButton.applyLabel("Restore defaults", symbol: "arrow.counterclockwise", font: .systemFont(ofSize: 13))
         saveButton.addTarget(self, action: #selector(saveGains), for: .touchUpInside)
         loadButton.addTarget(self, action: #selector(loadGains), for: .touchUpInside)
         defaultsButton.addTarget(self, action: #selector(restoreDefaults), for: .touchUpInside)
@@ -602,7 +602,8 @@ final class PidTuneViewController: UIViewController {
         motorSpeedField.widthAnchor.constraint(equalToConstant: 70).isActive = true
 
         let runAllButton = UIButton(type: .system)
-        runAllButton.setTitle("Run all", for: .normal)
+        runAllButton.applyLabel("Run all", symbol: "bolt.fill",
+                                font: .systemFont(ofSize: 13, weight: .semibold))
         runAllButton.addTarget(self, action: #selector(runAllMotors), for: .touchUpInside)
 
         let allRow = UIStackView(arrangedSubviews: [speedName, motorSpeedField, runAllButton])
@@ -610,9 +611,13 @@ final class PidTuneViewController: UIViewController {
         allRow.spacing = 8
         stack.addArrangedSubview(allRow)
 
-        motorStartButton.setTitle("Start test", for: .normal)
+        // All later label changes on this button go through applyLabel too — it
+        // styles with UIButton.Configuration, and setTitle would fight it.
+        // Mọi lần đổi nhãn của nút này về sau cũng đi qua applyLabel — nó tạo
+        // kiểu bằng UIButton.Configuration, còn setTitle sẽ xung đột với nó.
+        motorStartButton.applyLabel("Start test", symbol: "play.fill",
+                                    font: .systemFont(ofSize: 15, weight: .semibold), color: .white)
         motorStartButton.backgroundColor = .systemOrange
-        motorStartButton.setTitleColor(.white, for: .normal)
         motorStartButton.layer.cornerRadius = 10
         motorStartButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
         motorStartButton.addTarget(self, action: #selector(toggleMotorTest), for: .touchUpInside)
@@ -677,7 +682,8 @@ final class PidTuneViewController: UIViewController {
             return
         }
         motorRunning = true
-        motorStartButton.setTitle("Stop test", for: .normal)
+        motorStartButton.applyLabel("Stop test", symbol: "stop.fill",
+                                    font: .systemFont(ofSize: 15, weight: .semibold), color: .white)
         motorStartButton.backgroundColor = .systemRed
         motorStatusLabel.text = "Running — re-sending every 150 ms."
         fireMotorTest()
@@ -708,7 +714,8 @@ final class PidTuneViewController: UIViewController {
         if wasRunning {
             client.motorTestStop()
         }
-        motorStartButton.setTitle("Start test", for: .normal)
+        motorStartButton.applyLabel("Start test", symbol: "play.fill",
+                                    font: .systemFont(ofSize: 15, weight: .semibold), color: .white)
         motorStartButton.backgroundColor = .systemOrange
         motorStatusLabel.text = reason
     }
