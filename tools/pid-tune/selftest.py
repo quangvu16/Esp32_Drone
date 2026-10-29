@@ -5,13 +5,17 @@
 
 No drone needed: a fake firmware answers on UDP exactly as Esp32_drone.ino
 does, so the wire layer (framing, TOCs, parameter read/write, log blocks,
-telemetry decode) is exercised end to end. The optimisers are then run against
-a synthetic cost surface with a known minimum, which is the only way to tell a
-faithful port from a plausible-looking one without spinning motors.
+telemetry decode) is exercised end to end. The Bluetooth links (btlink.py) get
+the same treatment through their pure halves — BLE segment packing/reassembly
+against the firmware's bleRxSeg(), and SPP stream resync against btFrameLen().
+The optimisers are then run against a synthetic cost surface with a known
+minimum, which is the only way to tell a faithful port from a plausible-looking
+one without spinning motors.
 
 The firmware has its own suite (Esp32_drone/test/) and the apps have theirs;
 this is the tuner's half of the same arrangement.
 """
+import asyncio
 import math
 import os
 import socket
@@ -26,6 +30,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import btlink as B        # noqa: E402
 import drone as D          # noqa: E402
 import ml_tune as M        # noqa: E402
 
@@ -462,7 +467,15 @@ def test_link():
         st = D.ThrustStream(d, pct=30, ramp_s=0.5)
         time.sleep(1.6)
         check("the stream starts at zero thrust", fw.thrusts and fw.thrusts[0] == 0)
-        check("~50 packets a second", 60 <= len(fw.thrusts) <= 95)
+        # The loop aims at SETPOINT_HZ = 50, but time.sleep() overshoots on some
+        # hosts (27 ms for a 20 ms request on this macOS = 37 Hz ceiling), so the
+        # floor sits below 1.6 x 50 on purpose: it still catches a halved,
+        # stuttering or missing stream without failing on the scheduler.
+        # Vòng lặp đặt mục tiêu SETPOINT_HZ = 50, nhưng time.sleep() trễ trên
+        # một số máy (27 ms cho yêu cầu 20 ms trên macOS này = trần 37 Hz), nên
+        # sàn cố tình đặt dưới 1.6 x 50: vẫn bắt được luồng chậm một nửa, giật
+        # cục hay mất luồng mà không fail vì chính bộ lập lịch.
+        check("~50 packets a second", 48 <= len(fw.thrusts) <= 95)
         close("it ramps to the target", D.thrust_counts(30), fw.thrusts[-1], 1)
         check("the board armed on thrust-up", fw.arm_events[:1] == ["arm"] and fw.armed)
         st.stop()
@@ -473,6 +486,218 @@ def test_link():
     finally:
         d.close()
         fw.close()
+
+
+# ============================================================ bluetooth links
+
+
+def test_btlink():
+    # The Bluetooth wire rules are the firmware's: the BLE segment state
+    # machine is pinned by Esp32_drone/test/bleseg_test.cpp, and the SPP stream
+    # resync by btFrameLen()/btPoll(). These tests pin the Python half of the
+    # same rules so the three implementations cannot drift apart.
+    # Quy tắc dây Bluetooth là của firmware: máy trạng thái đoạn BLE được chốt
+    # bởi Esp32_drone/test/bleseg_test.cpp, còn đồng bộ luồng SPP bởi
+    # btFrameLen()/btPoll(). Các bài này chốt nửa Python của cùng quy tắc để ba
+    # bản triển khai không thể lệch nhau.
+    print("\n--- bluetooth links (BLE segments, SPP stream) ---")
+    expect("btlink checksum agrees with Drone",
+           D.Drone._checksum(b"\x70\x07"), B.crtp_checksum(b"\x70\x07"))
+
+    pay = bytes(range(0xA0, 0xA0 + 30))
+
+    print("\n--- BLE segment packing (PROTOCOL.md §6) ---")
+    segs = B.seg_pack(pay[:15], 0)
+    expect("a 15-byte packet is one segment", 1, len(segs))
+    expect("it is start|pid0|len-1 then the CRTP", bytes([0x80 | 14]) + pay[:15], segs[0])
+    segs = B.seg_pack(pay[:24], 1)
+    expect("a 24-byte packet is two segments", 2, len(segs))
+    expect("first segment: start|pid1|23, 19 bytes", bytes([0x80 | (1 << 5) | 23]) + pay[:19], segs[0])
+    expect("second segment: cont|pid1|23, 5 bytes", bytes([(1 << 5) | 23]) + pay[19:24], segs[1])
+    segs = B.seg_pack(pay[:20], 2)
+    expect("a 20-byte packet is two segments (it cannot fit one)", 2, len(segs))
+    expect("its last byte travels alone", bytes([(2 << 5) | 19]) + pay[19:20], segs[1])
+    segs = B.seg_pack(pay[:30], 3)
+    expect("a 30-byte packet is two segments", 2, len(segs))
+    expect("the split is 19 + 11", [20, 12], [len(s) for s in segs])
+    for bad in (b"", pay + b"\xEE"):
+        try:
+            B.seg_pack(bad, 0)
+            check("pack refuses %d-byte datagrams" % len(bad), False)
+        except ValueError:
+            check("pack refuses %d-byte datagrams" % len(bad), True)
+
+    print("\n--- BLE reassembly mirrors bleRxSeg ---")
+    for n in (1, 15, 16, 19, 20, 21, 24, 30):
+        segs = B.seg_pack(pay[:n], 1)
+        ra = B.SegReassembler()
+        got = None
+        for i, s in enumerate(segs):
+            r = ra.feed(s[0], s[1:])
+            if i < len(segs) - 1:
+                check("%d-byte datagram: segment %d waits" % (n, i + 1), r is None)
+            else:
+                got = r
+        expect("%d-byte datagram reassembles" % n, pay[:n], got)
+        check("%d-byte datagram resets the state" % n, not ra.buf)
+
+    ra = B.SegReassembler()
+    check("a 20-byte packet is not mistaken for single-segment",
+          ra.feed(0x80 | (2 << 5) | 19, pay[:19]) is None)
+    expect("its last byte completes it", pay[:20], ra.feed((2 << 5) | 19, pay[19:20]))
+    expect("padding beyond the announced length is ignored",
+           pay[:4], B.SegReassembler().feed(0x80 | 3, pay[:19]))
+    ra = B.SegReassembler()
+    ra.feed(0x80 | 23, pay[:19])
+    check("a continuation with another pid is refused",
+          ra.feed((1 << 5) | 23, pay[19:24]) is None)
+    check("and the partial packet is gone", not ra.buf)
+    check("a continuation without start is refused",
+          B.SegReassembler().feed(23, pay[:5]) is None)
+    check("an oversize write is refused",
+          B.SegReassembler().feed(0x80 | 30, pay + b"\xEE") is None)
+    ra = B.SegReassembler()
+    ra.feed(0x80 | 29, pay[:19])
+    check("accumulation past CRTP_MAX_SIZE resets",
+          ra.feed(29, pay[19:] + b"\xEE") is None and not ra.buf)
+
+    print("\n--- BLE writes never carry a checksum ---")
+    commander = bytes([0x30]) + bytes(range(14))       # 15-byte raw CommanderPacket
+    w = B.ble_writes(commander, 0)
+    expect("a 15-byte commander is one raw write on 0x202",
+           [(B.BLE_UUID_CRTP, commander)], w)
+    expect("the raw write is exactly the CRTP bytes", 15, len(w[0][1]))
+    big = bytes([0x70]) + bytes(range(25))             # 26 bytes -> segmented
+    w = B.ble_writes(big, 3)
+    expect("a 26-byte packet goes to 0x203 in two segments",
+           [B.BLE_UUID_CRTPUP, B.BLE_UUID_CRTPUP], [u for u, _ in w])
+    expect("the segments carry exactly the CRTP bytes, checksum-free",
+           big, b"".join(d[1:] for _u, d in w))
+
+    print("\n--- SPP stream framing mirrors btFrameLen ---")
+
+    def frame(raw):
+        return bytes(raw) + bytes([sum(raw) & 0xFF])   # PROTOCOL.md §1, built
+                                                       # here, not via btlink
+    f1, f2 = frame(b"\x20\x05\x01"), frame(b"\x20\x06\x02\x03")
+    fd = B.StreamDeframer()
+    expect("two back-to-back frames come out stripped",
+           [b"\x20\x05\x01", b"\x20\x06\x02\x03"], fd.feed(f1 + f2))
+    check("nothing is left over", not fd.acc)
+    fd = B.StreamDeframer()
+    check("a partial frame waits", [] == fd.feed(f1[:2]))
+    expect("and completes when the rest arrives", [b"\x20\x05\x01"], fd.feed(f1[2:]))
+
+    junk = bytearray([0x50])                           # never a valid prefix:
+    while len(junk) < B.BT_FRAME_MAX:                  # each byte != running sum
+        junk.append((sum(junk) + 1) & 0xFF)
+    expect("31 bytes with no valid frame ask to drop one for resync",
+           -1, B.frame_len(bytes(junk)))
+    expect("under 31, the same stream waits for more", 0, B.frame_len(bytes(junk[:30])))
+
+    cmd_raw = bytes([0x30]) + bytes(range(14))
+    cmd_f = frame(cmd_raw)
+    expect("a commander frame is 16 wire bytes", 16, len(cmd_f))
+    expect("it is recognised at its real length", 16, B.frame_len(cmd_f))
+    expect("a partial commander waits", 0, B.frame_len(cmd_f[:10]))
+    bad = cmd_f[:15] + bytes([(cmd_f[15] + 1) & 0xFF])
+    expect("a bad commander checksum drops the head byte, never a shorter frame",
+           -1, B.frame_len(bad))
+    tricky = bytes([0x30, 0x30]) + bytes(13) + b"\x00"  # an inner l=2 match...
+    expect("a commander frame is never split at an inner match",
+           -1, B.frame_len(tricky))
+
+    print("\n--- SppLink frames and deframes like the wire ---")
+    a, b = socket.socketpair()
+    link = B.SppLink("AA:BB:CC:DD:EE:FF", sock=a)
+    link.connect()
+    try:
+        link.send(b"\x70\x07")
+        expect("send appends the checksum", b"\x70\x07\x77", b.recv(64))
+        b.sendall(frame(b"\x20\x01\x02"))
+        expect("recv strips the checksum", b"\x20\x01\x02", link.recv())
+        b.sendall(f1 + f2)
+        expect("recv returns one frame per call", b"\x20\x05\x01", link.recv())
+        expect("and then the next", b"\x20\x06\x02\x03", link.recv())
+        check("silence reads as None", link.recv() is None)
+
+        print("\n--- Drone drives a stream link end to end ---")
+        def echo_once():
+            data = b.recv(256)
+            reply = data[:-1]                      # strip the wire checksum
+            b.sendall(reply + bytes([sum(reply) & 0xFF]))
+        threading.Thread(target=echo_once, daemon=True).start()
+        d = D.Drone(link=link, timeout=1.5)
+        try:
+            expect("a request round-trips over SPP", b"\x03", d.request(2, 1, b"\x03"))
+        finally:
+            d.close()
+    finally:
+        try:
+            b.close()
+        except OSError:
+            pass
+
+    print("\n--- a dead link fails as OSError, never a bleak error ---")
+    # bleak's BleakError is a bare Exception, so unless the link translates it
+    # (the way _write_all does) it sails past every except in the GUI and
+    # lands as "Exception in Tkinter callback". These checks pin the contract:
+    # anything a dead or broken BLE link raises is an OSError.
+    # BleakError của bleak là Exception trần, nên trừ khi link dịch nó (như
+    # _write_all làm) nó sẽ lọt qua mọi except trong GUI và rơi thành
+    # "Exception in Tkinter callback". Các kiểm này chốt hợp đồng: mọi thứ
+    # liên kết BLE chết/lỗi ném ra đều là OSError.
+
+    class BleakShapedError(Exception):
+        pass                                  # same shape as bleak.exc.BleakError
+                                              # cùng hình dạng với bleak.exc.BleakError
+
+    class DyingClient:
+        async def write_gatt_char(self, uuid, data, response=False):
+            raise BleakShapedError("Service Discovery has not been performed yet")
+
+    link = B.BleLink("ESP32_Done")
+    try:
+        link.send(b"\x70\x07")
+        check("send before connect raises OSError", False)
+    except OSError:
+        check("send before connect raises OSError", True)
+
+    link._client = DyingClient()
+    link._loop = asyncio.new_event_loop()   # send() dispatches onto a live loop
+    threading.Thread(target=link._loop.run_forever, daemon=True).start()
+    try:
+        link.send(b"\x70\x07")
+        check("a bleak write error escapes as OSError", False)
+    except OSError as e:
+        check("a bleak write error escapes as OSError",
+              "BLE link lost" in str(e))
+    except BleakShapedError:
+        check("a bleak write error escapes as OSError", False)
+    check("and the link is marked dead", link._dead is not None)
+    link._loop.call_soon_threadsafe(link._loop.stop)
+    link._loop = None
+
+    try:
+        link.send(b"\x70\x07")
+        check("a later send fails fast on the dead state", False)
+    except OSError as e:
+        expect("a later send fails fast on the dead state",
+               "BLE link lost", str(e).split(" (")[0])
+    try:
+        link.recv()
+        check("recv raises the same dead error", False)
+    except OSError:
+        check("recv raises the same dead error", True)
+
+    link = B.BleLink("ESP32_Done")
+    link.close()
+    check("close() marks the link dead", link._dead is not None)
+    try:
+        link.send(b"\x70\x07")
+        check("send after close() raises OSError", False)
+    except OSError:
+        check("send after close() raises OSError", True)
 
 
 # ============================================================ maths tests
@@ -695,7 +920,8 @@ def test_stop_and_errors():
 
 
 def main():
-    for name, fn in [("wire", test_wire), ("link", test_link), ("maths", test_maths),
+    for name, fn in [("wire", test_wire), ("link", test_link), ("btlink", test_btlink),
+                     ("maths", test_maths),
                      ("optimisers", test_optimisers), ("history", test_history_seeding),
                      ("stop", test_stop_and_errors)]:
         try:

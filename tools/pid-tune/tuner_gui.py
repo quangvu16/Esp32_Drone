@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Live PID tuning with graphs for the ESP32 drone, over the CRTP/UDP link.
+"""Live PID tuning with graphs for the ESP32 drone, over the CRTP link (UDP or
+Bluetooth LE / Classic).
 
 The PC counterpart of the phone apps' Tune PID screen, and the port of
 PID-Calibration's tuner_gui.py: scrolling charts of everything the firmware
 logs, each control-loop term on its own trace so you can see which one does the
-work. What changed from the reference is the link (UDP instead of USB serial)
-and what is being tuned — one drone axis at a time instead of the balance
-robot's eight parameters.
+work. What changed from the reference is the link (UDP or Bluetooth instead of USB
+serial) and what is being tuned — one drone axis at a time instead of the
+balance robot's eight parameters.
 
   angle           stabilizer.<axis>, deg (yaw is logged as a rate in deg/s)
   rate            deg/s: stabilizer.yaw directly, finite-differenced otherwise
@@ -14,10 +15,11 @@ robot's eight parameters.
   controller      controller.<axis>, the summed PID output
   motor m1        one motor's command, 1000..2000 us; dashed lines at the rails
 
-Left panel: the axis picker, parameter editors (Enter or Set applies at once,
+Left panel: the link picker (UDP / BLE / SPP, Reconnect), the axis picker,
+parameter editors (Enter or Set applies at once,
 -/+ step 10 %), Get/Save (NVS)/Load/Defaults, arm/disarm/emergency, per-motor
-bench test (Run/Stop M1..M4), the log rate, statistics of the visible window,
-and CSV recording.
+bench test (Run/Stop M1..M4, Run all), the log rate, statistics of the visible
+window, and CSV recording.
 
 Auto-tune: tunes the ticked gains while the drone sits armed on a stand
 (ml_tune.py), with the method picked in the list (METHODS below):
@@ -40,6 +42,12 @@ plan plotted in the drone's launch frame (click to add a waypoint).
 
   python3 tuner_gui.py                      # the soft-AP default, 192.168.43.42
   python3 tuner_gui.py --host esp-drone.local --axis pitch --window 20
+  python3 tuner_gui.py --link ble                  # Bluetooth LE (PROTOCOL.md §6)
+  python3 tuner_gui.py --link spp --spp AA:BB:CC:DD:EE:FF   # Bluetooth serial
+
+The link is UDP by default and can be Bluetooth (BLE or Classic SPP) instead;
+the Link box switches between them live (the drone must be on a matching link
+profile, §8 — LINK 2/3/6).
 
 Spin up (Drone panel) streams level setpoints at the Thrust % so the motors run;
 the drone must be held by a stand, or have its props off. Stop, EMERGENCY or
@@ -50,6 +58,7 @@ import csv
 import math
 import os
 import queue
+import sys
 import threading
 import time
 import tkinter as tk
@@ -63,6 +72,7 @@ from matplotlib.figure import Figure  # noqa: E402
 from matplotlib.ticker import FuncFormatter, LogFormatter  # noqa: E402
 
 import ml_tune  # noqa: E402
+from btlink import BleLink, SppLink, scan_ble, scan_spp  # noqa: E402
 from drone import (AXES, MOTOR_SAT_HI, MOTOR_SAT_LO, PORT_FLIGHT, PORT_LOG,  # noqa: E402
                    PORT_PARAMS, THRUST_MAX_PCT, Drone, ThrustStream, axis_names,
                    gain_name, open_tune_blocks, stop_log_blocks)
@@ -71,6 +81,38 @@ from planner import (CMD_SET_CURRENT, CMD_START, DEFAULT_WAYPOINT_ALT,  # noqa: 
                      DEFAULT_WAYPOINT_RADIUS, FLOWN_COMMANDS, MISSION_ACCEPTED,
                      MISSION_CH, MissionTransfer, PlannerItem, PlannerMission,
                      mission_result_name, parse_command, to_lat_lon, to_north_east)
+
+# The three link choices in the Link box and on the command line. `addr` is the
+# UDP host, the BLE name or MAC, or the SPP MAC — one entry box covers all three.
+# Ba lựa chọn liên kết trong hộp Link và trên dòng lệnh. `addr` là host UDP,
+# tên hoặc MAC của BLE, hay MAC của SPP — một ô nhập dùng cho cả ba.
+LINK_KINDS = ("UDP", "BLE", "SPP")
+
+
+def make_drone(kind, addr, opts=None):
+    """Build a Drone on the chosen transport (PROTOCOL.md §8).
+    Tạo Drone trên giao thức đã chọn (PROTOCOL.md mục 8)."""
+    if kind == "BLE":
+        return Drone(link=BleLink(addr or "ESP32_Done"))
+    if kind == "SPP":
+        if not addr:
+            raise ValueError("SPP needs the drone's Bluetooth MAC address")
+        return Drone(link=SppLink(addr))
+    host = addr or getattr(opts, "host", None) or "192.168.43.42"
+    return Drone(host,
+                 getattr(opts, "device_port", None) or 2390,
+                 getattr(opts, "app_port", None) or 2399)
+
+
+def link_of(drone):
+    """(kind, addr) for the Link box, read back off the live link.
+    (kind, addr) cho hộp Link, đọc lại từ liên kết đang chạy."""
+    link = drone.link
+    if isinstance(link, BleLink):
+        return "BLE", link.address or link.name
+    if isinstance(link, SppLink):
+        return "SPP", link.address
+    return "UDP", link.host
 
 # (subplot title, unit, [(series key, label, colour)])
 # (tiêu đề subplot, đơn vị, [(khóa chuỗi, nhãn, màu)])
@@ -755,12 +797,19 @@ class PlanWindow:
 
 
 class TunerGui:
-    def __init__(self, root, drone, axis, window_s):
+    def __init__(self, root, drone, axis, window_s, opts=None):
         self.root = root
         self.drone = drone
+        self.opts = opts               # command-line options, to rebuild the link
+                                       # tùy chọn dòng lệnh, để dựng lại liên kết
         self.axis = axis
         self.names = axis_names(axis)
         self.window = tk.DoubleVar(value=window_s)
+        kind, addr = link_of(drone)
+        self.link_kind = tk.StringVar(value=kind)
+        self.link_addr = tk.StringVar(value=addr)
+        self.link_cur = (kind, addr)   # what the live Drone was built with
+                                       # thứ Drone đang chạy được tạo với
         self.paused = False
         self.rec = None                     # (file, writer, host time of the last row)
         self.params = [None] * 3
@@ -816,15 +865,26 @@ class TunerGui:
     def _build_link(self, parent):
         box = ttk.LabelFrame(parent, text="Link", padding=4)
         box.pack(fill=tk.X)
-        ttk.Label(box, text=self.drone.host, font=("TkFixedFont", 9)
-                  ).grid(row=0, column=0, columnspan=3, sticky=tk.W)
-        ttk.Label(box, text="Axis").grid(row=1, column=0, sticky=tk.W)
+        self.link_desc = ttk.Label(box, text=self.drone.link.describe(),
+                                   font=("TkFixedFont", 9))
+        self.link_desc.grid(row=0, column=0, columnspan=3, sticky=tk.W)
+        kinds = ttk.Frame(box)
+        kinds.grid(row=1, column=0, columnspan=3, sticky=tk.W)
+        for name in LINK_KINDS:
+            ttk.Radiobutton(kinds, text=name, value=name,
+                            variable=self.link_kind).pack(side=tk.LEFT)
+        ttk.Entry(box, textvariable=self.link_addr, width=26,
+                  font=("TkFixedFont", 9)).grid(row=2, column=0, columnspan=3,
+                                                sticky=tk.W + tk.E)
+        ttk.Label(box, text="Axis").grid(row=3, column=0, sticky=tk.W)
         self.axis_var = tk.StringVar(value=self.axis)
         for n, name in enumerate(AXES):
             ttk.Radiobutton(box, text=name.capitalize(), value=name, variable=self.axis_var,
-                            command=self.switch_axis).grid(row=1, column=1 + n, sticky=tk.W)
+                            command=self.switch_axis).grid(row=3, column=1 + n, sticky=tk.W)
         self.link_btn = ttk.Button(box, text="Reconnect", command=self.reconnect)
-        self.link_btn.grid(row=2, column=0, columnspan=3, sticky=tk.W, pady=(4, 0))
+        self.link_btn.grid(row=4, column=0, sticky=tk.W, pady=(4, 0))
+        self.dev_btn = ttk.Button(box, text="Devices…", command=self.show_devices)
+        self.dev_btn.grid(row=4, column=1, columnspan=2, sticky=tk.W, pady=(4, 0))
 
     def _build_params(self, parent):
         box = ttk.LabelFrame(parent, text="Gains", padding=4)
@@ -893,11 +953,11 @@ class TunerGui:
 
     def _build_motor_test(self, parent):
         # Bench motor test (FC_MOTOR_TEST, PROTOCOL.md §5): one Run/Stop pair per
-        # motor, a shared speed, and STOP ALL. Disarmed bench use only — firmware
-        # refuses the test while armed and never auto-arms here.
+        # motor plus Run all, a shared speed, and STOP ALL. Disarmed bench use
+        # only — firmware refuses the test while armed and never auto-arms here.
         # Thử động cơ trên bàn (FC_MOTOR_TEST, PROTOCOL.md §5): mỗi motor một cặp
-        # Run/Stop, tốc độ dùng chung, và STOP ALL. Chỉ dùng khi chưa armed trên
-        # bàn — firmware từ chối khi đang armed và không bao giờ tự arm ở đây.
+        # Run/Stop cộng Run all, tốc độ dùng chung, và STOP ALL. Chỉ dùng khi chưa
+        # armed trên bàn — firmware từ chối khi đang armed và không bao giờ tự arm ở đây.
         box = ttk.LabelFrame(parent, text="Motor test", padding=4)
         box.pack(fill=tk.X, pady=(6, 0))
         ttk.Label(box, text="disarmed only — props clear").grid(row=0, column=0,
@@ -912,9 +972,10 @@ class TunerGui:
                        command=lambda n=n: self.motor_run(n)).grid(row=2 + n, column=1, sticky=tk.W)
             ttk.Button(box, text="Stop", width=6,
                        command=lambda n=n: self.motor_stop(n)).grid(row=2 + n, column=2, sticky=tk.W)
+        ttk.Button(box, text="Run all", width=6,
+                   command=self.motor_run_all).grid(row=6, column=1, sticky=tk.W, pady=(4, 0))
         ttk.Button(box, text="STOP ALL", width=11,
-                   command=self.motor_stop_all).grid(row=6, column=0, columnspan=3,
-                                                     sticky=tk.W, pady=(4, 0))
+                   command=self.motor_stop_all).grid(row=6, column=2, sticky=tk.W, pady=(4, 0))
 
     def _build_autotune(self, parent):
         box = ttk.LabelFrame(parent, text="Auto-tune", padding=4)
@@ -959,13 +1020,35 @@ class TunerGui:
 
     # ---------------------------------------------------------------- drone I/O
     def start(self):
+        # First contact happens here, after the window is up — the TOC fetches
+        # used to block and abort before any UI appeared. A dead link is not
+        # fatal: the Link box picks UDP / BLE / SPP and Reconnect retries.
+        # Chạm mặt lần đầu diễn ra ở đây, sau khi cửa sổ đã mở — hai lần lấy TOC
+        # trước đây chặn và thoát trước khi có giao diện. Liên kết chết không
+        # phải lỗi nặng: hộp Link chọn UDP / BLE / SPP và Reconnect thử lại.
         try:
-            self.open_blocks()
-            self.refresh_params()
+            self._sync()
             self.status.set("")
         except (TimeoutError, OSError, RuntimeError, KeyError) as e:
-            self.status.set(f"link problem ({e}); check the drone, then press Reconnect")
+            hint = ("join the drone's WiFi first (ESP-Drone / 12345678), or the drone "
+                    "may be on a Bluetooth profile — pick BLE/SPP in the Link box "
+                    "and press Devices… to find it"
+                    if self.link_cur[0] == "UDP"
+                    else "check the drone is on a Bluetooth link profile (LINK 2/3/6), "
+                         "or press Devices… to pick it from the list")
+            self.status.set(f"no reply from {self.link_cur[1]} ({e}); {hint}; "
+                            "then press Reconnect")
         self.root.after(100, self.redraw)
+
+    def _sync(self):
+        # TOCs, log blocks and gains — everything the first contact needs from
+        # a live link, shared by start() and reconnect().
+        # TOC, khối log và gain — mọi thứ lần chạm mặt đầu cần từ liên kết sống,
+        # dùng chung cho start() và reconnect().
+        self.drone.fetch_toc(PORT_PARAMS, self.drone.param_toc)
+        self.drone.fetch_toc(PORT_LOG, self.drone.log_toc)
+        self.open_blocks()
+        self.refresh_params()
 
     def open_blocks(self):
         open_tune_blocks(self.drone, self.axis, int(1000 / max(1, self.rate.get())))
@@ -977,14 +1060,126 @@ class TunerGui:
             self.status.set(f"log rate: {e}")
 
     def reconnect(self):
+        # A dropped Bluetooth link never comes back in place — its client is
+        # gone for good — so a sync that fails with OSError (as opposed to a
+        # plain timeout: the link is fine, the drone is not answering) rebuilds
+        # the whole transport once and tries again, even when the target is
+        # unchanged. Without this the old "target unchanged" check kept
+        # writing through the corpse and every button raised a traceback.
+        # Liên kết Bluetooth đã rơi không thể sống lại tại chỗ — client của nó
+        # mất hẳn — nên một lần đồng bộ lỗi OSError (khác timeout thường: liên
+        # kết vẫn ổn, drone không trả lời) sẽ dựng lại toàn bộ giao thức một lần
+        # và thử lại, ngay cả khi mục tiêu không đổi. Thiếu đoạn này, phép kiểm
+        # "mục tiêu không đổi" cũ sẽ tiếp tục ghi qua xác chết và mọi nút đều
+        # ném traceback.
         try:
-            self.drone.fetch_toc(PORT_PARAMS, self.drone.param_toc)
-            self.drone.fetch_toc(PORT_LOG, self.drone.log_toc)
-            self.open_blocks()
-            self.refresh_params()
+            want = (self.link_kind.get(), self.link_addr.get().strip())
+            fresh = want != self.link_cur
+            if fresh:
+                self._switch_link(*want)
+            try:
+                self._sync()
+            except OSError:
+                if fresh:             # a fresh link already failed — report it
+                                      # liên kết mới đã lỗi — báo ra
+                    raise
+                self._switch_link(*want)
+                self._sync()
             self.status.set("")
-        except (TimeoutError, OSError, RuntimeError) as e:
+        except (TimeoutError, OSError, RuntimeError, ValueError) as e:
             self.status.set(f"reconnect: {e}")
+
+    # ---------------------------------------------------------------- device picker
+    def show_devices(self):
+        # The picker lists what the radio can see so the user chooses the drone
+        # instead of typing a name or address. BLE scans advertisers; SPP lists
+        # already-paired devices (Classic has no service scan). The scan runs on
+        # a worker thread so the window keeps painting.
+        # Trình chọn liệt kê những gì radio thấy được để người dùng chọn drone
+        # thay vì gõ tên hay địa chỉ. BLE quét thiết bị quảng bá; SPP liệt kê
+        # thiết bị đã ghép đôi (Classic không có quét dịch vụ). Phép quét chạy
+        # trên luồng phụ để cửa sổ vẫn vẽ được.
+        kind = self.link_kind.get()
+        if kind == "UDP":
+            self.status.set("the device list is Bluetooth — switch the Link box to BLE or SPP")
+            return
+        self.status.set(f"scanning for {kind} devices…")
+        self.dev_btn.state(["disabled"])
+        threading.Thread(target=self._scan_worker, args=(kind,), daemon=True).start()
+
+    def _scan_worker(self, kind):
+        try:
+            rows = scan_spp() if kind == "SPP" else scan_ble()
+            err = None
+        except Exception as e:                 # no bleak / no radio / no tool
+                                               # thiếu bleak / thiếu radio / thiếu công cụ
+            rows, err = [], e
+        self.root.after(0, lambda: self._show_devices(kind, rows, err))
+
+    def _show_devices(self, kind, rows, err):
+        self.dev_btn.state(["!disabled"])
+        if err is not None:
+            self.status.set(f"{kind} scan: {err}")
+            return
+        if not rows:
+            self.status.set(f"no {kind} devices found")
+            return
+        self.status.set(f"found {len(rows)} {kind} device(s) — pick one to connect")
+        win = tk.Toplevel(self.root)
+        win.title(f"{kind} devices")
+        win.transient(self.root)
+        tree = ttk.Treeview(win, columns=("addr", "rssi"),
+                            height=min(12, max(4, len(rows))))
+        tree.heading("#0", text="Name")
+        tree.heading("addr", text="Address")
+        tree.heading("rssi", text="RSSI")
+        tree.column("#0", width=180)
+        tree.column("addr", width=210, anchor=tk.W)
+        tree.column("rssi", width=50, anchor=tk.CENTER)
+        for name, addr, rssi in rows:
+            tree.insert("", tk.END, text=name,
+                        values=(addr, "" if rssi is None else rssi))
+        tree.grid(row=0, column=0, columnspan=2, padx=6, pady=6, sticky=tk.NSEW)
+
+        def chosen(_event=None):
+            # The address is the direct handle: BleLink/SppLink connect to it
+            # without a name scan, so two drones with the same name stay apart.
+            # Địa chỉ là tay cầm trực tiếp: BleLink/SppLink kết nối thẳng không
+            # quét tên, nên hai drone trùng tên vẫn phân biệt được.
+            sel = tree.selection()
+            if not sel:
+                return
+            self.link_addr.set(tree.set(sel[0], "addr"))
+            win.destroy()
+            self.reconnect()
+
+        ttk.Button(win, text="Connect", command=chosen).grid(
+            row=1, column=0, padx=6, pady=6, sticky=tk.W)
+        ttk.Button(win, text="Close", command=win.destroy).grid(
+            row=1, column=1, padx=6, pady=6, sticky=tk.E)
+        tree.bind("<Double-1>", chosen)
+        first = tree.get_children()[0]
+        tree.selection_set(first)
+        tree.focus(first)
+
+    def _switch_link(self, kind, addr):
+        # Rebuild the Drone on another transport. The new one is built first so
+        # a failed connect leaves the old link alone. A mission cannot survive
+        # a link change, so the Plan window and any spin-up close with it — the
+        # same guard the Android app uses on a disconnect.
+        # Dựng lại Drone trên giao thức khác. Dựng cái mới trước để kết nối
+        # thất bại không phá liên kết cũ. Nhiệm vụ không thể sống qua đổi liên
+        # kết nên cửa sổ Plan và spin-up đóng theo — cùng guard mà app Android
+        # dùng khi mất kết nối.
+        new = make_drone(kind, addr, self.opts)
+        if self.plan_win is not None:
+            self.plan_win.close(force=True)
+        self.stop_spin()
+        self.motor_hold = False
+        self.drone.close()
+        self.drone = new
+        self.link_cur = (kind, addr)
+        self.link_desc.config(text=new.link.describe())
 
     def switch_axis(self):
         axis = self.axis_var.get()
@@ -1140,6 +1335,24 @@ class TunerGui:
         if not self._motor_apply():
             return
         self.status.set(f"M{n + 1} stopped")
+        self._motor_hold_start()
+
+    def motor_run_all(self):
+        # Run all four motors at once at the shared speed — one enable=1 packet
+        # carries four speeds, so the whole power train can be bench-tested
+        # together (MOTOR_TEST, PROTOCOL.md §5).
+        # Chạy cả bốn motor cùng lúc ở tốc độ dùng chung — một gói enable=1 mang
+        # bốn tốc độ, nên toàn bộ hệ truyền động có thể được thử cùng nhau trên
+        # bàn (MOTOR_TEST, PROTOCOL.md mục 5).
+        try:
+            speed = max(1000, min(1500, int(self.motor_speed.get())))
+        except (tk.TclError, ValueError):
+            self.status.set("motor speed: not a number")
+            return
+        self.motor_vals = [speed] * 4
+        if not self._motor_apply():
+            return
+        self.status.set(f"all motors running at {speed}")
         self._motor_hold_start()
 
     def motor_stop_all(self, msg="all motors stopped"):
@@ -1331,7 +1544,12 @@ class TunerGui:
             self.canvas.draw_idle()
             self.update_stats(frames)
         elif not frames:
-            self.status.set("no telemetry")
+            # The watchdog only owns the "no telemetry" message — it must not
+            # clobber a link/reconnect hint that tells the user what to fix.
+            # Watchdog chỉ sở hữu thông điệp "no telemetry" — không được ghi đè
+            # gợi ý liên kết/kết nối lại vốn chỉ cho người dùng cách xử lý.
+            if self.status.get() in ("", "connecting...", "no telemetry"):
+                self.status.set("no telemetry")
         self.root.after(100, self.redraw)
 
     def update_stats(self, frames):
@@ -1380,23 +1598,38 @@ class TunerGui:
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--link", choices=("udp", "ble", "spp"), default="udp",
+                    help="transport: udp (default), ble (Bluetooth LE), "
+                         "spp (Bluetooth Classic serial)")
     ap.add_argument("--host", default="192.168.43.42",
-                    help="drone address (soft-AP default: 192.168.43.42)")
+                    help="drone address for --link udp (soft-AP default: 192.168.43.42)")
+    ap.add_argument("--ble", default="ESP32_Done", metavar="NAME|MAC",
+                    help="BLE device name or MAC for --link ble (default ESP32_Done)")
+    ap.add_argument("--spp", default="", metavar="MAC",
+                    help="Bluetooth Classic MAC for --link spp, e.g. AA:BB:CC:DD:EE:FF")
     ap.add_argument("--device-port", type=int, default=2390)
     ap.add_argument("--app-port", type=int, default=2399)
     ap.add_argument("--axis", choices=AXES, default="roll")
     ap.add_argument("--window", type=float, default=10.0, help="seconds shown (default 10)")
     args = ap.parse_args()
 
-    drone = Drone(args.host, args.device_port, args.app_port)
+    kind = args.link.upper()
+    addr = {"UDP": args.host, "BLE": args.ble, "SPP": args.spp}[kind]
     try:
-        drone.fetch_toc(PORT_PARAMS, drone.param_toc)
-        drone.fetch_toc(PORT_LOG, drone.log_toc)
-    except TimeoutError as e:
-        raise SystemExit(f"no reply from {args.host} ({e}); "
-                         "join the drone's WiFi first (ESP-Drone / 12345678)")
+        drone = make_drone(kind, addr, args)
+    except (OSError, RuntimeError, ValueError) as e:
+        # The window must open even when the asked-for link is impossible — the
+        # Link box switches transport. Fall back to UDP (always constructible)
+        # and say why in the terminal.
+        # Cửa sổ phải mở kể cả khi liên kết yêu cầu là bất khả thi — hộp Link
+        # đổi được giao thức. Dự phòng sang UDP (lúc nào cũng dựng được) và
+        # giải thích trong terminal.
+        print(f"cannot open the {kind} link to {addr or '?'} ({e}); "
+              "starting on UDP — pick the transport in the Link box", file=sys.stderr)
+        kind, addr = "UDP", args.host
+        drone = make_drone(kind, addr, args)
     root = tk.Tk()
-    TunerGui(root, drone, args.axis, args.window)
+    TunerGui(root, drone, args.axis, args.window, opts=args)
     root.mainloop()
 
 

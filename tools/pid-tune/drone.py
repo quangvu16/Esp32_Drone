@@ -3,8 +3,11 @@
 
 Stands in for PID-Calibration's `autotune.Robot`, which talked to a balancing
 robot over USB serial with its own command bytes. This speaks the same CRTP the
-phone apps speak, over UDP: [CRTP bytes ...][uint8 checksum], checksum the low
-byte of the sum of all CRTP bytes including the header (PROTOCOL.md section 1).
+phone apps speak, over a pluggable link whose wire formats are all in
+PROTOCOL.md: UDP (the default) and Bluetooth Classic SPP carry
+[CRTP bytes ...][uint8 checksum], checksum the low byte of the sum of all CRTP
+bytes including the header (section 1); BLE carries raw CRTP and never a
+checksum (section 6, see btlink.py).
 
 Wire map, all from PROTOCOL.md:
 
@@ -37,6 +40,16 @@ NAV_CH, MISSION_CH = 1, 2        # port 7: navigation / mission (§6, §12)
                                  # port 7: định hướng / nhiệm vụ (mục 6, 12)
 NAV_ORIGIN = 0x23                # 0x23 ORIGIN double lat, double lon (§12)
                                  # 0x23 ORIGIN double vĩ độ, double kinh độ
+
+
+def crtp_checksum(payload):
+    """The low byte of the sum of every CRTP byte including the header
+    (PROTOCOL.md §1). btlink.py carries the same formula for the Bluetooth
+    links; selftest.py pins the two together.
+    Byte thấp của tổng mọi byte CRTP kể cả header (PROTOCOL.md mục 1).
+    btlink.py mang cùng công thức cho các liên kết Bluetooth; selftest.py chốt
+    hai cái lại với nhau."""
+    return sum(payload) & 0xFF
 
 CMD_TOC_ELEMENT, CMD_TOC_INFO = 0, 1
 
@@ -211,18 +224,65 @@ class Toc:
         return self.by_name[complete_name]
 
 
-class Drone:
-    """CRTP over UDP. Thread-safe; telemetry frames are buffered for measure()."""
+class UdpLink:
+    """The default link: CRTP over UDP, [CRTP bytes ...][uint8 checksum].
+    Liên kết mặc định: CRTP qua UDP, [CRTP bytes ...][uint8 checksum]."""
 
-    def __init__(self, host="192.168.43.42", device_port=UDP_DEVICE_PORT,
-                 app_port=UDP_APP_PORT, timeout=1.0):
+    def __init__(self, host, device_port=UDP_DEVICE_PORT, app_port=UDP_APP_PORT):
         self.host = host
-        self.timeout = timeout
+        self._sendto = (host, device_port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("", app_port))
         self.sock.settimeout(0.05)
-        self._sendto = (host, device_port)
+
+    def connect(self):
+        pass                       # UDP is connectionless
+                                   # UDP không có kết nối
+
+    def describe(self):
+        return "udp %s" % self.host
+
+    def send(self, raw):
+        raw = bytes(raw)
+        self.sock.sendto(raw + bytes([crtp_checksum(raw)]), self._sendto)
+
+    def recv(self):
+        """One raw CRTP frame (checksum stripped), None when nothing arrived
+        yet. A closed socket raises OSError and stops the reader thread.
+        Một khung CRTP thô (đã bỏ checksum), None khi chưa có gì. Socket bị
+        đóng ném OSError và dừng luồng đọc."""
+        try:
+            data, _ = self.sock.recvfrom(512)
+        except socket.timeout:
+            return None
+        if len(data) < 2:
+            return None
+        raw, csum = data[:-1], data[-1]
+        if crtp_checksum(raw) != csum:
+            return None             # corrupt; drop
+                                    # hỏng; bỏ qua
+        return raw
+
+    def close(self):
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+
+class Drone:
+    """CRTP over a pluggable link (UDP by default, Bluetooth from btlink.py).
+    Thread-safe; telemetry frames are buffered for measure().
+    CRTP qua liên kết có thể thay (mặc định UDP, Bluetooth từ btlink.py).
+    An toàn luồng; các khung telemetry được đệm cho measure()."""
+
+    def __init__(self, host="192.168.43.42", device_port=UDP_DEVICE_PORT,
+                 app_port=UDP_APP_PORT, timeout=1.0, link=None):
+        self.host = host
+        self.timeout = timeout
+        self.link = link if link is not None else UdpLink(host, device_port, app_port)
+        self.link.connect()
         self._lock = threading.Lock()
         self._pending = {}            # (port, channel) -> list of raw replies
         self._hooks = {}              # (port, channel) -> callback (deliver live)
@@ -237,38 +297,33 @@ class Drone:
         self._rx.start()
 
     # --- transport ---
+    # send() hands the link raw CRTP (header + payload): UdpLink and SppLink
+    # add the checksum on the wire, BleLink never does (PROTOCOL.md §6).
+    # send() giao cho liên kết CRTP thô (header + phần dữ liệu): UdpLink và
+    # SppLink thêm checksum lên dây, BleLink thì không (PROTOCOL.md mục 6).
 
     def close(self):
         self._running = False
-        try:
-            self.sock.close()
-        except OSError:
-            pass
+        self.link.close()
 
     @staticmethod
     def _checksum(payload):
-        return sum(payload) & 0xFF
+        return crtp_checksum(payload)
 
     def send(self, port, channel, payload):
         raw = bytes([((port & 0xF) << 4) | (channel & 0xF)]) + bytes(payload)
-        pkt = raw + bytes([self._checksum(raw)])
-        with self._lock:
-            self.sock.sendto(pkt, self._sendto)
+        with self._lock:            # one whole frame at a time on a stream link
+                                    # mỗi lần một khung trọn vẹn trên liên kết luồng
+            self.link.send(raw)
 
     def _reader(self):
         while self._running:
             try:
-                data, _ = self.sock.recvfrom(512)
-            except socket.timeout:
-                continue
+                raw = self.link.recv()
             except OSError:
                 break
-            if len(data) < 2:
+            if raw is None:
                 continue
-            raw, csum = data[:-1], data[-1]
-            if self._checksum(raw) != csum:
-                continue                        # corrupt; drop
-                                                # hỏng; bỏ qua
             header = raw[0]
             port, channel, payload = header >> 4, header & 0xF, raw[1:]
             if port == PORT_LOG and channel == LOG_CH_DATA:
@@ -394,9 +449,10 @@ class Drone:
         try:
             self._log_ctrl(LOG_STOP, bytes([block_id]))
             self._log_ctrl(LOG_DELETE, bytes([block_id]))
-        except TimeoutError:
-            pass                                    # already gone; re-acking is idempotent
-                                                    # đã biến mất rồi; ack lại là idempotent
+        except (TimeoutError, OSError):
+            # already gone (or the link is); re-acking is idempotent
+            # đã biến mất rồi (hoặc liên kết đã chết); ack lại là idempotent
+            pass
 
     def _handle_log_data(self, payload):
         if len(payload) < 4:

@@ -5,7 +5,8 @@
 Step-by-step guide: **[docs/PID_TUNER_GUIDE.md](../../docs/PID_TUNER_GUIDE.md)** · Tiếng Việt: **[docs/PID_TUNER_GUIDE.vi.md](../../docs/PID_TUNER_GUIDE.vi.md)**
 
 A tkinter + matplotlib GUI that tunes one drone axis at a time (roll, pitch or
-yaw) over the same CRTP/UDP link the phone apps use. Ported from
+yaw) over the same CRTP link the phone apps use — UDP, Bluetooth LE or
+Bluetooth Classic SPP. Ported from
 [`quangvu16/PID-Calibration`](https://github.com/quangvu16/PID-Calibration):
 the eleven search algorithms are that project's, unchanged — same grids, same
 hyperparameters, same trial loop — so a run here and a run there mean the same
@@ -26,32 +27,60 @@ python3 -m venv .venv
 pip install numpy matplotlib
 ```
 
+Bluetooth LE additionally needs `bleak` (`pip install bleak`); it is imported
+only when `--link ble` is used, so UDP/SPP installs never touch it. Classic SPP
+uses the standard library's `socket.AF_BLUETOOTH` and works on Linux (BlueZ);
+other platforms raise a clear error.
+
 ## Run
 
-1. Power the drone and join its network — soft-AP **ESP-Drone** / **12345678**,
-   drone at `192.168.43.42`, or your own station-mode network.
+1. Power the drone and put it on a link profile you can reach: soft-AP
+   **ESP-Drone** / **12345678** (drone at `192.168.43.42`), your own
+   station-mode network, or a Bluetooth profile (`LINK` 2/3/6).
 2. Put the drone on a tuning stand (props on, one axis free) or take the props
    off for a dry run. **Spin up** in the Drone panel runs all four motors.
 3. `python tuner_gui.py`
 
 ```
 python tuner_gui.py --host 192.168.43.42 --axis roll
+python tuner_gui.py --link ble --ble ESP32_Done
+python tuner_gui.py --link spp --spp AA:BB:CC:DD:EE:FF
 ```
 
 | flag | default | meaning |
 | --- | --- | --- |
-| `--host` | `192.168.43.42` | drone address (soft-AP default; `esp-drone.local` in station mode) |
-| `--device-port` | `2390` | UDP port the drone listens on |
-| `--app-port` | `2399` | UDP port the drone replies to |
+| `--link` | `udp` | `udp`, `ble` or `spp` (also switchable in the GUI) |
+| `--host` | `192.168.43.42` | UDP: drone address (soft-AP default; `esp-drone.local` in station mode) |
+| `--device-port` | `2390` | UDP: port the drone listens on |
+| `--app-port` | `2399` | UDP: port the drone replies to |
+| `--ble` | `ESP32_Done` | BLE: drone name, MAC or CoreBluetooth UUID |
+| `--spp` | — | SPP: drone Bluetooth MAC (required for `--link spp`) |
 | `--axis` | `roll` | `roll`, `pitch` or `yaw` |
 | `--window` | `10` | seconds of telemetry shown in the plots |
 
-If it exits with `no reply from ...`, you are not on the drone's network yet —
-the two TOC fetches at startup are the first thing that talks to the board.
+If the first contact fails, the window still opens — it says what to fix in the
+status line (join the drone's WiFi, or switch the Link box to BLE/SPP) and
+**Reconnect** retries. **Devices…** lists the Bluetooth devices the radio can
+see (BLE scan) or has paired (SPP), and picking one connects to that exact
+device by address — no typing, and two drones with the same name stay apart.
+
+**Bluetooth notes** — the drone only speaks Bluetooth on a Bluetooth link
+profile: `LINK` 2 (SPP), 3 (BLE) or 6 (SPP + BLE). BLE is raw CRTP with
+control-byte segmentation; SPP is the UDP wire format in a stream with
+checksum framing (PROTOCOL.md §8). BLE needs the `bleak` package (`pip install
+bleak`, or run `tools/pid-tune/.venv/bin/python`). SPP needs `socket.AF_BLUETOOTH`
+— Linux/BlueZ only; on macOS the **Devices…** list still shows paired devices,
+but the RFCOMM connect itself is not available to Python.
 
 ## The window
 
-**Link** — address, axis radio, Reconnect. Changing axis tears down both log
+**Link** — the link picker (UDP / BLE / SPP radios plus an address field),
+the live link's description, the axis radio, Reconnect and **Devices…**.
+Devices… opens the Bluetooth device list — BLE advertisers or paired Classic
+devices — and Connect on a row fills the address field and links to that exact
+device. Reconnect with a different link or address tears down the current one
+and rebuilds it (the mission window and any spin-up or motor test stop first —
+a mission cannot survive a link change). Changing axis tears down both log
 blocks and rebuilds them for the new axis.
 
 **Gains** — the three PID values for the selected axis, each with `-` `+` and a
@@ -77,16 +106,18 @@ EMERGENCY takes one click, with no confirmation dialog, like CUT MOTORS on the
 phones' Tune screen. A refused command (ARM not from idle, SAVE while armed) is
 shown as “refused by the drone” in the status line.
 
-**Motor test** — bench testing of single motors with the PID loop bypassed
+**Motor test** — bench testing of motors with the PID loop bypassed
 (`MOTOR_TEST`, `0x0C`, PROTOCOL.md §5). A shared **Speed** spinbox (1000–1500 in
 steps of 50; 1000 = stopped) plus a **Run** / **Stop** pair for each motor
-M1–M4 and a **STOP ALL** button. `Run` spins only that motor at the chosen
-speed and returns the other three to 1000; `Stop` returns its motor to 1000
-keeping the others' state; **STOP ALL** sends `enable=0`, which ends the test
-at once. While any motor is spinning the GUI re-sends the packet every 150 ms,
-because the firmware stops the test after 300 ms of silence. Disarmed bench
-use only — the firmware refuses the test while armed, and a failed ack is
-reported on the status line ("motor test not acked — drone must be disarmed").
+M1–M4, a **Run all** button and a **STOP ALL** button. `Run` spins only that
+motor at the chosen speed and returns the other three to 1000; `Stop` returns
+its motor to 1000 keeping the others' state; **Run all** spins all four motors
+at once at the shared speed (one `enable=1` packet carries four speeds);
+**STOP ALL** sends `enable=0`, which ends the test at once. While any motor is
+spinning the GUI re-sends the packet every 150 ms, because the firmware stops
+the test after 300 ms of silence. Disarmed bench use only — the firmware
+refuses the test while armed, and a failed ack is reported on the status line
+("motor test not acked — drone must be disarmed").
 
 **Auto-tune** — method dropdown, which of the three gains to include (uncheck
 one to hold it fixed), "learn from past trials", and Trials / Trial s / Range x.
@@ -233,8 +264,11 @@ Sections: wire framing and struct budgets, the link against the fake firmware,
 the port-7 flight commands' exact bytes, the stand-thrust stream (arms on
 thrust-up, disarms at zero),
 telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all
-eleven optimisers, history seeding, and error paths (including that a CREATE
-with different variables over a live block is refused with `EXISTS`).
+eleven optimisers, history seeding, error paths (including that a CREATE
+with different variables over a live block is refused with `EXISTS`), and the
+Bluetooth link layer (`btlink`): the checksum boundary, BLE segmentation
+mirroring the firmware's `bleSend`/`bleRxSeg`, SPP framing mirroring
+`btFrameLen`, and a socketpair round-trip through `Drone(link=...)`.
 
 The plan side has its own suite, `planner_test.py`: it pins the `.waypoints`
 codec against the Android `CodecCheck.java` driver's 32 checks (byte-exact
