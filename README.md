@@ -1,6 +1,6 @@
 # Esp32_Drone
 
-Flight-controller firmware and phone apps for the **XW_Z1_V2.0 欣薇_无人机** —
+Flight-controller firmware and phone apps for the XW_Z1_V2.0 —
 a small ESP32 quadcopter board carrying nothing but an MPU6500.
 
 The firmware speaks the Bitcraze **CRTP** protocol over UDP, Bluetooth Classic
