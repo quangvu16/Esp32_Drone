@@ -166,6 +166,9 @@ final class ViewController: UIViewController {
         vc.onApply = { [weak self] in
             self?.viewModel?.applyConnectionSettings()
         }
+        vc.onSwitchLinkProfile = { [weak self] mode in
+            self?.viewModel?.switchLinkProfile(mode)
+        }
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .formSheet
         present(nav, animated: true)
@@ -668,7 +671,14 @@ final class ViewController: UIViewController {
         hoverSlider.minimumValue = 8000
         hoverSlider.maximumValue = 55000
         hoverSlider.value = Float(hoverThrust)
+        // Track tint is iPad styling; UIKit's Mac idiom throws on it (the
+        // "unsupported on Mac Catalyst" exception), so leave the default on Mac.
+        // Tô màu thanh trượt là kiểu trang trí của iPad; UIKit ở idiom Mac ném
+        // lỗi với nó (exception "không hỗ trợ trên Mac Catalyst"), nên trên Mac
+        // giữ màu mặc định.
+#if !targetEnvironment(macCatalyst)
         hoverSlider.minimumTrackTintColor = Fly.accent
+#endif
         hoverSlider.accessibilityLabel = "Hover thrust"
         hoverSlider.addTarget(self, action: #selector(hoverChanged), for: .valueChanged)
         hoverValueLabel.text = "\(hoverThrust)"
@@ -681,7 +691,11 @@ final class ViewController: UIViewController {
         let yawText = UIStackView(arrangedSubviews: [yawTitle, yawCaption])
         yawText.axis = .vertical
         yawSwitch.isOn = UserDefaults.standard.bool(forKey: "isYawOnOff")
+        // Same Mac idiom rule as the slider's track tint above.
+        // Cùng quy tắc idiom Mac như màu thanh trượt ở trên.
+#if !targetEnvironment(macCatalyst)
         yawSwitch.onTintColor = Fly.accent
+#endif
         yawSwitch.addTarget(self, action: #selector(yawToggled), for: .valueChanged)
         let yawRow = UIStackView(arrangedSubviews: [yawText, yawSwitch])
         yawRow.alignment = .center

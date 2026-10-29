@@ -130,7 +130,14 @@ class ESPUDPLink: NSObject, CrtpDriver, GCDAsyncUdpSocketDelegate {
     }
 
     func sendPacket(_ packet: Data, callback: ((Bool) -> ())?) {
-        clientSocket.send(packet, toHost: udpHost, port: devicePort, withTimeout: -1, tag: 0)
+        // The driver owns the wire format: UDP is [CRTP ...][checksum] (§1),
+        // so append it here — symmetric with the strip in didReceive above.
+        // The CRTP layer above always talks raw CRTP (BLE needs that).
+        // Trình điều khiển sở hữu định dạng dây: UDP là [CRTP ...][checksum]
+        // (mục 1), nên nối thêm ở đây — đối xứng với bước tách ở didReceive
+        // phía trên. Ngăn CRTP phía trên luôn dùng CRTP thô (BLE cần vậy).
+        clientSocket.send(CrtpChecksum.append(to: packet),
+                          toHost: udpHost, port: devicePort, withTimeout: -1, tag: 0)
     }
 
     func onStateUpdated(_ callback: @escaping (NSString) -> ()) {

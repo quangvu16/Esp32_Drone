@@ -42,9 +42,6 @@ final class BleLink: NSObject, CrtpDriver {
     private static let segmentBytes = 19
 
     var stateCallback: ((NSString) -> ())?
-    /// Discovered drone names, for the connection picker.
-    /// Tên các drone đã phát hiện, dùng cho trình chọn kết nối.
-    var onPeripheralsFound: (([String]) -> Void)?
 
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
@@ -62,12 +59,31 @@ final class BleLink: NSObject, CrtpDriver {
     private var sendPid: UInt8 = 0
     private var knownNames: [String: CBPeripheral] = [:]
     private var preferredName: String?
+    private var preferredId: String?
+
+    /// The names the drone firmware advertises under (BT_DEVICE_NAME and the
+    /// legacy ones) — the device list sorts these to the top.
+    /// Các tên mà firmware drone dùng để quảng bá (BT_DEVICE_NAME và tên cũ) —
+    /// danh sách thiết bị xếp chúng lên đầu.
+    static func isDroneName(_ name: String) -> Bool {
+        return name == "ESP32_Done" || name == "ESP-Drone" || name == "Crazyflie"
+    }
 
     private var state = "idle" {
         didSet { stateCallback?(state as NSString) }
     }
 
-    override init() {
+    /// `preferredName` narrows the scan to one drone (the connection picker's
+    /// name field feeds it via LinkSettings). Blank/nil = first match.
+    /// `preferredId` is the exact peripheral the pilot tapped in the device
+    /// list — it wins over the name and skips the scan entirely.
+    /// `preferredName` thu hẹp phép quét về một drone (ô tên của trình chọn
+    /// kết nối cấp nó qua LinkSettings). Trống/nil = kết quả khớp đầu tiên.
+    /// `preferredId` là đúng thiết bị người lái chạm trong danh sách — nó ưu
+    /// tiên hơn tên và bỏ qua luôn bước quét.
+    init(preferredName: String? = nil, preferredId: String? = nil) {
+        self.preferredName = preferredName
+        self.preferredId = preferredId
         super.init()
         central = CBCentralManager(delegate: self, queue: .main)
     }
@@ -76,7 +92,10 @@ final class BleLink: NSObject, CrtpDriver {
 
     func connect(_ address: String?, callback: @escaping (Bool) -> ()) {
         connectCallback = callback
-        preferredName = address
+        if let address = address {
+            preferredName = address          // keep the init's name when nil
+                                             // giữ tên từ init khi nil
+        }
         guard central.state == .poweredOn else {
             // CBCentralManagerDelegate will retry once powered on.
             // CBCentralManagerDelegate sẽ thử lại khi Bluetooth đã được bật.
@@ -89,11 +108,21 @@ final class BleLink: NSObject, CrtpDriver {
         if let peripheral = peripheral {
             central.cancelPeripheralConnection(peripheral)
         }
+        resetLink()
+        state = "idle"
+    }
+
+    /// Everything a live connection owns. Called on disconnect and on
+    /// disconnect callbacks so a stale characteristic can never be written to.
+    /// Mọi thứ mà một kết nối sống sở hữu. Gọi khi ngắt và trong callback ngắt
+    /// để không bao giờ ghi vào một characteristic cũ.
+    private func resetLink() {
         peripheral = nil
         crtpChar = nil
         crtpUpChar = nil
         rxBuffer.removeAll()
-        state = "idle"
+        rxExpected = 0
+        rxPid = 0xFF
     }
 
     func setPacketHandler(_ handler: @escaping (Data) -> ()) {
@@ -109,6 +138,11 @@ final class BleLink: NSObject, CrtpDriver {
             callback?(false)
             return
         }
+        // Normalize first: a slice keeps its parent's indices and the offset
+        // maths below assumes they start at 0.
+        // Chuẩn hóa trước: một lát giữ chỉ số của dữ liệu mẹ, còn phép tính
+        // offset bên dưới giả sử chỉ số bắt đầu từ 0.
+        let packet = Data(packet)
         if packet.count <= 20, let crtpChar = crtpChar {
             peripheral.writeValue(packet, for: crtpChar, type: .withResponse)
             callback?(true)
@@ -143,10 +177,28 @@ final class BleLink: NSObject, CrtpDriver {
 
     private func scanAndConnect() {
         knownNames.removeAll()
+        // A picked identifier connects directly: retrievePeripherals knows the
+        // peripheral from before, so no scan round is needed. Fall back to
+        // scanning when the identifier is unknown (fresh install, forgotten
+        // device).
+        // Định danh đã chọn thì kết nối thẳng: retrievePeripherals biết thiết
+        // bị từ trước nên không cần quét. Quét lại khi định danh lạ (cài mới,
+        // thiết bị đã quên).
+        if let idString = preferredId, let uuid = UUID(uuidString: idString) {
+            let known = central.retrievePeripherals(withIdentifiers: [uuid])
+            if let target = known.first {
+                peripheral = target
+                target.delegate = self
+                central.connect(target, options: nil)
+                state = "connecting"
+                return
+            }
+        }
         central.scanForPeripherals(withServices: [BleLink.serviceUUID], options: nil)
-        // Connect to the preferred or first match; the picker can name one.
-        // Kết nối tới thiết bị ưa thích hoặc kết quả khớp đầu tiên; trình chọn
-        // có thể chỉ định một thiết bị.
+        // Connect to the preferred or first match; the picker's name field is
+        // what sets the preference (LinkSettings -> init).
+        // Kết nối tới thiết bị ưa thích hoặc kết quả khớp đầu tiên; ô tên của
+        // trình chọn là thứ đặt lựa chọn đó (LinkSettings -> init).
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
             guard let self = self, self.peripheral == nil else { return }
             self.connectToPreferred()
@@ -163,27 +215,13 @@ final class BleLink: NSObject, CrtpDriver {
         }
         guard let target = target else {
             connectCallback?(false)
+            connectCallback = nil
             return
         }
         peripheral = target
         target.delegate = self
         central.connect(target, options: nil)
         state = "connecting"
-    }
-
-    /// Lets the connection picker choose a specific drone by name.
-    /// Cho phép trình chọn kết nối chọn một drone cụ thể theo tên.
-    func connect(toName name: String) {
-        preferredName = name
-        if let target = knownNames[name] {
-            central.stopScan()
-            peripheral = target
-            target.delegate = self
-            central.connect(target, options: nil)
-            state = "connecting"
-        } else {
-            scanAndConnect()
-        }
     }
 
     // MARK: - Control-byte framing (§8)
@@ -203,7 +241,11 @@ final class BleLink: NSObject, CrtpDriver {
             // Single-segment when the announced length fits in this segment.
             // Là đơn đoạn khi chiều dài báo trước nằm gọn trong đoạn này.
             if total <= body.count {
-                packetHandler?(Data(rxBuffer))
+                // The length field is authoritative: dispatch what was
+                // announced, so padding cannot reach the parser (bleRxSeg).
+                // Trường độ dài là nguồn quyết định: xử lý đúng số đã báo, để phần
+                // đệm không lọt vào bộ phân tích (bleRxSeg).
+                packetHandler?(Data(rxBuffer.prefix(total)))
                 rxBuffer.removeAll()
             }
         } else {
@@ -213,7 +255,7 @@ final class BleLink: NSObject, CrtpDriver {
             }
             rxBuffer.append(body)
             if rxBuffer.count >= total {
-                packetHandler?(Data(rxBuffer))
+                packetHandler?(Data(rxBuffer.prefix(total)))
                 rxBuffer.removeAll()
             }
         }
@@ -224,15 +266,19 @@ extension BleLink: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         if central.state == .poweredOn, connectCallback != nil {
             scanAndConnect()
-        } else if central.state != .poweredOn {
+        } else if central.state != .poweredOn, connectCallback != nil {
+            // A pending connect can never succeed with the radio off — fail it
+            // once and clear it so the callback cannot fire twice.
+            // Kết nối đang chờ không thể thành công khi radio tắt — báo hỏng một
+            // lần rồi xóa nó để callback không bắn hai lần.
             connectCallback?(false)
+            connectCallback = nil
         }
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
         knownNames[peripheral.name ?? peripheral.identifier.uuidString] = peripheral
-        onPeripheralsFound?(knownNames.keys.sorted())
         // Auto-connect to the first advertisement unless the picker is driving.
         // Tự động kết nối với quảng bá đầu tiên, trừ khi trình chọn đang điều khiển.
         if self.peripheral == nil, preferredName == nil {
@@ -245,13 +291,21 @@ extension BleLink: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        resetLink()
         state = "idle"
         connectCallback?(false)
+        connectCallback = nil
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        // Drop every connection-owned handle (chars, rx state) so nothing can
+        // write to a stale characteristic, then tell the caller the link is gone.
+        // Gỡ mọi thứ thuộc về kết nối (characteristic, trạng thái nhận) để không
+        // ai ghi được vào characteristic cũ, rồi báo cho người gọi là link đã mất.
+        resetLink()
         state = "idle"
-        self.peripheral = nil
+        connectCallback?(false)
+        connectCallback = nil
     }
 }
 

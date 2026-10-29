@@ -24,6 +24,12 @@ enum LinkType: Int, CaseIterable {
                                // serial Bluetooth Classic — không dùng được trên iOS (MFi)
     case bleGatt = 3           // Bitcraze GATT service
                                // service GATT của Bitcraze
+    case wifiApBle = 4         // WiFi SoftAP + BLE coexistence profile
+                               // hồ sơ chung sống WiFi SoftAP + BLE
+    case wifiStaBle = 5        // WiFi Station + BLE coexistence profile
+                               // hồ sơ chung sống WiFi Station + BLE
+    case btDual = 6            // Bluetooth Classic SPP + BLE together
+                               // Bluetooth Classic SPP + BLE cùng lúc
 
     var title: String {
         switch self {
@@ -31,6 +37,9 @@ enum LinkType: Int, CaseIterable {
         case .wifiStation: return "WiFi Station"
         case .bluetoothSPP: return "Bluetooth Classic (SPP)"
         case .bleGatt: return "Bluetooth LE (GATT)"
+        case .wifiApBle: return "WiFi SoftAP + BLE"
+        case .wifiStaBle: return "WiFi Station + BLE"
+        case .btDual: return "Bluetooth SPP + BLE"
         }
     }
 
@@ -42,6 +51,18 @@ enum LinkType: Int, CaseIterable {
         case .wifiStation: return 1
         case .bluetoothSPP: return 2
         case .bleGatt: return 3
+        case .wifiApBle: return 4
+        case .wifiStaBle: return 5
+        case .btDual: return 6
+        }
+    }
+
+    /// True when the profile serves the Bitcraze BLE GATT service (§8).
+    /// Đúng khi hồ sơ phục vụ service BLE GATT của Bitcraze (mục 8).
+    var servesBle: Bool {
+        switch self {
+        case .bleGatt, .wifiApBle, .wifiStaBle, .btDual: return true
+        default: return false
         }
     }
 
@@ -55,6 +76,12 @@ enum LinkType: Int, CaseIterable {
             return "iOS only exposes Bluetooth Classic serial to MFi accessories (ExternalAccessory). A bare ESP32 SPP link cannot work from this app."
         case .bleGatt:
             return "Bitcraze GATT service 00000201…: short writes raw on 00000202, long writes segmented on 00000203, all notifications framed on 00000204."
+        case .wifiApBle:
+            return "Drone serves SoftAP UDP and BLE at once (firmware LINK 4). This app uses the WiFi side; BLE stays free for another client."
+        case .wifiStaBle:
+            return "Drone on your WiFi and BLE at once (firmware LINK 5). This app uses the WiFi side; BLE stays free for another client."
+        case .btDual:
+            return "Drone serves Bluetooth Classic SPP and BLE together (firmware LINK 6). This app uses the BLE side — SPP needs an Android or desktop client."
         }
     }
 }
@@ -70,6 +97,8 @@ struct LinkSettings {
         static let host = "linkHost"
         static let devicePort = "linkDevicePort"
         static let appPort = "linkAppPort"
+        static let bleName = "linkBleName"
+        static let bleId = "linkBleId"
     }
 
     static var linkType: LinkType {
@@ -84,8 +113,8 @@ struct LinkSettings {
     static func host(for type: LinkType) -> String {
         let saved = UserDefaults.standard.string(forKey: Keys.host)
         switch type {
-        case .wifiSoftAP: return saved ?? defaultHost
-        case .wifiStation: return saved ?? defaultStationHost
+        case .wifiSoftAP, .wifiApBle: return saved ?? defaultHost
+        case .wifiStation, .wifiStaBle: return saved ?? defaultStationHost
         default: return saved ?? defaultHost
         }
     }
@@ -110,16 +139,41 @@ struct LinkSettings {
         set { UserDefaults.standard.set(Int(newValue), forKey: Keys.appPort) }
     }
 
-    /// Builds the driver for the current selection.
-    /// Dựng trình điều khiển cho lựa chọn hiện tại.
+    /// Preferred BLE peripheral name (blank = first advertisement found).
+    /// Persisted so the picker's name field survives relaunches.
+    /// Tên thiết bị BLE ưa thích (trống = quảng bá đầu tiên tìm thấy). Được lưu
+    /// để ô tên của trình chọn còn giữ qua các lần khởi động lại.
+    static var bleName: String {
+        get { UserDefaults.standard.string(forKey: Keys.bleName) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: Keys.bleName) }
+    }
+
+    /// Identifier (UUID string) of the exact peripheral the pilot tapped in the
+    /// device list — connecting is direct, never a name scan, so two drones
+    /// advertising the same name stay apart. Blank = match by name.
+    /// Định danh (chuỗi UUID) của đúng thiết bị người lái chạm trong danh sách
+    /// — kết nối thẳng, không quét tên, nên hai drone trùng tên quảng bá vẫn
+    /// phân biệt được. Trống = khớp theo tên.
+    static var bleId: String {
+        get { UserDefaults.standard.string(forKey: Keys.bleId) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: Keys.bleId) }
+    }
+
+    /// Builds the driver for the current selection. Coexistence profiles pick
+    /// the side this app can use: WiFi for 4/5 (BLE left free for another
+    /// client), BLE for 6 (SPP is not reachable from iOS).
+    /// Dựng trình điều khiển cho lựa chọn hiện tại. Các hồ sơ chung sống chọn
+    /// phía mà app này dùng được: WiFi cho 4/5 (BLE nhàn cho client khác),
+    /// BLE cho 6 (SPP không với tới được từ iOS).
     static func makeDriver() -> CrtpDriver {
         switch linkType {
-        case .wifiSoftAP, .wifiStation:
+        case .wifiSoftAP, .wifiStation, .wifiApBle, .wifiStaBle:
             return ESPUDPLink(host: host(for: linkType),
                               devicePort: devicePort,
                               appPort: appPort)
-        case .bleGatt:
-            return BleLink()
+        case .bleGatt, .btDual:
+            return BleLink(preferredName: bleName.isEmpty ? nil : bleName,
+                           preferredId: bleId.isEmpty ? nil : bleId)
         case .bluetoothSPP:
             return SppLink()
         }

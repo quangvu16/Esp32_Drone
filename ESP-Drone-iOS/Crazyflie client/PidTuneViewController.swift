@@ -60,9 +60,13 @@ final class PidTuneViewController: UIViewController {
     // màn hình là động cơ tự dừng. Chỉ khi chưa armed — firmware từ chối khi đang armed.
     private let motorStartButton = UIButton(type: .system)
     private let motorStatusLabel = UILabel()
+    private let motorSpeedField = UITextField()
     private var motorSliders: [UISlider] = []
     private var motorValueLabels: [UILabel] = []
     private var motorTimer: Timer?
+    /// Token for the resign-active observer that cuts a running motor test.
+    /// Token cho observer khi app vào nền để cắt phép thử motor đang chạy.
+    private var resignActiveObserver: NSObjectProtocol?
     private var motorRunning = false
 
     private var tuner: AutoTuner?
@@ -127,6 +131,10 @@ final class PidTuneViewController: UIViewController {
 
     deinit {
         tuner?.stop()
+        motorTimer?.invalidate()
+        if let observer = resignActiveObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         if let listener = listener {
             telemetry.listeners.removeAll { $0 as AnyObject === listener as AnyObject }
         }
@@ -142,6 +150,16 @@ final class PidTuneViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         title = "Tune"
+        // A spinning prop must not outlive the screen the pilot can see: when
+        // the app resigns active (app switch, lock), stop the motor test.
+        // Chân quay đang quay không được sống quá màn hình mà người lái thấy:
+        // khi app vào nền (đổi app, khóa máy), dừng phép thử motor.
+        resignActiveObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self = self, self.motorRunning else { return }
+            self.stopMotorTest("Stopped (app left foreground).")
+        }
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .done, target: self, action: #selector(close))
         let header = SectionHeader(host: self, selected: .tune, telemetry: telemetry, twoTapCut: false) { [weak self] in
@@ -537,7 +555,7 @@ final class PidTuneViewController: UIViewController {
         note.font = .systemFont(ofSize: 12)
         note.textColor = .secondaryLabel
         note.text = "Props off or restrained. Drives m1..m4 directly with the PID bypassed, "
-            + "disarmed only. The link re-sends every 200 ms — dismissing this screen or "
+            + "disarmed only. The link re-sends every 150 ms — dismissing this screen or "
             + "losing the link stops the motors."
         stack.addArrangedSubview(note)
 
@@ -567,6 +585,30 @@ final class PidTuneViewController: UIViewController {
             row.spacing = 8
             stack.addArrangedSubview(row)
         }
+
+        // Speed + Run all: one tap spins all four motors at the same µs — one
+        // enable=1 packet carries four speeds (MOTOR_TEST, PROTOCOL.md §5).
+        // Speed + Run all: một chạm quay cả bốn motor ở cùng µs — một gói
+        // enable=1 mang bốn tốc độ (MOTOR_TEST, PROTOCOL.md mục 5).
+        let speedName = UILabel()
+        speedName.text = "Speed"
+        speedName.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        speedName.widthAnchor.constraint(equalToConstant: 45).isActive = true
+
+        motorSpeedField.borderStyle = .roundedRect
+        motorSpeedField.keyboardType = .numberPad
+        motorSpeedField.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+        motorSpeedField.text = "1200"
+        motorSpeedField.widthAnchor.constraint(equalToConstant: 70).isActive = true
+
+        let runAllButton = UIButton(type: .system)
+        runAllButton.setTitle("Run all", for: .normal)
+        runAllButton.addTarget(self, action: #selector(runAllMotors), for: .touchUpInside)
+
+        let allRow = UIStackView(arrangedSubviews: [speedName, motorSpeedField, runAllButton])
+        allRow.axis = .horizontal
+        allRow.spacing = 8
+        stack.addArrangedSubview(allRow)
 
         motorStartButton.setTitle("Start test", for: .normal)
         motorStartButton.backgroundColor = .systemOrange
@@ -600,8 +642,34 @@ final class PidTuneViewController: UIViewController {
         }
     }
 
-    /// Start the test (refused while armed) and arm the 200 ms re-send timer.
-    /// Bắt đầu thử (từ chối khi đang armed) và bật timer gửi lại 200 ms.
+    /// Run all four motors at once at the Speed field value (MOTOR_TEST, §5).
+    /// Chạy cả bốn motor cùng lúc ở giá trị trường Speed (MOTOR_TEST, mục 5).
+    @objc private func runAllMotors() {
+        view.endEditing(true)
+        guard var speed = Int(motorSpeedField.text?
+                .trimmingCharacters(in: .whitespaces) ?? "") else {
+            motorStatusLabel.text = "Speed: not a number."
+            return
+        }
+        speed = max(1000, min(2000, speed))
+        for i in 0..<4 {
+            motorSliders[i].value = Float(speed)
+            motorValueLabels[i].text = "\(speed) µs"
+        }
+        if !motorRunning {
+            // startMotorTest() carries the armed guard and the 150 ms re-send timer.
+            // startMotorTest() mang bước kiểm tra armed và timer gửi lại 150 ms.
+            startMotorTest()
+            if !motorRunning {
+                return // refused (armed) — startMotorTest already said why
+                       // bị từ chối (armed) — startMotorTest đã nêu lý do
+            }
+        }
+        motorStatusLabel.text = "All motors at \(speed) µs — re-sending every 150 ms."
+    }
+
+    /// Start the test (refused while armed) and arm the 150 ms re-send timer.
+    /// Bắt đầu thử (từ chối khi đang armed) và bật timer gửi lại 150 ms.
     private func startMotorTest() {
         let armed = (telemetry.value("flight.armed") ?? 0) > 0.5
         if armed {
@@ -611,9 +679,13 @@ final class PidTuneViewController: UIViewController {
         motorRunning = true
         motorStartButton.setTitle("Stop test", for: .normal)
         motorStartButton.backgroundColor = .systemRed
-        motorStatusLabel.text = "Running — re-sending every 200 ms."
+        motorStatusLabel.text = "Running — re-sending every 150 ms."
         fireMotorTest()
-        motorTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+        // 150 ms keeps the firmware's motor-command watchdog fed over BLE's
+        // slower round trips, while still stopping quickly on a dead link.
+        // 150 ms đủ giữ watchdog lệnh motor của firmware sống qua các vòng BLE
+        // chậm hơn, nhưng vẫn dừng nhanh khi link chết.
+        motorTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
             self?.fireMotorTest()
         }
     }

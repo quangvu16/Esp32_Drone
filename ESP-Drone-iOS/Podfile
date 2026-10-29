@@ -14,6 +14,15 @@ post_install do |installer|
     t.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
 
+      # The app builds for Mac Catalyst too (SUPPORTS_MACCATALYST in the app
+      # target), and both pods ship a macOS platform, so let every pod target
+      # build for the Mac as well. CocoaPods does not set this itself.
+      # App cũng build cho Mac Catalyst (SUPPORTS_MACCATALYST trong target app),
+      # và cả hai pod đều có nền tảng macOS, nên cho phép mọi target pod build
+      # cho Mac. CocoaPods tự nó không đặt cài đặt này.
+      config.build_settings['SUPPORTS_MACCATALYST'] = 'YES'
+      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '10.15'
+
       # Not our code to modernise. AFNetworking still calls the SecTrust and
       # UTType APIs deprecated in iOS 14/15, and CocoaAsyncSocket's TLS layer
       # is built on SecureTransport, deprecated since iOS 13. Neither the

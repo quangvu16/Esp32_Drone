@@ -49,7 +49,13 @@ open class CrazyFlie: NSObject {
 
     var commander: CrazyFlieCommander?
 
-    init(crtpDriver:CrtpDriver? = ESPUDPLink(), delegate: CrazyFlieDelegate?) {
+    /// No default driver: the caller must name the transport (LinkSettings
+    /// builds it). A silent ESPUDPLink default made "just connect" mean UDP
+    /// even where the pilot had chosen Bluetooth.
+    /// Không có trình điều khiển mặc định: người gọi phải chỉ rõ tầng truyền
+    /// (LinkSettings dựng nó). Mặc định ESPUDPLink im lặng làm "chỉ cần kết
+    /// nối" nghĩa là UDP ngay cả khi người lái đã chọn Bluetooth.
+    init(crtpDriver:CrtpDriver?, delegate: CrazyFlieDelegate?) {
 
         state = .idle
         self.delegate = delegate
@@ -65,6 +71,11 @@ open class CrazyFlie: NSObject {
                 self?.state = .idle
             } else if state.isEqual(to: "connected") {
                 self?.state = .connected
+            } else if state.isEqual(to: "scanning")
+                        || state.isEqual(to: "connecting")
+                        || state.isEqual(to: "services")
+                        || state.isEqual(to: "characteristics") {
+                self?.state = .connecting
             }
         }
     }
@@ -78,14 +89,24 @@ open class CrazyFlie: NSObject {
         self.crtpDriver.connect(nil, callback: {[weak self] (connected) in
         callback?(connected)
             guard connected else {
-                var title:String
-                var body:String?
-                
-                // Find the reason and prepare a message
-                // Tìm nguyên nhân và chuẩn bị một thông điệp
-                title = "Network Error"
-                body = "The network is not connected"
-                
+                // Transport-accurate text: a BLE failure is not a network
+                // failure, and SPP has its own explanation.
+                // Chữ đúng theo tầng truyền: lỗi BLE không phải lỗi mạng,
+                // và SPP có lời giải thích riêng.
+                let title: String
+                let body: String
+                if self?.crtpDriver is BleLink {
+                    title = "Bluetooth Error"
+                    body = "Could not connect to the drone over Bluetooth LE. "
+                        + "Check it is powered and on a link profile that serves BLE (LINK 3/4/5/6)."
+                } else if self?.crtpDriver is SppLink {
+                    title = "Not available on iOS"
+                    body = SppLink.unavailableReason
+                } else {
+                    title = "Network Error"
+                    body = "The network is not connected. Join the drone's WiFi "
+                        + "(ESP-Drone) or check the host address."
+                }
                 self?.delegate?.didFail(with: title, message: body)
                 return
             }
@@ -133,21 +154,13 @@ open class CrazyFlie: NSObject {
         }
         let commandPacket = CommanderPacket(header: CrazyFlieHeader.commander.rawValue, roll: roll, pitch: pitch, yaw: yawdef, thrust: UInt16(thrust))
         let data = CommandPacketCreator.data(from: commandPacket)
-        let sendData = self.sendDataCRC(data!)
-//        print("发送数据: \(sendData)")
-        self.crtpDriver.sendPacket(sendData, callback: nil)
+        // Raw CRTP — the driver adds the checksum iff its wire needs one (§1 vs
+        // §8). The old sendDataCRC() here appended one unconditionally, which
+        // BLE must never carry.
+        // CRTP thô — trình điều khiển nối thêm checksum nếu đường truyền cần
+        // (mục 1 so với mục 8). sendDataCRC() cũ nối thêm vô điều kiện, còn BLE
+        // thì không bao giờ được mang checksum.
+        self.crtpDriver.sendPacket(data!, callback: nil)
         print("pitch: \(pitch) roll: \(roll) thrust: \(thrust) yaw: \(yawdef)")
-    }
-    func sendDataCRC(_ data:Data) -> Data {
-        var sendData = data
-        let sendByte = [UInt8](data)
-        var count = 0
-        for item in sendByte {
-            count = count + Int(item)
-//            print("字节：\(item) === 总和：\(count)")
-        }
-        let countByte = UInt8(count & 0xff)
-        sendData.append(countByte)
-        return sendData
     }
 }

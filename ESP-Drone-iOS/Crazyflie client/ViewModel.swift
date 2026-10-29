@@ -99,6 +99,18 @@ final class ViewModel {
         crazyFlie = session.crazyFlie
         applyCommander()
     }
+
+    /// Sends FC_CMD_LINK (0x10) over the live link so the drone stores the new
+    /// transport profile and reboots. Explicit only — the picker's Apply never
+    /// calls this, because it would drop any working link the pilot did not
+    /// mean to change.
+    /// Gửi FC_CMD_LINK (0x10) qua liên kết đang mở để drone lưu hồ sơ tầng
+    /// truyền mới rồi khởi động lại. Chỉ khi người dùng yêu cầu tường minh —
+    /// nút Apply của trình chọn không bao giờ gọi nó, vì nó sẽ cắt liên kết
+    /// đang chạy mà người lái không định đổi.
+    func switchLinkProfile(_ mode: UInt8) {
+        crazyFlie?.crtp.setLinkProfile(mode)
+    }
     
     // MARK: - Private Methods
     

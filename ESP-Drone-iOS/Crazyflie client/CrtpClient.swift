@@ -103,10 +103,16 @@ final class CrtpClient {
 
     // MARK: - Sending
 
-    /// Fire-and-forget send (commander packets).
-    /// Gửi không chờ phản hồi (các gói tin commander).
+    /// Fire-and-forget send (commander packets). Raw CRTP, no checksum: the
+    /// driver appends it iff its wire needs one — UDP and SPP do (§1), BLE
+    /// never does (§8). A checksum here made every BLE packet one byte too
+    /// long, and the firmware dropped the full-size ones outright.
+    /// Gửi không chờ phản hồi (các gói tin commander). CRTP thô, không checksum:
+    /// trình điều khiển nối thêm byte checksum nếu đường truyền cần — UDP và SPP
+    /// cần (mục 1), BLE thì không bao giờ (mục 8). Checksum ở đây làm mọi gói
+    /// BLE dài thêm một byte, và firmware bỏ thẳng các gói cỡ lớn.
     func send(_ packet: CrtpPacket) {
-        driver.sendPacket(CrtpChecksum.append(to: packet.raw), callback: nil)
+        driver.sendPacket(packet.raw, callback: nil)
     }
 
     /// Sends and retransmits every 500 ms until `matches` sees its reply.
@@ -116,7 +122,7 @@ final class CrtpClient {
                       onAck: (() -> Void)? = nil,
                       onGiveUp: (() -> Void)? = nil) {
         queue.async {
-            let pending = PendingRequest(packet: CrtpChecksum.append(to: packet.raw),
+            let pending = PendingRequest(packet: packet.raw,
                                          retries: self.maxRetries,
                                          matches: matches,
                                          onAck: onAck, onGiveUp: onGiveUp)
