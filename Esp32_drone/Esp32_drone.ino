@@ -197,6 +197,8 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 //  Drone -> điện thoại: udp://<ip điện thoại>:2399
 #define WIFI_AP_SSID      "ESP-Drone"
 #define WIFI_AP_PASS      "12345678"      // WPA2, >=8 chars
+#define BT_DEVICE_NAME    "ESP32_Done"    // Bluetooth name: SPP + BLE advertising
+                                          // tên Bluetooth: quảng bá SPP + BLE
 #define WIFI_AP_CHANNEL   6
 #define WIFI_AP_IP        IPAddress(192, 168, 43, 42)
 #define WIFI_AP_GW        IPAddress(192, 168, 43, 42)
@@ -319,23 +321,30 @@ float pid_p_gain_yaw   = PID_YAW_KP;    float pid_i_gain_yaw   = PID_YAW_KI;   f
 //    4  WIFI_AP_BLE WiFi softAP kèm BLE, dùng chung radio
 //    5  WIFI_STA_BLE WiFi station plus BLE
 //    5  WIFI_STA_BLE WiFi station kèm BLE
+//    6  BT_DUAL     Bluetooth Classic SPP and BLE together, no WiFi
+//    6  BT_DUAL     Bluetooth Classic SPP và BLE cùng lúc, không WiFi
 //
 //  ESP32 WiFi and Bluetooth Classic share one 2.4 GHz radio, so BT_SPP is an
 //  alternative to WiFi rather than something that runs alongside it. BLE has a
 //  coexistence mode and can share with WiFi, which is what the *_BLE profiles
-//  use. Pick one with "link <n>" on the serial console or FC_CMD_LINK over
-//  CRTP; the board reboots to apply it.
+//  use — and the Bluetooth controller itself runs dual-mode, which is what
+//  BT_DUAL uses to serve SPP and BLE clients at the same time. Pick one with
+//  "link <n>" on the serial console or FC_CMD_LINK over CRTP; the board
+//  reboots to apply it.
 //  WiFi và Bluetooth Classic trên ESP32 dùng chung một radio 2.4 GHz, nên BT_SPP
 //  là phương án thay thế WiFi chứ không phải chạy song song. BLE có chế độ chung
-//  sống và có thể dùng chung với WiFi — đó là các hồ sơ *_BLE. Chọn bằng "link <n>"
-//  trên console serial hoặc FC_CMD_LINK qua CRTP; board sẽ khởi động lại để áp dụng.
+//  sống và có thể dùng chung với WiFi — đó là các hồ sơ *_BLE — và chính bộ điều
+//  khiển Bluetooth chạy chế độ kép, là thứ BT_DUAL dùng để phục vụ client SPP và
+//  BLE cùng lúc. Chọn bằng "link <n>" trên console serial hoặc FC_CMD_LINK qua
+//  CRTP; board sẽ khởi động lại để áp dụng.
 #define LINK_MODE_WIFI_AP      0
 #define LINK_MODE_WIFI_STA     1
 #define LINK_MODE_BT_SPP       2
 #define LINK_MODE_BLE          3
 #define LINK_MODE_WIFI_AP_BLE  4
 #define LINK_MODE_WIFI_STA_BLE 5
-#define LINK_MODE_COUNT        6
+#define LINK_MODE_BT_DUAL      6
+#define LINK_MODE_COUNT        7
 
 // Station-mode credentials, used by LINK_MODE_WIFI_STA*. Empty SSID falls back
 // to the softAP profile so a board with no config still comes up reachable.
@@ -637,6 +646,19 @@ typedef struct {
                         // nhịp cho lần gửi kế tiếp
 } LogBlock;
 
+// SHA-1 state for the WebSocket handshake accept key. Up here with the other
+// structs because the Arduino preprocessor needs the type complete before the
+// first function definition (see the CRTP TOC note above).
+// Trạng thái SHA-1 cho khóa chấp nhận bắt tay WebSocket. Nằm ở đây cùng các
+// struct khác vì bộ tiền xử lý Arduino cần kiểu hoàn chỉnh trước định nghĩa
+// hàm đầu tiên (xem ghi chú CRTP TOC ở trên).
+typedef struct {
+  uint32_t h[5];
+  uint64_t len;                        // total bytes fed
+  uint8_t  block[64];
+  size_t   used;
+} WsSha1;
+
 // ============================ MPU6500 REGISTERS ============================
 #define MPU_REG_SMPLRT_DIV  0x19
 #define MPU_REG_CONFIG      0x1A
@@ -714,6 +736,15 @@ IPAddress app_ip;                    // learned from first inbound datagram
 bool      app_ip_known = false;
 uint32_t  crtp_last_rx_ms = 0;
 uint8_t   crtp_rx_buf[64];
+// Where CRTP replies go: 0 = UDP or BLE, 1 = the WebSocket client that sent
+// the last packet, 2 = Bluetooth Classic SPP. The clients take turns — the
+// transport of the last inbound packet owns the replies (BT_DUAL can carry an
+// SPP phone and a BLE client at once, so SPP needs its own value).
+// CRTP trả lời đi đâu: 0 = UDP hoặc BLE, 1 = client WebSocket vừa gửi gói cuối,
+// 2 = Bluetooth Classic SPP. Các client luân phiên — tầng truyền của gói vào cuối
+// cùng sở hữu các câu trả lời (BT_DUAL có thể chở điện thoại SPP và client BLE
+// cùng lúc, nên SPP cần một giá trị riêng).
+uint8_t   crtp_reply_via = 0;
 
 // commander setpoints (from CRTP CommanderPacket)
 // các setpoint từ commander (từ CRTP CommanderPacket)
@@ -779,6 +810,11 @@ double   home_lat = 0.0, home_lon = 0.0;
 // Runtime của cầu nối MAVLink (§13). Socket nghe ở cổng 14550 cho mọi GCS
 // ArduPilot; mav_gcs_ip học từ gói đầu tiên, giống cách linkSend() học địa chỉ app.
 WiFiUDP MavUdp;
+// The socket is only opened on profiles that bring up WiFi: MAVLink rides lwIP,
+// and with WiFi off lwIP's TCP/IP thread never starts, so an open would assert.
+// Socket chỉ mở trên các hồ sơ có WiFi: MAVLink chạy trên lwIP, mà khi WiFi tắt
+// luồng TCP/IP của lwIP không bao giờ khởi động, nên mở socket sẽ gây assert.
+static bool      mav_udp_up = false;
 static bool      mav_gcs_known = false;
 static IPAddress mav_gcs_ip;
 static uint16_t  mav_gcs_port = 0;
@@ -1052,7 +1088,7 @@ bool linkUsesUdp(uint8_t mode) {
 }
 bool linkUsesBle(uint8_t mode) {
   return mode == LINK_MODE_BLE || mode == LINK_MODE_WIFI_AP_BLE ||
-         mode == LINK_MODE_WIFI_STA_BLE;
+         mode == LINK_MODE_WIFI_STA_BLE || mode == LINK_MODE_BT_DUAL;
 }
 
 // Inbound UDP/SPP: `data` is [CRTP ...][checksum].
@@ -1068,6 +1104,7 @@ void crtpReceiveFramed(const uint8_t *data, size_t len) {
 // Vào từ BLE: tầng truyền đã đóng khung sẵn, nên không có checksum.
 void crtpReceiveRaw(const uint8_t *data, size_t len) {
   if (len < 1 || len > CRTP_MAX_SIZE) return;
+  crtp_reply_via = 0;                  // replies follow the BLE phone
   crtpDispatch(data, len);
   crtp_last_rx_ms = millis();
 }
@@ -1124,7 +1161,10 @@ void btPoll() {
   for (;;) {
     int l = btFrameLen();
     if (l == 0) break;
-    if (l > 0) crtpReceiveFramed(bt_acc, (size_t)l);
+    if (l > 0) {
+      crtp_reply_via = 2;              // replies follow the SPP phone
+      crtpReceiveFramed(bt_acc, (size_t)l);
+    }
     size_t drop = (l < 0) ? 1 : (size_t)l;
     memmove(bt_acc, bt_acc + drop, bt_acc_len - drop);
     bt_acc_len -= drop;
@@ -1209,6 +1249,56 @@ class BleRawCb : public BLECharacteristicCallbacks {
   }
 };
 
+// Reassemble one control-byte segment into ble_rx_buf (see PROTOCOL.md §6).
+//   ctrl: bit7 start | bits6..5 pid | bits4..0 (totalLen - 1)
+//   pay:  the CRTP bytes after the control byte
+//   n:    how many the client wrote
+// Returns the assembled CRTP length when a packet just completed, else 0.
+// The length field is authoritative: dispatch what was announced rather than
+// what happened to arrive, so padding cannot reach the parser. A packet is
+// single-segment when the whole thing fits here, NOT merely when that field
+// reads < 20: the field saturates at 32 and a 20-byte datagram would
+// otherwise be mistaken for a single segment it cannot fit into.
+// (Copied verbatim by test/bleseg_test.cpp.)
+// Lắp ráp một đoạn có control byte vào ble_rx_buf (xem PROTOCOL.md §6).
+//   ctrl: bit7 bắt đầu | bits6..5 pid | bits4..0 (tổng độ dài - 1)
+//   pay:  các byte CRTP nằm sau control byte
+//   n:    số byte client đã ghi
+// Trả về độ dài CRTP đã lắp ráp xong khi một gói vừa hoàn tất, ngược lại 0.
+// Trường độ dài là nguồn quyết định: xử lý đúng số đã báo chứ không phải số byte
+// thực tế đến, để phần đệm không lọt vào bộ phân tích. Một gói là một đoạn duy
+// nhất khi toàn bộ gói nằm gọn trong đây, CHỨ không chỉ khi trường đó < 20:
+// trường này bão hòa ở 32 và một gói 20 byte sẽ bị hiểu nhầm thành một đoạn duy
+// nhất mà nó không thể chứa được.
+// (Được test/bleseg_test.cpp sao chép nguyên văn.)
+size_t bleRxSeg(uint8_t ctrl, const uint8_t *pay, size_t n) {
+  bool    start = (ctrl & 0x80) != 0;
+  uint8_t pid   = (uint8_t)((ctrl >> 5) & 0x03);
+  size_t  total = (size_t)((ctrl & 0x1F) + 1);
+
+  if (start) {
+    ble_rx_len = 0;
+    ble_rx_pid = pid;
+    if (n > sizeof(ble_rx_buf)) return 0;
+    memcpy(ble_rx_buf, pay, n);
+    ble_rx_len = n;
+    if (total <= n) {                 // single-segment packet
+      ble_rx_len = 0;
+      return total;
+    }
+    return 0;
+  }
+  if (pid != ble_rx_pid || ble_rx_len == 0) { ble_rx_len = 0; return 0; }
+  if (ble_rx_len + n > sizeof(ble_rx_buf))   { ble_rx_len = 0; return 0; }
+  memcpy(ble_rx_buf + ble_rx_len, pay, n);
+  ble_rx_len += n;
+  if (ble_rx_len >= total) {
+    ble_rx_len = 0;
+    return total;
+  }
+  return 0;
+}
+
 // 0x203: long packets arrive here segmented with a control byte.
 // 0x203: các gói dài đến đây theo từng đoạn có control byte.
 class BleSegCb : public BLECharacteristicCallbacks {
@@ -1216,47 +1306,8 @@ class BleSegCb : public BLECharacteristicCallbacks {
     uint8_t buf[BLE_SEG_BYTES + 1];
     size_t n = bleReadValue(ch, buf, sizeof(buf));
     if (n < 2) return;
-
-    uint8_t ctrl = buf[0];
-    bool    start = (ctrl & 0x80) != 0;
-    uint8_t pid   = (uint8_t)((ctrl >> 5) & 0x03);
-    // The length field is (total CRTP length - 1). A packet is single-segment
-    // when the whole thing fits here, NOT merely when that field reads < 20:
-    // the field saturates at 32 and a 20-byte datagram would otherwise be
-    // mistaken for a single segment it cannot fit into.
-    // Trường độ dài là (tổng độ dài CRTP - 1). Một gói là một đoạn duy nhất khi
-    // toàn bộ gói nằm gọn trong đây, CHỨ không chỉ khi trường đó < 20:
-    // trường này bão hòa ở 32 và một gói 20 byte sẽ bị hiểu nhầm thành một đoạn
-    // duy nhất mà nó không thể chứa được.
-    size_t total = (size_t)((ctrl & 0x1F) + 1);
-    size_t body  = n - 1;
-
-    if (start) {
-      ble_rx_len = 0;
-      ble_rx_pid = pid;
-      if (body > sizeof(ble_rx_buf)) return;
-      memcpy(ble_rx_buf, buf + 1, body);
-      ble_rx_len = body;
-      if (total <= body) {
-        // The length field is authoritative. A well-behaved client sends
-        // exactly `total` bytes here, but dispatch what was announced rather
-        // than what happened to arrive, so padding cannot reach the parser.
-        // Trường độ dài là nguồn quyết định. Client đúng chuẩn gửi đúng `total`
-        // byte vào đây, nhưng hãy xử lý đúng số đã báo chứ không phải số byte thực
-        // tế đến, để phần đệm không lọt vào bộ phân tích.
-        crtpReceiveRaw(ble_rx_buf, total);
-        ble_rx_len = 0;
-      }
-    } else {
-      if (pid != ble_rx_pid || ble_rx_len == 0) { ble_rx_len = 0; return; }
-      if (ble_rx_len + body > sizeof(ble_rx_buf)) { ble_rx_len = 0; return; }
-      memcpy(ble_rx_buf + ble_rx_len, buf + 1, body);
-      ble_rx_len += body;
-      if (ble_rx_len >= total) {
-        crtpReceiveRaw(ble_rx_buf, total);
-        ble_rx_len = 0;
-      }
-    }
+    size_t done = bleRxSeg(buf[0], buf + 1, n - 1);
+    if (done > 0) crtpReceiveRaw(ble_rx_buf, done);
   }
 };
 
@@ -1282,9 +1333,17 @@ bool bleInit(const char *name) {
   srv->setCallbacks(new BleServerCb());
 
   BLECharacteristic *c;
-  c = svc->createCharacteristic(BLE_UUID_CRTP,   BLECharacteristic::PROPERTY_WRITE);
+  // Both write chars accept ATT write requests AND write commands: some stacks
+  // (Android's low-latency mode, bleak's response=False) send commands, and a
+  // GATT server that only permits requests drops those at the attribute layer
+  // without a word — the bytes never reach onWrite.
+  // Cả hai char ghi chấp nhận write request VÀ write command của ATT: một số
+  // ngăn xếp (chế độ độ trễ thấp của Android, response=False của bleak) gửi
+  // command, mà máy chủ GATT chỉ cho phép request thì sẽ bỏ chúng ở tầng thuộc
+  // tính không một lời — byte không bao giờ tới onWrite.
+  c = svc->createCharacteristic(BLE_UUID_CRTP,   BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
   c->setCallbacks(new BleRawCb());
-  c = svc->createCharacteristic(BLE_UUID_CRTPUP, BLECharacteristic::PROPERTY_WRITE);
+  c = svc->createCharacteristic(BLE_UUID_CRTPUP, BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
   c->setCallbacks(new BleSegCb());
   bleCrtpDown = svc->createCharacteristic(BLE_UUID_CRTPDOWN, BLECharacteristic::PROPERTY_NOTIFY);
   bleCrtpDown->addDescriptor(new BLE2902());
@@ -1356,7 +1415,793 @@ void udpPoll() {
     app_ip_known = true;
     Serial.printf("[CRTP] App at %s\n", app_ip.toString().c_str());
   }
+  crtp_reply_via = 0;                  // replies follow the UDP phone/tuner
   crtpReceiveFramed(crtp_rx_buf, (size_t)n);
+}
+
+// ---------------------------------------------------------------------------
+//  WebSocket  —  HTTP page + RFC 6455 subset on TCP port 80
+//
+//  The browser joins the drone's WiFi, opens http://<drone>/ and gets a
+//  control page (the Drone + Motor test panels). One binary WebSocket frame
+//  carries exactly one UDP wire packet: [CRTP ...][uint8 checksum], so the
+//  page speaks the same protocol as the phone apps and the Python tuner
+//  (PROTOCOL.md §8). Handshake and framing are hand-rolled — no libraries —
+//  which also keeps them host-testable (test/ws_test.cpp).
+//  Trình duyệt vào WiFi của drone, mở http://<drone>/ và nhận trang điều khiển
+//  (các bảng Drone + Motor test). Một khung WebSocket nhịp phân mang đúng một
+//  gói dây UDP: [CRTP ...][uint8 checksum], nên trang nói cùng giao thức với
+//  app điện thoại và tuner Python (PROTOCOL.md mục 8). Bắt tay và đóng khung
+//  được viết tay — không thư viện — nên cũng kiểm thử được trên máy host
+//  (test/ws_test.cpp).
+// ---------------------------------------------------------------------------
+
+// ---- SHA-1 (only for the handshake accept key) ----------------------------
+// Hand-rolled rather than mbedtls so the host test can compile the same
+// lines; the sketch and ws_test.cpp must stay in sync (run.sh guards it).
+// WsSha1 itself is declared up with the other structs (Arduino preprocessor).
+// Viết tay thay vì mbedtls để test trên máy host biên dịch đúng các dòng đó;
+// sketch và ws_test.cpp phải đồng bộ (run.sh kiểm tra).
+// Bản thân WsSha1 được khai báo ở trên cùng các struct khác (bộ tiền xử lý
+// Arduino).
+uint32_t wsRol(uint32_t v, int n) { return (v << n) | (v >> (32 - n)); }
+
+void wsSha1Init(WsSha1 *s) {
+  s->h[0] = 0x67452301;
+  s->h[1] = 0xEFCDAB89;
+  s->h[2] = 0x98BADCFE;
+  s->h[3] = 0x10325476;
+  s->h[4] = 0xC3D2E1F0;
+  s->len = 0;
+  s->used = 0;
+}
+
+void wsSha1Block(WsSha1 *s, const uint8_t p[64]) {
+  uint32_t w[80];
+  for (int i = 0; i < 16; i++)
+    w[i] = ((uint32_t)p[i * 4] << 24) | ((uint32_t)p[i * 4 + 1] << 16) |
+           ((uint32_t)p[i * 4 + 2] << 8) | (uint32_t)p[i * 4 + 3];
+  for (int i = 16; i < 80; i++)
+    w[i] = wsRol(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+  uint32_t a = s->h[0], b = s->h[1], c = s->h[2], d = s->h[3], e = s->h[4];
+  for (int i = 0; i < 80; i++) {
+    uint32_t f, k;
+    if (i < 20)      { f = (b & c) | (~b & d);          k = 0x5A827999; }
+    else if (i < 40) { f = b ^ c ^ d;                   k = 0x6ED9EBA1; }
+    else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+    else             { f = b ^ c ^ d;                   k = 0xCA62C1D6; }
+    uint32_t t = wsRol(a, 5) + f + e + k + w[i];
+    e = d; d = c; c = wsRol(b, 30); b = a; a = t;
+  }
+  s->h[0] += a; s->h[1] += b; s->h[2] += c; s->h[3] += d; s->h[4] += e;
+}
+
+void wsSha1Update(WsSha1 *s, const uint8_t *p, size_t n) {
+  s->len += n;
+  while (n > 0) {
+    size_t take = 64 - s->used;
+    if (take > n) take = n;
+    memcpy(s->block + s->used, p, take);
+    s->used += take;
+    p += take;
+    n -= take;
+    if (s->used == 64) { wsSha1Block(s, s->block); s->used = 0; }
+  }
+}
+
+void wsSha1Final(WsSha1 *s, uint8_t out[20]) {
+  uint64_t bits = s->len * 8;
+  uint8_t pad = 0x80, zero = 0;
+  wsSha1Update(s, &pad, 1);
+  while (s->used != 56) wsSha1Update(s, &zero, 1);
+  uint8_t lenb[8];
+  for (int i = 0; i < 8; i++) lenb[i] = (uint8_t)(bits >> (56 - 8 * i));
+  wsSha1Update(s, lenb, 8);
+  for (int i = 0; i < 5; i++) {
+    out[i * 4]     = (uint8_t)(s->h[i] >> 24);
+    out[i * 4 + 1] = (uint8_t)(s->h[i] >> 16);
+    out[i * 4 + 2] = (uint8_t)(s->h[i] >> 8);
+    out[i * 4 + 3] = (uint8_t)(s->h[i]);
+  }
+}
+
+static const char WS_B64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+void wsBase64(const uint8_t *in, size_t n, char *out) {
+  size_t k = 0;
+  for (size_t i = 0; i < n; i += 3) {
+    uint32_t v = (uint32_t)in[i] << 16;
+    if (i + 1 < n) v |= (uint32_t)in[i + 1] << 8;
+    if (i + 2 < n) v |= in[i + 2];
+    out[k++] = WS_B64[(v >> 18) & 0x3F];
+    out[k++] = WS_B64[(v >> 12) & 0x3F];
+    out[k++] = (i + 1 < n) ? WS_B64[(v >> 6) & 0x3F] : '=';
+    out[k++] = (i + 2 < n) ? WS_B64[v & 0x3F] : '=';
+  }
+  out[k] = '\0';
+}
+
+static const char WS_GUID[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+// Sec-WebSocket-Accept = base64(SHA1(key + GUID)) — RFC 6455 §4.2.2.
+void wsAcceptKey(const char *key, char out[29]) {
+  WsSha1 s;
+  uint8_t dig[20];
+  wsSha1Init(&s);
+  wsSha1Update(&s, (const uint8_t *)key, strlen(key));
+  wsSha1Update(&s, (const uint8_t *)WS_GUID, 36);
+  wsSha1Final(&s, dig);
+  wsBase64(dig, 20, out);
+}
+
+// ---- frame codec ---------------------------------------------------------
+// A frame is [b0 FIN|opcode][b1 mask|len][4-byte mask if masked][payload].
+// Only 7-bit lengths are accepted: a CRTP wire packet is at most 32 bytes and
+// a jumbo frame has no business on a drone link — it closes the connection.
+// Client frames are masked; server frames are not (RFC 6455 §5.1). The parser
+// tolerates unmasked frames so the same code can also read back what we emit.
+// Một khung là [b0 FIN|opcode][b1 mask|len][4 byte mặt nạ nếu có][payload].
+// Chỉ chấp nhận độ dài 7 bit: gói dây CRTP dài tối đa 32 byte và khung khổng
+// lồ không có chỗ trên liên kết drone — nó đóng kết nối. Khung client bị mặt
+// nạ; khung server thì không (RFC 6455 mục 5.1). Bộ phân tích chấp nhận cả
+// khung không mặt nạ để cùng một đoạn mã đọc lại được thứ ta phát ra.
+#define WS_MAX_MSG 64                  // room for a CRTP packet + checksum
+uint8_t ws_msg[WS_MAX_MSG];            // reassembled fragmented payload
+uint16_t ws_frag_len = 0;
+uint8_t  ws_frag_op = 0;               // 0 = no fragmented message open
+
+// >0: a complete frame of that length is at the head of acc
+//  0: need more bytes
+// -1: malformed — drop the connection
+// >0: một khung trọn vẹn độ dài đó đang ở đầu acc
+//  0: cần thêm byte
+// -1: sai định dạng — ngắt kết nối
+int wsFrameLen(const uint8_t *acc, size_t n) {
+  if (n < 2) return 0;
+  uint8_t b1 = acc[1];
+  size_t len = b1 & 0x7F;
+  if (len == 126 || len == 127) return -1;   // jumbo frames are refused
+  if (len > WS_MAX_MSG) return -1;
+  size_t off = 2 + ((b1 & 0x80) ? 4 : 0);
+  if (n < off + len) return 0;
+  return (int)(off + len);
+}
+
+// Unmask and copy the payload of the frame at the head of acc into out.
+// Returns the opcode (low 4 bits of b0). FIN is acc[0] & 0x80.
+// Gỡ mặt nạ và chép payload của khung ở đầu acc vào out. Trả về opcode
+// (4 bit thấp của b0). FIN là acc[0] & 0x80.
+uint8_t wsFrameTake(const uint8_t *acc, uint8_t *out, size_t *out_len) {
+  uint8_t b0 = acc[0], b1 = acc[1];
+  size_t len = b1 & 0x7F, off = 2;
+  const uint8_t *mask = nullptr;
+  if (b1 & 0x80) { mask = acc + off; off += 4; }
+  for (size_t i = 0; i < len; i++)
+    out[i] = mask ? (uint8_t)(acc[off + i] ^ mask[i & 3]) : acc[off + i];
+  *out_len = len;
+  return b0 & 0x0F;
+}
+
+// Build one unmasked server frame. Returns the total byte count.
+// Dựng một khung server không mặt nạ. Trả về tổng số byte.
+size_t wsFramePut(uint8_t *out, uint8_t opcode, const uint8_t *payload, size_t len) {
+  out[0] = (uint8_t)(0x80 | opcode);   // FIN + opcode
+  out[1] = (uint8_t)len;               // len < 126 always holds here
+  memcpy(out + 2, payload, len);
+  return 2 + len;
+}
+
+// ---- TCP / HTTP / WebSocket server ---------------------------------------
+WiFiServer webSrv(80);
+WiFiClient webCli;
+uint8_t  webAcc[1200];                 // HTTP request / WS frame accumulator
+size_t   webAccLen = 0;
+bool     webWsOpen = false;
+
+bool webAccept() {
+  // One browser at a time, like the single UDP peer: a new tab replaces the
+  // old connection. core 3.x renamed available() to accept().
+  // Một trình duyệt tại một thời điểm, như peer UDP duy nhất: tab mới thay thế
+  // kết nối cũ. core 3.x đổi tên available() thành accept().
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  WiFiClient c = webSrv.accept();
+#else
+  WiFiClient c = webSrv.available();
+#endif
+  if (!c) return false;
+  if (webCli) webCli.stop();
+  webCli = c;
+  webCli.setNoDelay(true);
+  webAccLen = 0;
+  webWsOpen = false;
+  return true;
+}
+
+void webSendAll(const uint8_t *data, size_t n) {
+  // Chunked so a wedged peer cannot hold the flight loop hostage: each slice
+  // is flushed through the TCP send buffer and we drop what does not fit.
+  // Chia mảnh để peer kẹt không giữ chân vòng lặp bay: từng lát được đẩy qua
+  // bộ đệm gửi TCP và ta bỏ phần không đủ chỗ.
+  size_t off = 0;
+  while (off < n) {
+    size_t slice = n - off;
+    if (slice > 512) slice = 512;
+    if (webCli.availableForWrite() < (int)slice) return;
+    webCli.write(data + off, slice);
+    off += slice;
+  }
+}
+
+// The control page: the Drone + Motor test panels of the Python tuner, in the
+// browser (PROTOCOL.md §8). Vanilla JS, no CDN — the drone may be the only
+// network there is.
+// Trang điều khiển: các bảng Drone + Motor test của tuner Python, trong trình
+// duyệt (PROTOCOL.md mục 8). JS thuần, không CDN — có khi drone là mạng duy nhất.
+const char WEB_PAGE[] PROGMEM = R"rawliteral(<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ESP-Drone control</title>
+<style>
+body{font:15px/1.45 -apple-system,system-ui,sans-serif;background:#101418;color:#e8edf2;margin:0;padding:12px}
+h1{font-size:18px;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card{background:#1a2129;border-radius:10px;padding:12px;margin:0 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+button{font:600 15px/1 inherit;border:0;border-radius:8px;padding:11px 15px;color:#fff;background:#2b6cb0;cursor:pointer;touch-action:manipulation}
+button:active{transform:translateY(1px)}
+.green{background:#2f855a}.orange{background:#c05621}.red{background:#c53030}.grey{background:#4a5568}
+input{font:15px/1 inherit;width:76px;padding:9px;border-radius:8px;border:1px solid #2d3748;background:#101418;color:#e8edf2}
+.pill{font-size:13px;padding:4px 11px;border-radius:999px;background:#4a5568;white-space:nowrap}
+.pill.ok{background:#2f855a}.pill.bad{background:#c53030}
+.kv{min-width:74px}.kv b{display:block;font-size:11px;color:#9fb0bf;letter-spacing:.04em}
+#status{font-size:13px;color:#9fb0bf;min-height:19px}
+.note{font-size:12px;color:#7c8b99}
+</style>
+</head>
+<body>
+<h1>ESP-Drone control <span id="link" class="pill">connecting&hellip;</span>
+  <button class="grey" id="reconnect" style="margin-left:auto">Reconnect</button></h1>
+<div class="card">
+  <div class="row">
+    <div class="kv"><b>VBAT</b><span id="vbat">&mdash;</span></div>
+    <div class="kv"><b>MODE</b><span id="mode">&mdash;</span></div>
+    <div class="kv"><b>ARMED</b><span id="armed">&mdash;</span></div>
+    <div class="kv"><b>ROLL</b><span id="roll">&mdash;</span></div>
+    <div class="kv"><b>PITCH</b><span id="pitch">&mdash;</span></div>
+    <div class="kv"><b>STATE</b><span id="astate">&mdash;</span></div>
+  </div>
+  <div class="row">
+    <div class="kv"><b>M1</b><span id="mv1">1000</span></div>
+    <div class="kv"><b>M2</b><span id="mv2">1000</span></div>
+    <div class="kv"><b>M3</b><span id="mv3">1000</span></div>
+    <div class="kv"><b>M4</b><span id="mv4">1000</span></div>
+  </div>
+</div>
+<div class="card">
+  <div class="row">
+    <button class="green" id="arm">ARM</button>
+    <button class="orange" id="disarm">DISARM</button>
+    <button class="red" id="emergency">EMERGENCY</button>
+  </div>
+  <div class="row">
+    <label>Thrust % <input id="thrust" type="number" min="0" max="60" value="30"></label>
+    <button class="green" id="spin">Spin up</button>
+    <button class="grey" id="stop">Stop motors</button>
+  </div>
+  <div class="note">Spin up streams level setpoints at 50 Hz: 0.5 s at zero thrust,
+  then a 1 s ramp. Stopping the stream (or hiding this page) drops thrust to zero,
+  which disarms the drone.</div>
+</div>
+<div class="card">
+  <div class="row">
+    <label>Speed <input id="speed" type="number" min="1000" max="2000" step="50" value="1200"></label>
+  </div>
+  <div class="row"><div class="kv"><b>M1</b><span id="tv1">1000</span></div>
+    <button class="green" onclick="runMotor(1)">Run</button>
+    <button class="grey" onclick="stopMotor(1)">Stop</button></div>
+  <div class="row"><div class="kv"><b>M2</b><span id="tv2">1000</span></div>
+    <button class="green" onclick="runMotor(2)">Run</button>
+    <button class="grey" onclick="stopMotor(2)">Stop</button></div>
+  <div class="row"><div class="kv"><b>M3</b><span id="tv3">1000</span></div>
+    <button class="green" onclick="runMotor(3)">Run</button>
+    <button class="grey" onclick="stopMotor(3)">Stop</button></div>
+  <div class="row"><div class="kv"><b>M4</b><span id="tv4">1000</span></div>
+    <button class="green" onclick="runMotor(4)">Run</button>
+    <button class="grey" onclick="stopMotor(4)">Stop</button></div>
+  <div class="row">
+    <button class="green" id="runAll">Run all</button>
+    <button class="red" id="stopAll">STOP ALL</button>
+    <span class="pill" id="hold">stopped</span>
+  </div>
+  <div class="note">Bench test with the PID loop bypassed (MOTOR_TEST, PROTOCOL.md
+  &sect;5). Disarmed only; the packet is re-sent every 150 ms and the firmware
+  stops the motors after 300 ms of silence.</div>
+</div>
+<div id="status"></div>
+<script>
+/* CRTP over WebSocket: one binary frame = one UDP wire packet,
+   [header][payload][checksum], checksum = sum & 0xFF (PROTOCOL.md §1/§8). */
+var ws=null,keepTimer=null,lastRx=0,acks={},logToc={},blockVars=[];
+var motorVals=[1000,1000,1000,1000],holdTimer=null;
+var streamTimer=null,streamCurrent=0,streamTarget=0,streamHold=0,rampStep=0;
+function $(id){return document.getElementById(id);}
+function say(t){$('status').textContent=t;}
+function str(b){var s='';for(var i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return s;}
+function f32(p,off){return new DataView(p.buffer,p.byteOffset+off,4).getFloat32(0,true);}
+function csum(a){var s=0;for(var i=0;i<a.length;i++)s=(s+a[i])&255;return s;}
+function pkt(port,ch,payload){
+  var a=new Uint8Array(payload.length+2);   /* header + payload + checksum (PROTOCOL.md §1) */
+  a[0]=(port<<4)|ch;
+  a.set(payload,1);
+  a[a.length-1]=csum(a.subarray(0,a.length-1));
+  return a;
+}
+function send(port,ch,payload){
+  if(!ws||ws.readyState!==1)return;
+  try{ws.send(pkt(port,ch,payload));}catch(e){}
+}
+/* ---- request/reply with 500 ms retransmission (the apps' resend queue) ---- */
+function request(port,ch,payload,want,cb){
+  var key=port+':'+ch,list=acks[key]||(acks[key]=[]),tries=0,t=null;
+  function done(p){clearInterval(t);var i=list.indexOf(entry);if(i>=0)list.splice(i,1);cb(p);}
+  function entry(p){if(!want(p))return false;done(p);return true;}
+  list.push(entry);
+  function tick(){
+    if(tries++>5){done(null);return;}
+    send(port,ch,payload);
+  }
+  tick();t=setInterval(tick,500);
+}
+/* ---- flight-control commands (PROTOCOL.md §5) ---- */
+var FC={EMERGENCY:5,ARM:7,DISARM:8,MOTOR_TEST:0x0C};
+function fc(cmd,args,onStatus){
+  var body=new Uint8Array([cmd].concat(args||[]));
+  request(7,0,body,function(p){return p.length>=2&&p[0]===cmd;},
+    function(p){
+      if(p===null){say('no reply from the drone');return;}
+      var status=p[p.length-1];
+      if(onStatus)onStatus(status);
+    });
+}
+function modes(n){return ['MANUAL','HOLD','AUTO','FOLLOW','RTH'][n]||('?'+n);}
+function show(t){
+  $('vbat').textContent=t.vbat.toFixed(2)+' V';
+  $('mode').textContent=modes(t.mode);
+  $('armed').textContent=t.armed?'YES':'no';
+  $('armed').style.color=t.armed?'#fc8181':'';
+  $('roll').textContent=t.roll.toFixed(1)+'°';
+  $('pitch').textContent=t.pitch.toFixed(1)+'°';
+  $('astate').textContent=t.mode===2?['IDLE','TAKEOFF','HOLD','LAND'][t.astate]||t.astate:'—';
+  for(var i=0;i<4;i++)$('m'+(i+1)).textContent=t['m'+(i+1)]+'µs';
+}
+/* ---- status telemetry: one log block (PROTOCOL.md §2/§4) ---- */
+var STATUS_VARS=['pm.vbat','flight.mode','flight.armed','flight.auto_state',
+  'stabilizer.roll','stabilizer.pitch','motor.m1','motor.m2','motor.m3','motor.m4'];
+var LOG_SIZES={1:1,2:2,3:4,4:1,5:2,6:4,7:4};
+function fetchLogToc(done){
+  request(5,0,new Uint8Array([1]),function(p){return p.length>=6&&p[0]===1;},
+    function(p){
+      if(!p){done(false);return;}
+      var n=p[1],i=0;
+      (function next(){
+        if(i>=n){done(true);return;}
+        var id=i;
+        request(5,0,new Uint8Array([0,id]),
+          function(q){return q.length>1&&q[0]===0&&q[1]===id;},
+          function(q){
+            if(q){
+              var body=q.subarray(2),z1=body.indexOf(0),
+                  z2=z1>=0?body.indexOf(0,z1+1):-1;
+              if(z1>0&&z2>z1)
+                logToc[str(body.subarray(z1+1,z2))]={id:id,type:body[0]&0x0F};
+            }
+            i++;next();
+          });
+      })();
+    });
+}
+function startStatusBlock(){
+  var args=[1],ok=true;
+  blockVars=[];
+  for(var i=0;i<STATUS_VARS.length;i++){
+    var v=logToc[STATUS_VARS[i]];
+    if(!v){say('log TOC is missing '+STATUS_VARS[i]);ok=false;break;}
+    args.push(v.type&0x0F,v.id);
+    blockVars.push(v);
+  }
+  if(!ok)return;
+  request(5,1,new Uint8Array([0].concat(args)),
+    function(p){return p.length>=3&&p[0]===0&&p[1]===1;},
+    function(p){
+      if(!p||p[2]!==0){say('log CREATE refused');return;}
+      request(5,1,new Uint8Array([3,1,20]),  /* block 1, period 20 = 200 ms */
+        function(q){return q.length>=3&&q[0]===3&&q[1]===1;},
+        function(q){
+          if(!q||q[2]!==0){say('log START refused');return;}
+          say('telemetry live — status block every 200 ms');
+        });
+    });
+}
+function onLogData(p){
+  if(p.length<4||p[0]!==1)return;      /* block id 1 */
+  var off=4,t={};
+  for(var i=0;i<blockVars.length;i++){
+    var v=blockVars[i],sz=LOG_SIZES[v.type];
+    if(off+sz>p.length)return;
+    var name=STATUS_VARS[i];
+    if(v.type===7)t[name]=f32(p,off);
+    else if(sz===1)t[name]=p[off];
+    else if(sz===2)t[name]=p[off]|(p[off+1]<<8);
+    else t[name]=(p[off]|(p[off+1]<<8)|(p[off+2]<<16)|(p[off+3]<<24))>>>0;
+    off+=sz;
+  }
+  show({vbat:t['pm.vbat'],mode:t['flight.mode'],armed:t['flight.armed'],
+        astate:t['flight.auto_state'],roll:t['stabilizer.roll'],
+        pitch:t['stabilizer.pitch'],
+        m1:t['motor.m1'],m2:t['motor.m2'],m3:t['motor.m3'],m4:t['motor.m4']});
+}
+/* ---- motor test (PROTOCOL.md §5) ---- */
+function speedVal(){
+  var v=parseInt($('speed').value,10);
+  if(isNaN(v)){say('motor speed: not a number');return null;}
+  return Math.max(1000,Math.min(2000,v));
+}
+function pushMotorLabels(){
+  for(var i=0;i<4;i++)$('tv'+(i+1)).textContent=motorVals[i]+' µs';
+}
+function motorPacket(enable){
+  var args=[enable?1:0];
+  for(var i=0;i<4;i++){
+    var v=motorVals[i]|0;
+    args.push(v&255,(v>>8)&255);
+  }
+  return args;
+}
+function startHold(){
+  stopHold();
+  holdTimer=setInterval(function(){send(7,0,new Uint8Array([FC.MOTOR_TEST].concat(motorPacket(1))));},150);  /* same frame as motorGo */
+  $('hold').textContent='holding — 150 ms';
+}
+function stopHold(){
+  if(holdTimer){clearInterval(holdTimer);holdTimer=null;}
+  $('hold').textContent='stopped';
+}
+function motorGo(){
+  fc(FC.MOTOR_TEST,motorPacket(1),function(status){
+    if(status===0){startHold();say('motors at '+motorVals.join('/ ')+' µs — re-sending every 150 ms');}
+    else{stopHold();say('motor test not acked — drone must be disarmed');}
+  });
+}
+function runMotor(n){          /* one motor at the shared speed */
+  var s=speedVal();if(s===null)return;
+  for(var i=0;i<4;i++)motorVals[i]=(i===n-1)?s:1000;
+  pushMotorLabels();motorGo();
+}
+function stopMotor(n){         /* park one motor, keep the others running */
+  motorVals[n-1]=1000;
+  pushMotorLabels();
+  var any=motorVals.some(function(v){return v>1000;});
+  if(any)motorGo();
+  else stopAll();
+}
+function runAll(){             /* one enable=1 packet carries four speeds */
+  var s=speedVal();if(s===null)return;
+  for(var i=0;i<4;i++)motorVals[i]=s;
+  pushMotorLabels();motorGo();
+}
+function stopAll(){
+  stopHold();
+  fc(FC.MOTOR_TEST,motorPacket(0),function(){
+    for(var i=0;i<4;i++)motorVals[i]=1000;
+    pushMotorLabels();
+    say('motor test stopped');
+  });
+}
+/* ---- stand thrust stream (50 Hz level CommanderPackets, PROTOCOL.md §7) ---- */
+function commanderPacket(thrust){
+  var b=new Uint8Array(14);   /* roll/pitch/yaw float 0.0 + u16 thrust */
+  var t=thrust|0;
+  b[12]=t&255;b[13]=(t>>8)&255;
+  send(3,0,b);
+}
+function spinUp(){
+  var pct=Math.max(0,Math.min(60,parseFloat($('thrust').value)||0));
+  if(streamTimer)return;
+  streamTarget=Math.round(pct/100*65535);
+  streamCurrent=0;
+  streamHold=25;                       /* 0.5 s at zero thrust (50 Hz) */
+  rampStep=65535/50;                   /* 1 s ramp */
+  say('spin up: 0.5 s at zero thrust, 1 s ramp to '+pct+' %');
+  streamTimer=setInterval(function(){
+    if(streamHold>0){streamHold--;streamCurrent=0;}
+    else{
+      var d=Math.max(-rampStep,Math.min(rampStep,streamTarget-streamCurrent));
+      streamCurrent+=d;
+    }
+    commanderPacket(streamCurrent);
+  },20);
+}
+function stopMotors(){
+  if(streamTimer){clearInterval(streamTimer);streamTimer=null;}
+  var n=0,z=setInterval(function(){
+    commanderPacket(0);
+    if(++n>=5)clearInterval(z);
+  },20);
+  say('motors stopped — zero thrust disarms');
+}
+/* ---- socket ---- */
+function connect(){
+  if(ws){try{ws.onclose=null;ws.close();}catch(e){}}
+  stopHold();
+  $('link').textContent='connecting…';
+  $('link').className='pill';
+  ws=new WebSocket('ws://'+location.host+'/');
+  ws.binaryType='arraybuffer';
+  ws.onopen=function(){
+    $('link').textContent='live';
+    $('link').className='pill ok';
+    lastRx=Date.now();
+    say('fetching log TOC…');
+    fetchLogToc(function(ok){
+      if(!ok){say('no reply on port 5 ch 0');return;}
+      startStatusBlock();
+    });
+  };
+  ws.onmessage=function(ev){
+    if(!(ev.data instanceof ArrayBuffer))return;
+    var d=new Uint8Array(ev.data);
+    if(d.length<2)return;
+    var raw=d.subarray(0,d.length-1);
+    if(csum(raw)!==d[d.length-1])return;
+    lastRx=Date.now();
+    var port=raw[0]>>4,ch=raw[0]&15,p=raw.subarray(1);
+    if(port===5&&ch===2){onLogData(p);return;}
+    var list=acks[port+':'+ch]||[];
+    for(var i=0;i<list.length;i++)if(list[i](p))return;
+  };
+  ws.onclose=function(){
+    $('link').textContent='lost';
+    $('link').className='pill bad';
+    stopHold();
+    if(streamTimer){clearInterval(streamTimer);streamTimer=null;}
+    say('link lost — reconnecting…');
+    setTimeout(connect,2000);
+  };
+}
+/* ---- safety: leaving the page stops every motor path ---- */
+function killAll(){
+  stopHold();
+  if(streamTimer){clearInterval(streamTimer);streamTimer=null;}
+  for(var n=0;n<3;n++)send(7,0,new Uint8Array([FC.MOTOR_TEST].concat(motorPacket(0))));
+  commanderPacket(0);
+}
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden)return;
+  if(motorVals.some(function(v){return v>1000;})){
+    stopAll();
+    say('page hidden — motor test stopped');
+  }
+  if(streamTimer)stopMotors();
+});
+window.addEventListener('pagehide',function(){
+  killAll();
+  if(ws){try{ws.onclose=null;ws.close();}catch(e){}}
+});
+/* ---- buttons ---- */
+$('arm').onclick=function(){fc(FC.ARM,[],function(s){
+  say(s===0?'armed':'refused by the drone');});};
+$('disarm').onclick=function(){fc(FC.DISARM,[],function(s){
+  stopHold();say(s===0?'disarmed':'refused by the drone');});};
+$('emergency').onclick=function(){     /* one click, no confirmation */
+  stopHold();
+  if(streamTimer){clearInterval(streamTimer);streamTimer=null;}
+  fc(FC.EMERGENCY,[],function(){say('EMERGENCY — motors off');});
+};
+$('spin').onclick=spinUp;
+$('stop').onclick=stopMotors;
+$('runAll').onclick=runAll;
+$('stopAll').onclick=stopAll;
+$('reconnect').onclick=function(){killAll();connect();};
+/* ---- keepalive: one TOC info every 500 ms keeps the reply route and the
+       firmware's link-failsafe alive; closing the page ends both ---- */
+keepTimer=setInterval(function(){
+  if(ws&&ws.readyState===1)send(5,0,new Uint8Array([1]));
+  var live=Date.now()-lastRx<1500;
+  if(ws&&ws.readyState===1){
+    $('link').textContent=live?'live':'no reply';
+    $('link').className='pill '+(live?'ok':'bad');
+  }
+},500);
+connect();
+</script>
+</body>
+</html>
+)rawliteral";
+
+// Case-insensitive search for a header's value. Returns false when missing.
+// Tìm giá trị của một header, không phân biệt hoa thường. Trả về false nếu thiếu.
+bool webHeaderValue(const char *headers, const char *name, char *out, size_t outSz) {
+  size_t nlen = strlen(name);
+  const char *p = headers;
+  while (*p) {
+    size_t i = 0;
+    while (i < nlen && p[i] && tolower((unsigned char)p[i]) == tolower((unsigned char)name[i])) i++;
+    if (i == nlen && p[i] == ':') {
+      p += i + 1;
+      while (*p == ' ' || *p == '\t') p++;
+      size_t k = 0;
+      while (*p && *p != '\r' && *p != '\n' && k + 1 < outSz) out[k++] = *p++;
+      out[k] = '\0';
+      return k > 0;
+    }
+    while (*p && *p != '\n') p++;
+    if (*p == '\n') p++;
+  }
+  return false;
+}
+
+void webHttpReply() {
+  // GET with an Upgrade header is the WebSocket handshake (RFC 6455 §4.2);
+  // everything else gets the control page.
+  // GET có header Upgrade là bắt tay WebSocket (RFC 6455 mục 4.2); mọi thứ
+  // khác nhận trang điều khiển.
+  char key[64], accept[29];
+  bool isWs = webHeaderValue((const char *)webAcc, "sec-websocket-key", key, sizeof(key));
+  if (isWs) {
+    wsAcceptKey(key, accept);
+    char hdr[256];
+    int n = snprintf(hdr, sizeof(hdr),
+                     "HTTP/1.1 101 Switching Protocols\r\n"
+                     "Upgrade: websocket\r\n"
+                     "Connection: Upgrade\r\n"
+                     "Sec-WebSocket-Accept: %s\r\n\r\n", accept);
+    webSendAll((const uint8_t *)hdr, (size_t)n);
+    webAccLen = 0;
+    webWsOpen = true;
+    Serial.println(F("[WEB ] WebSocket client connected"));
+    return;
+  }
+  size_t pageLen = strlen_P(WEB_PAGE);
+  char hdr[128];
+  int n = snprintf(hdr, sizeof(hdr),
+                   "HTTP/1.1 200 OK\r\n"
+                   "Content-Type: text/html; charset=utf-8\r\n"
+                   "Content-Length: %u\r\n"
+                   "Connection: close\r\n\r\n", (unsigned)pageLen);
+  webSendAll((const uint8_t *)hdr, (size_t)n);
+  // Send the page from flash in slices (no RAM copy).
+  // Gửi trang từ flash theo lát (không chép vào RAM).
+  uint8_t slice[512];
+  size_t off = 0;
+  while (off < pageLen) {
+    size_t n2 = pageLen - off;
+    if (n2 > sizeof(slice)) n2 = sizeof(slice);
+    memcpy_P(slice, WEB_PAGE + off, n2);
+    webSendAll(slice, n2);
+    off += n2;
+  }
+  webCli.stop();
+}
+
+// Deliver one complete WS message payload to the CRTP layer.
+// Chuyển một payload thông điệp WS hoàn chỉnh sang tầng CRTP.
+void webDeliver(const uint8_t *msg, size_t len) {
+  if (len < 2 || len > CRTP_MAX_SIZE + 1) return;
+  crtp_reply_via = 1;                  // the ack follows the browser home
+  crtpReceiveFramed(msg, len);
+}
+
+void webWsFrames() {
+  uint8_t pay[WS_MAX_MSG];
+  for (;;) {
+    int fl = wsFrameLen(webAcc, webAccLen);
+    if (fl == 0) return;
+    if (fl < 0) { webCli.stop(); webWsOpen = false; return; }
+    size_t plen = 0;
+    uint8_t op = wsFrameTake(webAcc, pay, &plen);
+    bool fin = (webAcc[0] & 0x80) != 0;
+    webAccLen -= (size_t)fl;
+    memmove(webAcc, webAcc + fl, webAccLen);
+
+    switch (op) {
+      case 0x0:                        // continuation — append to the message
+        if (ws_frag_op && ws_frag_len + plen <= WS_MAX_MSG) {
+          memcpy(ws_msg + ws_frag_len, pay, plen);
+          ws_frag_len += (uint16_t)plen;
+          if (fin) {
+            webDeliver(ws_msg, ws_frag_len);
+            ws_frag_op = 0;
+            ws_frag_len = 0;
+          }
+        } else {                       // continuation without an open message
+          webCli.stop();
+          webWsOpen = false;
+          return;
+        }
+        break;
+      case 0x1:                        // text
+      case 0x2:                        // binary — CRTP wire packet
+        if (fin) {
+          webDeliver(pay, plen);
+        } else {                       // first fragment: open the message
+          memcpy(ws_msg, pay, plen);
+          ws_frag_len = (uint16_t)plen;
+          ws_frag_op = op;
+        }
+        break;
+      case 0x8: {                      // close — echo and drop the client
+        uint8_t out[4];
+        size_t n = wsFramePut(out, 0x8, pay, plen > 2 ? 2 : plen);
+        webSendAll(out, n);
+        webCli.stop();
+        webWsOpen = false;
+        return;
+      }
+      case 0x9: {                      // ping -> pong
+        uint8_t out[WS_MAX_MSG + 2];
+        size_t n = wsFramePut(out, 0xA, pay, plen);
+        webSendAll(out, n);
+        break;
+      }
+      case 0xA:                        // pong — nothing to do
+        break;
+      default:                         // reserved opcode — drop the connection
+        webCli.stop();
+        webWsOpen = false;
+        return;
+    }
+    if (!webWsOpen) return;
+  }
+}
+
+bool wsSend(const uint8_t *payload, size_t len) {
+  // One CRTP wire packet per binary frame, the same bytes UDP carries.
+  // Một gói dây CRTP mỗi khung nhịp phân, đúng byte mà UDP mang.
+  if (!webWsOpen || !webCli || !webCli.connected()) return false;
+  uint8_t out[WS_MAX_MSG + 2];
+  size_t n = wsFramePut(out, 0x2, payload, len);
+  if (webCli.availableForWrite() < (int)n) return false;
+  return webCli.write(out, n) == n;
+}
+
+void webPoll() {
+  if (!webCli || !webCli.connected()) {
+    if (webWsOpen) Serial.println(F("[WEB ] WebSocket client gone"));
+    webWsOpen = false;
+    webAccLen = 0;
+    webAccept();
+  }
+  if (!webCli) return;
+
+  while (webCli.available()) {
+    int c = webCli.read();
+    if (c < 0) break;
+    if (webAccLen >= sizeof(webAcc) - 1) {   // one spare byte for the C-string NUL
+      webCli.stop();                   // oversized request/frame — not ours
+      webWsOpen = false;
+      return;
+    }
+    webAcc[webAccLen++] = (uint8_t)c;
+    if (!webWsOpen) {
+      // Wait for the blank line that ends the HTTP request.
+      // Chờ dòng trống kết thúc yêu cầu HTTP.
+      if (webAccLen >= 4 && memcmp(webAcc + webAccLen - 4, "\r\n\r\n", 4) == 0) {
+        webAcc[webAccLen] = '\0';
+        webHttpReply();
+      }
+    }
+    if (webWsOpen) webWsFrames();
+  }
+}
+
+bool webInit() {
+  webSrv.begin();
+  webSrv.setNoDelay(true);
+  IPAddress ip = (link_mode == LINK_MODE_WIFI_AP || link_mode == LINK_MODE_WIFI_AP_BLE)
+                     ? WiFi.softAPIP() : WiFi.localIP();
+  Serial.printf("[WEB ] control page + WebSocket on http://%s/\n", ip.toString().c_str());
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1367,9 +2212,26 @@ void udpPoll() {
 bool linkSend(const uint8_t *payload, size_t len) {
   if (len == 0 || len > CRTP_MAX_SIZE) return false;
 
+  // The WebSocket client gets its replies on its own socket when it sent the
+  // last packet (see crtp_reply_via).
+  // Client WebSocket nhận trả lời trên socket của chính nó khi nó gửi gói cuối
+  // (xem crtp_reply_via).
+  if (webWsOpen && crtp_reply_via == 1) {
+    uint8_t out[CRTP_MAX_SIZE + 1];
+    memcpy(out, payload, len);
+    out[len] = crtpChecksum(payload, len);
+    return wsSend(out, len + 1);
+  }
+
 #if LINK_USE_BT_SPP
-  if (link_mode == LINK_MODE_BT_SPP) {
-    if (!btSpp || !btSpp->connected()) return false;
+  // SPP owns the reply when the last packet arrived over SPP; in the SPP-only
+  // profile it owns every reply. BT_DUAL can carry an SPP phone and a BLE
+  // client at once, so last-inbound wins there.
+  // SPP sở hữu câu trả lời khi gói cuối đến qua SPP; ở hồ sơ chỉ-SPP nó sở hữu
+  // mọi câu trả lời. BT_DUAL có thể chở điện thoại SPP và client BLE cùng lúc,
+  // nên ở đó gói vào cuối cùng giành quyền.
+  if (btSpp && btSpp->connected() &&
+      (crtp_reply_via == 2 || link_mode == LINK_MODE_BT_SPP)) {
     uint8_t out[CRTP_MAX_SIZE + 1];
     memcpy(out, payload, len);
     out[len] = crtpChecksum(payload, len);
@@ -1394,8 +2256,9 @@ bool linkSend(const uint8_t *payload, size_t len) {
 
 void linkPoll() {
   if (linkUsesUdp(link_mode)) udpPoll();
+  if (linkUsesUdp(link_mode)) webPoll();   // HTTP page + WebSocket (§8)
 #if LINK_USE_BT_SPP
-  if (link_mode == LINK_MODE_BT_SPP) btPoll();
+  if (link_mode == LINK_MODE_BT_SPP || link_mode == LINK_MODE_BT_DUAL) btPoll();
 #endif
   // BLE RX arrives in callbacks; nothing to poll.
   // BLE RX đến trong các callback; không có gì để poll.
@@ -1421,10 +2284,25 @@ void linkInit() {
     case LINK_MODE_WIFI_AP_BLE:   ok = wifiApInit();  break;
     case LINK_MODE_WIFI_STA_BLE:  ok = wifiStaInit(); break;
 #if LINK_USE_BT_SPP
-    case LINK_MODE_BT_SPP:        ok = btInit(WIFI_AP_SSID); break;
+    case LINK_MODE_BT_SPP:        ok = btInit(BT_DEVICE_NAME); break;
 #endif
 #if LINK_USE_BLE
-    case LINK_MODE_BLE:           ok = bleInit(WIFI_AP_SSID); break;
+    case LINK_MODE_BLE:           ok = bleInit(BT_DEVICE_NAME); break;
+#endif
+#if LINK_USE_BT_SPP || LINK_USE_BLE
+    case LINK_MODE_BT_DUAL: {
+      // Both sides of the dual-mode controller: SPP for Android, BLE for iOS.
+      // Hai phía của bộ điều khiển chế độ kép: SPP cho Android, BLE cho iOS.
+      bool spp_ok = true, ble_ok = true;
+#if LINK_USE_BT_SPP
+      spp_ok = btInit(BT_DEVICE_NAME);
+#endif
+#if LINK_USE_BLE
+      ble_ok = bleInit(BT_DEVICE_NAME);
+#endif
+      ok = spp_ok && ble_ok;
+      break;
+    }
 #endif
     default:
       Serial.printf("[LINK] profile %u not built in — falling back to softAP\n", link_mode);
@@ -1434,8 +2312,14 @@ void linkInit() {
   }
 
 #if LINK_USE_BLE
-  if (ok && ble && link_mode != LINK_MODE_BLE) bleInit(WIFI_AP_SSID);
+  // The *_BLE profiles add BLE alongside WiFi. LINK_MODE_BLE and BT_DUAL
+  // already ran bleInit in the switch above.
+  // Các hồ sơ *_BLE thêm BLE bên cạnh WiFi. LINK_MODE_BLE và BT_DUAL đã gọi
+  // bleInit trong switch ở trên.
+  if (ok && (link_mode == LINK_MODE_WIFI_AP_BLE || link_mode == LINK_MODE_WIFI_STA_BLE))
+    bleInit(BT_DEVICE_NAME);
 #endif
+  if (ok && wifi) webInit();          // control page + WebSocket (§8)
 
   link_ready = ok;
   Serial.printf("[LINK] profile %u %s\n", link_mode, ok ? "up" : "FAILED");
@@ -2244,6 +3128,8 @@ size_t mavFrame(uint32_t msgid, const uint8_t *payload, size_t len, uint8_t *out
 
 void mavSendTo(const IPAddress &ip, uint16_t port, uint32_t msgid,
                const uint8_t *payload, size_t len) {
+  if (!mav_udp_up) return;          // no socket on Bluetooth-only profiles
+                                    // hồ sơ chỉ-Bluetooth thì không có socket
   uint8_t buf[128];
   if (10 + len + 2 > sizeof(buf)) return;
   size_t n = mavFrame(msgid, payload, len, buf);
@@ -2642,6 +3528,7 @@ bool mavHandle(const uint8_t *b, size_t n) {
 // system status 2 Hz, attitude + vị trí 5 Hz, và HOME_POSITION / MISSION_CURRENT
 // theo sự kiện.
 void mavlinkPoll() {
+  if (!mav_udp_up) return;          // same guard as mavSendTo / cùng chỗ chặn như mavSendTo
   int packetSize = MavUdp.parsePacket();
   while (packetSize > 0) {
     uint8_t buf[192];
@@ -4064,8 +4951,10 @@ void setup() {
   nvs.getString("ssid", sta_ssid, sizeof(sta_ssid));
   nvs.getString("pass", sta_pass, sizeof(sta_pass));
   linkInit();
-  MavUdp.begin(MAVLINK_UDP_PORT);   // ArduPilot GCS socket (§13)
-                                    // socket GCS ArduPilot (§13)
+  if (linkUsesUdp(link_mode)) {
+    mav_udp_up = MavUdp.begin(MAVLINK_UDP_PORT);   // ArduPilot GCS socket (§13)
+                                                   // socket GCS ArduPilot (§13)
+  }
 
   mpuCalibrateGyro();
   batteryUpdate();
@@ -4075,7 +4964,10 @@ void setup() {
   Serial.println(F("            throttle LOW + yaw LEFT 1 s to disarm."));
   Serial.println(F("[ARM] CRTP : thrust at 0, then up, arms; thrust back to 0 disarms."));
   Serial.println(F("[MODE] manual | hold | auto(takeoff->hover->land) over CRTP port 7."));
-  Serial.println(F("[MAV ] MAVLink v2 on UDP 14550 — Mission Planner / QGC / MAVProxy."));
+  // MAVLink rides UDP 14550, so a Bluetooth-only profile has none of it.
+  // MAVLink chạy trên UDP 14550, nên hồ sơ chỉ-Bluetooth thì không có nó.
+  if (mav_udp_up) Serial.println(F("[MAV ] MAVLink v2 on UDP 14550 — Mission Planner / QGC / MAVProxy."));
+  else            Serial.println(F("[MAV ] off — MAVLink needs WiFi (UDP 14550)."));
   Serial.println(F("[NOTE] IMU only — hold keeps a thrust level, not an altitude."));
   Serial.println(F("=================================================="));
 

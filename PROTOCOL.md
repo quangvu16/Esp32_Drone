@@ -435,7 +435,7 @@ roll/pitch/yaw fields and send this packet. See §9.
 
 ## 8. Transports
 
-Selected at boot from NVS key `link` (0..5). Change with `LINK` (§5) or the
+Selected at boot from NVS key `link` (0..6). Change with `LINK` (§5) or the
 serial console `link <n>`; the board reboots to apply it.
 
 | Value | Name | Notes |
@@ -446,10 +446,21 @@ serial console `link <n>`; the board reboots to apply it.
 | 3 | BLE | GATT, see below |
 | 4 | WIFI_AP_BLE | softAP + BLE together |
 | 5 | WIFI_STA_BLE | station + BLE together |
+| 6 | BT_DUAL | Bluetooth Classic SPP **and** BLE together |
+
+Bluetooth name: SPP and BLE both advertise as **`ESP32_Done`**
+(`BT_DEVICE_NAME` in the sketch) — independent of the WiFi SSID `ESP-Drone`.
+Clients accept the legacy `ESP-Drone` name too, for boards not yet re-flashed.
 
 UDP ports: phone→drone **2390**, drone→phone **2399** (the phone binds 2399).
 
 Station credentials: serial `sta <ssid> <pass>`, stored in NVS.
+
+**Reply routing** — three-way, keyed on the transport of the **last inbound
+packet** (`crtp_reply_via`): 0 = UDP or BLE, 1 = WebSocket, 2 = SPP. Two
+clients on different transports therefore take turns rather than sharing a
+reply stream; a client on a coexistence profile (4/5/6) can hand the route to
+another transport and get it back on its next packet.
 
 ### BLE GATT
 
@@ -461,6 +472,15 @@ Matches the Bitcraze service the stock Android `BleLink` speaks.
   00000203  CRTPUP    write   phone → drone, control-byte segmented
   00000204  CRTPDOWN  notify  drone → phone, always control-byte framed
 ```
+
+Both write chars accept ATT write **requests** and write **commands** —
+`PROPERTY_WRITE | PROPERTY_WRITE_NR`. This matters: a write command sent to a
+char that only permits requests is dropped at the attribute layer before the
+app ever sees it, with no error anywhere, so a client that chooses "write
+without response" against a requests-only char would hear nothing back. The
+Python client therefore writes with response, and so does iOS; Android's
+BLATENCY preference (no-response writes) is accepted because both write types
+are permitted.
 
 Control byte:
 
@@ -484,6 +504,54 @@ datagram cannot fit in a 20-byte write alongside the control byte.
 Note the asymmetry the stock client imposes: it sends short packets raw on
 `00000202` but expects **every** drone→phone notification to be control-byte
 framed.
+
+### Bluetooth Classic SPP framing (profiles 2 and 6)
+
+SPP carries the UDP wire format — `[CRTP ...][uint8 checksum]` — but as a byte
+stream: writes coalesce and split freely. The receiver scans for the shortest
+length in `[2, 31]` whose trailing checksum validates (a CommanderPacket (§7)
+is pinned at its fixed 16 wire bytes so a checksum match inside its payload
+cannot split it). No match at 31 buffered bytes drops the head byte and
+resyncs; the same rule runs on the drone (`btFrameLen`) and in the Python
+client (`btlink.frame_len`), so the two cannot drift.
+
+### Python tuner client
+
+`tools/pid-tune` connects over any transport: UDP (default), BLE
+(`--link ble --ble NAME|MAC`, via bleak) or SPP (`--link spp --spp MAC`,
+RFCOMM). Its link layer follows the same boundary as the apps: the transport
+adds the checksum iff its wire needs one, so BLE sends raw CRTP and SPP/UDP
+append it. The segmentation and framing helpers are pinned by tests to the
+firmware's `bleSend`/`bleRxSeg`/`btFrameLen` behaviour.
+
+### WebSocket (control page, TCP 80)
+
+Every WiFi profile (0/1/4/5) also serves a **control page** at
+`http://<drone>/` — `http://192.168.43.42/` on the soft-AP. The page connects
+back to the same port with WebSocket, and a binary WS frame carries **exactly
+one UDP wire packet**: `[CRTP ...][uint8 checksum]`. Nothing above changes in a
+browser: the page drives the flight-control commands (§5), streams
+CommanderPackets (§7) and reads log blocks (§4) byte-for-byte like the phone
+apps and the Python tuner.
+
+- **Handshake** — plain RFC 6455: `Sec-WebSocket-Accept = base64(SHA1(key +
+  "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))`. Frames are FIN + 7-bit length
+  (max 64 bytes); a jumbo-length frame drops the connection. Client frames are
+  masked as the RFC requires; drone frames are not.
+- **Reply routing** — replies go out on the transport of the **last inbound
+  packet** (`crtp_reply_via`), so a browser page and a phone/tuner take turns
+  rather than sharing. While the page is in use its motor-test hold (150 ms)
+  and its 500 ms keepalive keep the route on the WebSocket.
+- **The page's controls** are the tuner's Drone and Motor test panels: ARM /
+  DISARM / EMERGENCY, a Thrust % spin-up stream (50 Hz level setpoints, 0.5 s
+  at zero then a 1 s ramp), and the bench motor test (§5) with a Run/Stop pair
+  per motor, **Run all** and **STOP ALL**. Status telemetry is one log block
+  (§4): `pm.vbat`, `flight.mode`, `flight.armed`, `flight.auto_state`,
+  `stabilizer.roll/pitch`, `motor.m1..m4` at 200 ms.
+- **Safety** — the page never arms the drone itself (only `ARM` does, §5); the
+  motor test re-sends every 150 ms and the firmware stops it after 300 ms of
+  silence; hiding or closing the page sends `enable=0`, drops thrust to zero
+  and ends the keepalive, and the 500 ms failsafe stops the motors.
 
 ---
 
@@ -888,7 +956,9 @@ the conventional MAVLink-over-WiFi port — so ArduPilot ground stations
 (Mission Planner, QGroundControl, MAVProxy) connect to the drone directly
 and plan missions with their normal tools. It is a second transport for the
 same flight commands (§5) and the same mission engine (§12); the CRTP link
-keeps its low-latency control role for the apps.
+keeps its low-latency control role for the apps. The socket rides lwIP, so
+MAVLink is only up on the WiFi profiles (0/1/4/5) — on Bluetooth-only
+profiles (2/3/6) the boot banner says `[MAV ] off` instead.
 
 Vehicle identity: `sysid 1`, `compid 1` (`MAV_COMP_ID_AUTOPILOT1`),
 `MAV_TYPE_QUADROTOR` (2), `MAV_AUTOPILOT_GENERIC` (0) — this board is not an

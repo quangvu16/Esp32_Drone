@@ -15,15 +15,18 @@ if [ ! -f "$sketch" ]; then
     exit 1
 fi
 
-# Each entry is a line the tests rely on, copied from the sketch.
+# Each entry is a line the tests rely on, copied from the sketch. An optional
+# second argument names another source file to grep instead — commander_test
+# also copies the wire builders out of the Android / iOS apps and the web page.
 check() {
-    if ! grep -qF "$1" "$sketch"; then
-        echo "STALE TEST: '$1' is no longer in Esp32_drone.ino" >&2
+    f=${2:-$sketch}
+    if ! grep -qF "$1" "$f"; then
+        echo "STALE TEST: '$1' is no longer in $f" >&2
         echo "            the tests copy the math and framing verbatim;" >&2
-        echo "            re-sync test/*.cpp with the sketch before trusting them." >&2
+        echo "            re-sync test/*.cpp with the sources before trusting them." >&2
         exit 1
     fi
-    echo "ok   sketch still has: $1"
+    echo "ok   $f still has: $1"
 }
 
 echo "--- checking the tests are in sync with the sketch ---"
@@ -81,6 +84,78 @@ check 'for (size_t k = 1; k < i; k++) crc = mavCrcAccumulate(out[k], crc);'
 check 'crc = mavCrcAccumulate(mavCrcExtra(msgid), crc);'
 check 'if ((uint16_t)(b[crc_off] | (b[crc_off + 1] << 8)) != crc) return false;'
 
+# The WebSocket handshake and frame codec, copied by ws_test.cpp.
+echo "--- checking the WebSocket codec ---"
+check 's->h[0] = 0x67452301;'
+check 'w[i] = wsRol(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);'
+check 'static const char WS_B64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";'
+check 'out[k++] = WS_B64[(v >> 18) & 0x3F];'
+check 'static const char WS_GUID[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";'
+check 'if (len == 126 || len == 127) return -1;   // jumbo frames are refused'
+check 'return b0 & 0x0F;'
+check 'out[1] = (uint8_t)len;               // len < 126 always holds here'
+check 'memcpy(ws_msg + ws_frag_len, pay, plen);'
+
+# The web page's JS framing (WEB_PAGE). payload.length+1 once let the checksum
+# overwrite the last payload byte, and the hold/killAll re-sends went out
+# without the 0x0C command prefix that fc() adds — so the firmware refused
+# them. Grep all four lines so none can quietly drift apart again.
+echo "--- checking the web page framing ---"
+check 'var a=new Uint8Array(payload.length+2);'
+check 'var body=new Uint8Array([cmd].concat(args||[]));'
+check 'send(7,0,new Uint8Array([FC.MOTOR_TEST].concat(motorPacket(1))));'
+check 'send(7,0,new Uint8Array([FC.MOTOR_TEST].concat(motorPacket(0))));'
+
+# The BLE segment reassembly, copied by bleseg_test.cpp, and the Bluetooth
+# reply routing (SPP and BLE must claim replies the way UDP and the page do).
+echo "--- checking the BLE segment reassembly ---"
+check 'size_t bleRxSeg(uint8_t ctrl, const uint8_t *pay, size_t n) {'
+check 'if (total <= n) {                 // single-segment packet'
+check 'if (pid != ble_rx_pid || ble_rx_len == 0) { ble_rx_len = 0; return 0; }'
+check 'if (ble_rx_len + n > sizeof(ble_rx_buf))   { ble_rx_len = 0; return 0; }'
+check 'size_t done = bleRxSeg(buf[0], buf + 1, n - 1);'
+echo "--- checking the Bluetooth reply routing ---"
+check 'crtp_reply_via = 2;              // replies follow the SPP phone'
+check 'crtp_reply_via = 0;                  // replies follow the BLE phone'
+check '(crtp_reply_via == 2 || link_mode == LINK_MODE_BT_SPP)'
+check 'case LINK_MODE_BT_DUAL: {'
+check 'if (ok && (link_mode == LINK_MODE_WIFI_AP_BLE || link_mode == LINK_MODE_WIFI_STA_BLE))'
+
+# The CommanderPacket wire and the CRTP arming sequence, copied by
+# commander_test.cpp — both the firmware's parse/arm logic and the bytes the
+# Android, iOS and web clients build. The fly-screen sticks looked dead because
+# the arming gate (zero-thrust witness first, battery above 3.30 V) said no,
+# not because these lines moved; pin both sides so neither drifts quietly.
+echo "--- checking the commander wire and arming sequence ---"
+check 'if (len < 15) return;'
+check 'memcpy(&roll,  p + 1,  4);'
+check 'memcpy(&thrust, p + 13, 2);'
+check 'if (!isfinite(roll) || !isfinite(pitch) || !isfinite(yaw)) return;'
+check 'if (fabsf(roll) > 180.0f || fabsf(pitch) > 180.0f || fabsf(yaw) > 2000.0f) return;'
+check 'if (cmd_thrust <= 500) crtp_thrust_was_low = true;'
+check 'if (cmd_thrust > 1000 && crtp_thrust_was_low && armChecksOk("CRTP thrust-up")) {'
+check 'if (flight_mode != MODE_MANUAL) return;'
+check 'if (!cmd_ok) crtp_thrust_was_low = false;'
+check '#define VBAT_CELL_CRIT    3.30f'
+check '#define VBAT_ARM_CHECK    1'
+apps="$here/../.."
+check 'var b=new Uint8Array(14);'
+check 'b[12]=t&255;b[13]=(t>>8)&255;'
+check 'streamHold=25;'
+check 'buffer.putFloat(-mPitch); //invert axis' \
+      "$apps/ESP-Drone-Android/src/se/bitcraze/crazyflie/lib/crtp/CommanderPacket.java"
+check 'protected static final int MAX_THRUST = 65000;' \
+      "$apps/ESP-Drone-Android/src/se/bitcraze/crazyfliecontrol/controller/AbstractController.java"
+check 'return mControls.getMinThrust() + (thrust * mControls.getThrustFactor());' \
+      "$apps/ESP-Drone-Android/src/se/bitcraze/crazyfliecontrol/controller/AbstractController.java"
+check 'return thrust / 100 * MAX_THRUST;' \
+      "$apps/ESP-Drone-Android/src/se/bitcraze/crazyfliecontrol/controller/AbstractController.java"
+check 'preferences_deadzone_defaultValue">0.2' "$apps/ESP-Drone-Android/res/values/strings.xml"
+check 'preferences_minThrust_defaultValue">25' "$apps/ESP-Drone-Android/res/values/strings.xml"
+check 'preferences_maxThrust_defaultValue">90' "$apps/ESP-Drone-Android/res/values/strings.xml"
+check 'thrust = control * 65535 * (maxThrust/100)' \
+      "$apps/ESP-Drone-iOS/Crazyflie client/CrazyFlieCommandHelper.swift"
+
 # The nav accelerometer scale must match the range mpuInit() configures.
 # It once said +-2 g (16384) while the sensor ran at +-8 g -- a 4x error.
 echo "--- checking accelerometer scale ---"
@@ -119,6 +194,9 @@ echo "ok   NAV_HEADING_SIGN = $sign"
 "$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/sbus_test"   "$here/sbus_test.cpp"   -lm
 "$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/mission_test" "$here/mission_test.cpp" -lm
 "$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/mavlink_test" "$here/mavlink_test.cpp" -lm
+"$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/ws_test"     "$here/ws_test.cpp"     -lm
+"$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/bleseg_test" "$here/bleseg_test.cpp" -lm
+"$cxx" -std=c++17 -Wall -Wextra -O0 -o "$out/commander_test" "$here/commander_test.cpp" -lm
 
 echo
 echo "--- frame_test: does the target rotation match the dead reckoning? ---"
@@ -141,3 +219,12 @@ echo "--- mission_test: conversion, DO_JUMP accounting, jump chains ---"
 echo
 echo "--- mavlink_test: framing, crc_extra, golden frames ---"
 "$out/mavlink_test"
+echo
+echo "--- ws_test: handshake accept key, frame codec ---"
+"$out/ws_test"
+echo
+echo "--- bleseg_test: BLE control-byte segment reassembly ---"
+"$out/bleseg_test"
+echo
+echo "--- commander_test: CommanderPacket wire and the CRTP arming sequence ---"
+"$out/commander_test"
