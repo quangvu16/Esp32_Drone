@@ -438,6 +438,22 @@ firmware stops the test on its own after 300 ms of silence, and closing the
 window sends it off. EMERGENCY ends it too. If the status says the test was not
 acked, the drone is armed — disarm first.
 
+### Mission plan
+
+**Open plan window** opens the Plan screen of
+[section 8](#8-plan-flight-plan) on the laptop — the same grid, the same
+`.waypoints` files and the same Upload / Download / Start, over the drone's
+Wi-Fi. What differs is only what replaces the phone:
+
+| Part | What it does |
+|---|---|
+| **Plan plot** | The mission drawn in metres about home; **click** to add a waypoint there (the phone map's tap, minus keep-out zones — the PC has no map database to veto with). |
+| **Grid + row editor** | The Command / P1–P4 / Lat / Lng boxes edit the selected row and commit on **Set row** or when a box loses focus — Mission Planner's cell-exit behaviour. |
+| **Alt / Set alt / Add WP / ↑ ↓ Del** | As on the phone: the altitude new waypoints get, and reordering or removing rows. |
+| **Home lat / lon** | The phone's GPS fix, typed in. They hold the launch point — the file's home row and the origin sent before Upload or Start. |
+| **Load / Save** | `.waypoints` (QGC WPL 110) — the same files as the apps and Mission Planner. |
+| **Upload / Download / Start** | Write, read or fly the onboard mission (Read / Write / Start waypoints). |
+
 ---
 
 ## 13. Setup

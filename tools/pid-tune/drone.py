@@ -10,7 +10,7 @@ Wire map, all from PROTOCOL.md:
 
   port 2  parameters   ch 0 TOC, ch 1 read, ch 2 write
   port 5  logging      ch 0 TOC, ch 1 control, ch 2 data
-  port 7  extensions   ch 0 flight control, ch 1 navigation
+  port 7  extensions   ch 0 flight control, ch 1 navigation, ch 2 mission
 
 Nothing here is drone-specific beyond the parameter and log names, so the
 tuners in ml_tune.py stay the same shape as the reference's.
@@ -32,6 +32,10 @@ UDP_APP_PORT = 2399           # drone replies here
 PORT_PARAMS, PORT_LOG, PORT_FLIGHT = 2, 5, 7
 CH_TOC, CH_READ, CH_WRITE = 0, 1, 2
 LOG_CH_TOC, LOG_CH_CTRL, LOG_CH_DATA = 0, 1, 2
+NAV_CH, MISSION_CH = 1, 2        # port 7: navigation / mission (§6, §12)
+                                 # port 7: định hướng / nhiệm vụ (mục 6, 12)
+NAV_ORIGIN = 0x23                # 0x23 ORIGIN double lat, double lon (§12)
+                                 # 0x23 ORIGIN double vĩ độ, double kinh độ
 
 CMD_TOC_ELEMENT, CMD_TOC_INFO = 0, 1
 
@@ -218,6 +222,7 @@ class Drone:
         self._sendto = (host, device_port)
         self._lock = threading.Lock()
         self._pending = {}            # (port, channel) -> list of raw replies
+        self._hooks = {}              # (port, channel) -> callback (deliver live)
         self._samples = []            # decoded telemetry, oldest first
         self._frame_lock = threading.Lock()
         self._decoders = {}           # block id -> raw values -> sample dict | None
@@ -267,7 +272,12 @@ class Drone:
                 self._handle_log_data(payload)
             else:
                 with self._lock:
-                    self._pending.setdefault((port, channel), []).append(payload)
+                    hook = self._hooks.get((port, channel))
+                    if hook is None:
+                        self._pending.setdefault((port, channel), []).append(payload)
+                if hook is not None:
+                    hook(payload)       # outside the lock: the hook may send
+                                        # ngoài lock: hook có thể gửi tiếp
 
     def request(self, port, channel, payload, timeout=None, want=None):
         """Send and wait for one reply on (port, channel). `want(payload)` can
@@ -287,6 +297,34 @@ class Drone:
                 return reply
             time.sleep(0.005)
         raise TimeoutError("no reply on port %d ch %d" % (port, channel))
+
+    def set_hook(self, port, channel, callback):
+        """Deliver every payload on (port, channel) to callback as it arrives,
+        instead of queueing it for request() — the mission transfer matches its
+        own replies this way (the Android DataListener, planner.MissionTransfer).
+        Giao mọi phần dữ liệu trên (port, channel) cho callback ngay khi đến,
+        thay vì xếp hàng cho request() — phiên truyền nhiệm vụ tự so khớp câu
+        trả lời theo cách này (DataListener của Android, planner.MissionTransfer)."""
+        with self._lock:
+            self._hooks[(port, channel)] = callback
+
+    def clear_hook(self, port, channel):
+        with self._lock:
+            self._hooks.pop((port, channel), None)
+
+    # --- navigation extension (port 7, ch 1) ---
+
+    def send_nav_origin(self, lat, lon):
+        """0x23 ORIGIN (PROTOCOL.md §12): the launch lat/lon mission items and
+        telemetry are relative to. Sent before a mission flies; the reply is
+        <0x23><status>, 0 = ok.
+        0x23 ORIGIN (PROTOCOL.md §12): vĩ/kinh độ cất cánh mà các mục nhiệm vụ
+        và telemetry quy chiếu. Gửi trước khi bay nhiệm vụ; câu trả lời là
+        <0x23><status>, 0 = ok."""
+        args = struct.pack("<dd", lat, lon)
+        r = self.request(PORT_FLIGHT, NAV_CH, bytes([NAV_ORIGIN]) + args,
+                         want=lambda p: len(p) >= 2 and p[0] == NAV_ORIGIN)
+        return r[-1] == 0
 
     # --- parameters ---
 

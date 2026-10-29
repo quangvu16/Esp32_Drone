@@ -464,6 +464,21 @@ bài thử sau 300 ms im lặng, và đóng cửa sổ cũng gửi lệnh tắt.
 kết thúc nó. Nếu trạng thái báo bài thử không được xác nhận, drone đang arm —
 hãy disarm trước.
 
+### Kế hoạch nhiệm vụ
+
+**Open plan window** mở màn hình Plan của [mục 8](#s8) trên laptop — cùng lưới
+nhiệm vụ, cùng tệp `.waypoints` và cùng Upload / Download / Start, qua Wi-Fi
+của drone. Khác mỗi chỗ thay cho điện thoại:
+
+| Thành phần | Chức năng |
+|---|---|
+| **Plan plot** (biểu đồ kế hoạch) | Nhiệm vụ vẽ theo mét quanh home; **bấm** để thêm waypoint tại đó (cú chạm bản đồ của điện thoại, trừ vùng cấm — PC không có cơ sở dữ liệu bản đồ để phủ quyết). |
+| **Lưới + dải sửa dòng** | Các ô Command / P1–P4 / Vĩ độ / Kinh độ sửa dòng đang chọn và ghi nhận khi bấm **Set row** hoặc khi rời ô — đúng hành vi rời ô của Mission Planner. |
+| **Alt / Set alt / Add WP / ↑ ↓ Del** | Như trên điện thoại: độ cao cho waypoint mới, sắp xếp lại hoặc xoá dòng. |
+| **Home lat / lon** | Vị trí GPS của điện thoại, nhập tay. Chúng giữ điểm cất cánh — dòng home của tệp và điểm gốc gửi trước khi Upload hoặc Start. |
+| **Load / Save** | `.waypoints` (QGC WPL 110) — cùng tệp với các app và Mission Planner. |
+| **Upload / Download / Start** | Ghi, đọc hoặc bay nhiệm vụ trên drone (Read / Write / Start waypoints). |
+
 ---
 
 <a id="s13"></a>

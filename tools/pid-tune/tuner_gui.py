@@ -33,6 +33,11 @@ Auto-tune: tunes the ticked gains while the drone sits armed on a stand
 A second window shows every trial's cost and a Gaussian-process fit of the cost
 over the gains (for all but ML only a picture of the trials).
 
+Plan window: the apps' Plan page (Mission Planner's Flight Plan) — the mission
+grid (Command / P1-P4 / Lat / Lon / Alt), .waypoints load and save, and the
+CRTP mission transfer Upload / Download / Start (PROTOCOL.md §12), with the
+plan plotted in the drone's launch frame (click to add a waypoint).
+
   python3 tuner_gui.py                      # the soft-AP default, 192.168.43.42
   python3 tuner_gui.py --host esp-drone.local --axis pitch --window 20
 
@@ -56,9 +61,14 @@ from matplotlib.figure import Figure  # noqa: E402
 from matplotlib.ticker import FuncFormatter, LogFormatter  # noqa: E402
 
 import ml_tune  # noqa: E402
-from drone import (AXES, MOTOR_SAT_HI, MOTOR_SAT_LO, PORT_LOG, PORT_PARAMS,  # noqa: E402
-                   Drone, axis_names, gain_name, open_tune_blocks, stop_log_blocks)
+from drone import (AXES, MOTOR_SAT_HI, MOTOR_SAT_LO, PORT_FLIGHT, PORT_LOG,  # noqa: E402
+                   PORT_PARAMS, Drone, axis_names, gain_name, open_tune_blocks,
+                   stop_log_blocks)
 from ml_tune import from_y, read_history  # noqa: E402
+from planner import (CMD_SET_CURRENT, CMD_START, DEFAULT_WAYPOINT_ALT,  # noqa: E402
+                     DEFAULT_WAYPOINT_RADIUS, FLOWN_COMMANDS, MISSION_ACCEPTED,
+                     MISSION_CH, MissionTransfer, PlannerItem, PlannerMission,
+                     mission_result_name, parse_command, to_lat_lon, to_north_east)
 
 # (subplot title, unit, [(series key, label, colour)])
 # (tiêu đề subplot, đơn vị, [(khóa chuỗi, nhãn, màu)])
@@ -194,6 +204,554 @@ class ModelWindow:
             ax.yaxis.set_minor_formatter(plain)
 
 
+class PlanWindow:
+    """Mission Planner's Flight Plan screen: the mission grid, the row editor,
+    .waypoints files and the CRTP mission transfer (PROTOCOL.md §12).
+
+    The Python twin of the Android app's Plan page (PlannerActivity) and the
+    iOS app's Plan screen — the plan lives in the grid and on the drone. The
+    plot replaces the phone map: the plan drawn in the drone's launch frame in
+    metres (PROTOCOL.md §12), click to place a waypoint. The Home fields stand
+    in for the phone's GPS fix — they hold the launch lat/lon that becomes both
+    the file's home row and the ORIGIN sent before a mission flies.
+    Bản song sinh Python của trang Plan app Android (PlannerActivity) và màn
+    hình Plan app iOS — kế hoạch nằm trong lưới và trên drone. Biểu đồ thay bản
+    đồ điện thoại: kế hoạch vẽ trong khung cất cánh của drone theo mét
+    (PROTOCOL.md mục 12), bấm để đặt waypoint. Các ô Home thay cho vị trí GPS
+    của điện thoại — chúng giữ vĩ/kinh độ cất cánh, vừa thành dòng home của tệp
+    vừa thành ORIGIN gửi trước khi bay nhiệm vụ."""
+
+    def __init__(self, root, drone):
+        self.root = root
+        self.drone = drone
+        self.mission = PlannerMission()
+        self.selected = -1
+        self.default_alt = DEFAULT_WAYPOINT_ALT
+        self.filling = False                 # filling the strip; don't commit back
+                                             # đang điền dải sửa; đừng ghi ngược
+        self.closed = False
+        self.rx = queue.Queue()              # payloads from the link's reader thread
+                                             # gói dữ liệu từ luồng nhận của link
+        self.transfer = MissionTransfer(self, self._after, self._after_cancel)
+        self.transfer.attach(self._send_wire)
+        drone.set_hook(PORT_FLIGHT, MISSION_CH, self._on_payload)
+
+        self.top = tk.Toplevel(root)
+        self.top.title("Plan — mission")
+        self.top.minsize(940, 620)
+        self.top.protocol("WM_DELETE_WINDOW", self.close)
+        self._build()
+        self.refresh()
+        self.top.after(50, self._pump)
+
+    # ---------------------------------------------------------------- widgets
+    def _build(self):
+        top = self.top
+
+        # plan plot (left) + mission grid (right)
+        # biểu đồ kế hoạch (trái) + lưới nhiệm vụ (phải)
+        upper = ttk.Frame(top, padding=6)
+        upper.pack(fill=tk.BOTH, expand=True)
+
+        self.fig = Figure(figsize=(5.4, 4.8), layout="constrained")
+        self.ax = self.fig.add_subplot(111)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=upper)
+        self.canvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.canvas.mpl_connect("button_press_event", self._on_plot_click)
+
+        right = ttk.Frame(upper)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(6, 0))
+        cols = ("cmd", "p1", "p2", "p3", "p4", "lat", "lon", "alt")
+        self.tree = ttk.Treeview(right, columns=cols, show="tree headings",
+                                 height=11, selectmode="browse")
+        self.tree.heading("#0", text="#")
+        self.tree.column("#0", width=34, stretch=False)
+        heads = {"cmd": "Command", "p1": "P1", "p2": "P2", "p3": "P3", "p4": "P4",
+                 "lat": "Lat", "lon": "Lon", "alt": "Alt"}
+        widths = {"cmd": 116, "p1": 56, "p2": 56, "p3": 56, "p4": 56,
+                  "lat": 98, "lon": 98, "alt": 56}
+        for c in cols:
+            self.tree.heading(c, text=heads[c])
+            self.tree.column(c, width=widths[c], anchor=tk.W)
+        scroll = ttk.Scrollbar(right, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll.pack(side=tk.LEFT, fill=tk.Y)
+        self.tree.bind("<<TreeviewSelect>>", self._on_select)
+
+        # the row editor — Mission Planner's grid commits on cell-exit
+        # trình sửa dòng — lưới của Mission Planner ghi nhận khi rời ô
+        edit = ttk.LabelFrame(top, text="Selected row", padding=4)
+        edit.pack(fill=tk.X, padx=6)
+        ttk.Label(edit, text="Command").grid(row=0, column=0, sticky=tk.W)
+        self.cmd_var = tk.StringVar()
+        self.cmd_box = ttk.Combobox(edit, textvariable=self.cmd_var,
+                                    values=list(FLOWN_COMMANDS), state="readonly",
+                                    width=17)
+        self.cmd_box.grid(row=0, column=1, sticky=tk.W)
+        self.cmd_box.bind("<<ComboboxSelected>>", self._on_command)
+        self.field_vars = []
+        for k, label in enumerate(("P1", "P2", "P3", "P4")):
+            ttk.Label(edit, text=label).grid(row=0, column=2 + 2 * k, sticky=tk.W,
+                                             padx=(6, 0))
+            var = tk.StringVar()
+            entry = ttk.Entry(edit, textvariable=var, width=9)
+            entry.grid(row=0, column=3 + 2 * k, sticky=tk.W)
+            entry.bind("<Return>", lambda _e: self.commit_row())
+            entry.bind("<FocusOut>", lambda _e: self.commit_row())
+            self.field_vars.append(var)
+        ttk.Button(edit, text="Set row", command=self.commit_row).grid(
+            row=0, column=10, padx=(8, 0))
+        for k, label in enumerate(("Lat", "Lng")):
+            ttk.Label(edit, text=label).grid(row=1, column=2 * k, sticky=tk.W,
+                                             padx=(0 if k == 0 else 6, 0))
+            var = tk.StringVar()
+            entry = ttk.Entry(edit, textvariable=var, width=14)
+            entry.grid(row=1, column=1 + 2 * k, sticky=tk.W)
+            entry.bind("<Return>", lambda _e: self.commit_row())
+            entry.bind("<FocusOut>", lambda _e: self.commit_row())
+            self.field_vars.append(var)
+
+        # tools + the Alt box (Mission Planner's default for new waypoints)
+        # công cụ + ô độ cao (mặc định của Mission Planner cho waypoint mới)
+        tools = ttk.Frame(top, padding=(6, 4))
+        tools.pack(fill=tk.X)
+        ttk.Label(tools, text="Alt").pack(side=tk.LEFT)
+        self.alt_var = tk.StringVar(value=f"{DEFAULT_WAYPOINT_ALT:g}")
+        ttk.Entry(tools, textvariable=self.alt_var, width=7).pack(side=tk.LEFT,
+                                                                  padx=(2, 0))
+        for text, cmd in (("Set alt", self.set_alt), ("Add WP", self.add_waypoint),
+                          ("Up", lambda: self.move_waypoint(-1)),
+                          ("Down", lambda: self.move_waypoint(1)),
+                          ("Del", self.remove_waypoint),
+                          ("Load", self.load_mission), ("Save", self.save_mission)):
+            ttk.Button(tools, text=text, command=cmd).pack(side=tk.LEFT, padx=2)
+
+        # home = the launch origin (the phone GPS fix on the apps)
+        # home = điểm gốc cất cánh (vị trí GPS của điện thoại trên các app)
+        home = ttk.Frame(top, padding=(6, 0))
+        home.pack(fill=tk.X)
+        ttk.Label(home, text="Home lat").pack(side=tk.LEFT)
+        self.home_lat = tk.StringVar(value="0")
+        lat_box = ttk.Entry(home, textvariable=self.home_lat, width=12)
+        lat_box.pack(side=tk.LEFT, padx=(2, 0))
+        ttk.Label(home, text="lon").pack(side=tk.LEFT, padx=(8, 0))
+        self.home_lon = tk.StringVar(value="0")
+        lon_box = ttk.Entry(home, textvariable=self.home_lon, width=12)
+        lon_box.pack(side=tk.LEFT, padx=(2, 0))
+        for box in (lat_box, lon_box):
+            box.bind("<Return>", lambda _e: self._home_changed())
+            box.bind("<FocusOut>", lambda _e: self._home_changed())
+        ttk.Label(home, text="(launch origin — sent before Upload/Start)",
+                  foreground="#666").pack(side=tk.LEFT, padx=(8, 0))
+
+        # transfer row (PROTOCOL.md §12)
+        # dòng truyền nhiệm vụ (PROTOCOL.md mục 12)
+        bottom = ttk.Frame(top, padding=(6, 4))
+        bottom.pack(fill=tk.X)
+        for text, cmd in (("Upload", self.upload), ("Download", self.download),
+                          ("Start", self.start_mission)):
+            ttk.Button(bottom, text=text, command=cmd).pack(side=tk.LEFT, padx=2)
+        self.plan_status = tk.StringVar(value="")
+        ttk.Label(bottom, textvariable=self.plan_status, wraplength=520,
+                  justify=tk.LEFT).pack(side=tk.LEFT, padx=(10, 0))
+
+    # ---------------------------------------------------------------- link
+    def _send_wire(self, wire):
+        # The wire is the mission-channel payload; Drone.send() adds the CRTP
+        # header byte. A dead socket is left to the resend + "No reply" path.
+        # Gói dây là phần dữ liệu kênh nhiệm vụ; Drone.send() thêm byte header
+        # CRTP. Socket chết sẽ do đường gửi lại + "No reply" xử lý.
+        try:
+            self.drone.send(PORT_FLIGHT, MISSION_CH, wire)
+        except OSError:
+            pass
+
+    def _on_payload(self, payload):
+        # The link's reader thread delivers here; the 50 ms pump below hops to
+        # the Tk thread — the same post-to-main the Android port does.
+        # Luồng nhận của link chuyển dữ liệu tới đây; vòng pump 50 ms bên dưới
+        # nhảy sang luồng Tk — đúng kiểu post-to-main mà bản Android làm.
+        self.rx.put(payload)
+
+    def _pump(self):
+        if self.closed:
+            return
+        while True:
+            try:
+                payload = self.rx.get_nowait()
+            except queue.Empty:
+                break
+            self.transfer.on_reply(payload)
+        self.top.after(50, self._pump)
+
+    def _after(self, ms, fn):
+        try:
+            return self.top.after(ms, fn)
+        except tk.TclError:
+            return None
+
+    def _after_cancel(self, handle):
+        if handle is None:
+            return
+        try:
+            self.top.after_cancel(handle)
+        except tk.TclError:
+            pass
+
+    def _run(self, what, fn):
+        try:
+            return fn()
+        except (TimeoutError, OSError, RuntimeError, KeyError) as e:
+            self.plan_status.set(f"{what}: {e}")
+            return None
+
+    # ---------------------------------------------------------------- editing
+    def refresh(self):
+        self.filling = True
+        try:
+            self.tree.delete(*self.tree.get_children())
+            for i, item in enumerate(self.mission.items):
+                self.tree.insert("", "end", iid=str(i), text=f"#{i + 1}",
+                                 values=self._row_values(item))
+            if 0 <= self.selected < self.mission.size():
+                self.tree.selection_set(str(self.selected))
+            self.fill_edit_strip()
+        finally:
+            self.filling = False
+        home = self.mission.home
+        self.plan_status.set("%d items · home %.6f, %.6f"
+                             % (self.mission.size(), home.lat, home.lon))
+        self.redraw_plot()
+
+    @staticmethod
+    def _row_values(item):
+        return (item.command_name(),
+                f"{item.p1:g}", f"{item.p2:g}", f"{item.p3:g}", f"{item.p4:g}",
+                f"{item.lat:.7f}", f"{item.lon:.7f}", f"{item.alt:g}")
+
+    def fill_edit_strip(self):
+        # The dropdown lists the commands this firmware flies plus the row's
+        # own (or "UNKNOWN", as Mission Planner labels the rest).
+        # Dropdown liệt kê các lệnh firmware bay được cộng với lệnh của dòng đó
+        # (hoặc "UNKNOWN", như Mission Planner đặt tên cho phần còn lại).
+        was = self.filling
+        self.filling = True
+        try:
+            if not (0 <= self.selected < self.mission.size()):
+                for var in self.field_vars:
+                    var.set("")
+                self.cmd_var.set("")
+                return
+            item = self.mission.items[self.selected]
+            for var, value in zip(self.field_vars,
+                                  (f"{item.p1:g}", f"{item.p2:g}",
+                                   f"{item.p3:g}", f"{item.p4:g}",
+                                   f"{item.lat:.7f}", f"{item.lon:.7f}")):
+                var.set(value)
+            names = list(FLOWN_COMMANDS)
+            current = item.command_name()
+            if current not in names:
+                names.append(current)
+            if "UNKNOWN" not in names:
+                names.append("UNKNOWN")
+            self.cmd_box["values"] = names
+            self.cmd_var.set(current)
+        finally:
+            self.filling = was
+
+    def commit_row(self):
+        """Write the edit-strip fields into the selected row.
+        Ghi các trường trong dải sửa vào dòng đang chọn."""
+        if self.filling or not (0 <= self.selected < self.mission.size()):
+            return
+        item = self.mission.items[self.selected]
+        item.p1 = self._parse(self.field_vars[0].get(), item.p1)
+        item.p2 = self._parse(self.field_vars[1].get(), item.p2)
+        item.p3 = self._parse(self.field_vars[2].get(), item.p3)
+        item.p4 = self._parse(self.field_vars[3].get(), item.p4)
+        item.lat = self._parse(self.field_vars[4].get(), item.lat)
+        item.lon = self._parse(self.field_vars[5].get(), item.lon)
+        self.tree.item(str(self.selected), values=self._row_values(item))
+        self.redraw_plot()
+
+    @staticmethod
+    def _parse(text, fallback):
+        # parseFloat / parseDouble with fallback-to-existing (Android).
+        # parseFloat / parseDouble với giá trị dự phòng (Android).
+        try:
+            return float(text.strip())
+        except ValueError:
+            return fallback
+
+    def _on_select(self, _event=None):
+        if self.filling:
+            return
+        sel = self.tree.selection()
+        if not sel:
+            return
+        self.commit_row()
+        self.selected = int(sel[0])
+        self.fill_edit_strip()
+        self.redraw_plot()
+
+    def _on_command(self, _event=None):
+        if self.filling or not (0 <= self.selected < self.mission.size()):
+            return
+        command = parse_command(self.cmd_var.get())
+        if command >= 0:
+            self.commit_row()
+            self.mission.items[self.selected].command = command
+            self.refresh()
+
+    def add_waypoint(self):
+        self.commit_row()
+        item = PlannerItem.waypoint(0, 0, self.default_alt)
+        item.p2 = DEFAULT_WAYPOINT_RADIUS
+        # Without a map position yet, place it on the last one so the marker
+        # stack stays visible; the Lat/Lng cells move it where it belongs.
+        # Chưa có vị trí trên bản đồ thì đặt lên vị trí cuối để các marker còn
+        # nhìn thấy; ô Vĩ độ/Kinh độ sẽ đưa nó về đúng chỗ.
+        if self.mission.items:
+            last = self.mission.items[-1]
+            item.lat = last.lat
+            item.lon = last.lon
+        self.mission.add(item)
+        self.selected = self.mission.size() - 1
+        self.refresh()
+
+    def move_waypoint(self, delta):
+        self.commit_row()
+        if not (0 <= self.selected < self.mission.size()):
+            self.plan_status.set("Select a mission item first")
+            return
+        to = self.selected + delta
+        if to < 0 or to >= self.mission.size():
+            return
+        moved = self.mission.items.pop(self.selected)
+        self.mission.items.insert(to, moved)
+        self.selected = to
+        self.refresh()
+
+    def remove_waypoint(self):
+        self.commit_row()
+        if not (0 <= self.selected < self.mission.size()):
+            self.plan_status.set("Select a mission item first")
+            return
+        self.mission.items.pop(self.selected)
+        if self.selected >= self.mission.size():
+            self.selected = self.mission.size() - 1
+        self.refresh()
+
+    def set_alt(self):
+        """Apply the altitude box to the selected row; else it is the new-WP alt.
+        Ghi ô độ cao vào dòng đang chọn; nếu không thì đó là độ cao cho WP mới."""
+        alt = self._parse(self.alt_var.get(), self.default_alt)
+        self.default_alt = alt
+        if 0 <= self.selected < self.mission.size():
+            self.commit_row()
+            self.mission.items[self.selected].alt = alt
+            self.refresh()
+            self.plan_status.set("Altitude set")
+        else:
+            self.plan_status.set("New waypoints will use alt %g" % alt)
+
+    def _home_changed(self):
+        self.commit_home()
+        home = self.mission.home
+        self.plan_status.set("%d items · home %.6f, %.6f"
+                             % (self.mission.size(), home.lat, home.lon))
+        self.redraw_plot()
+
+    def commit_home(self):
+        # The Home fields stand in for the phone GPS fix: they edit the file's
+        # home row, which is also the launch origin sent to the drone.
+        # Các ô Home thay cho vị trí GPS của điện thoại: chúng sửa dòng home của
+        # tệp, cũng là điểm gốc cất cánh gửi cho drone.
+        home = self.mission.home
+        home.lat = self._parse(self.home_lat.get(), home.lat)
+        home.lon = self._parse(self.home_lon.get(), home.lon)
+
+    # ---------------------------------------------------------------- plot
+    def _ref(self):
+        # The plan plot's origin: home when set, else the first positioned row.
+        # Gốc của biểu đồ kế hoạch: home nếu có, ngược lại dòng có vị trí đầu tiên.
+        home = self.mission.home
+        if home.lat != 0 or home.lon != 0:
+            return home.lat, home.lon
+        for item in self.mission.items:
+            if item.lat != 0 or item.lon != 0:
+                return item.lat, item.lon
+        return 0.0, 0.0
+
+    def redraw_plot(self):
+        ax = self.ax
+        ax.clear()
+        ref_lat, ref_lon = self._ref()
+        xs, ys, idx = [], [], []
+        for i, item in enumerate(self.mission.items):
+            if item.lat == 0 and item.lon == 0:
+                continue                    # the phone map shows positioned rows only
+                                            # bản đồ điện thoại chỉ hiện dòng có vị trí
+            n, e = to_north_east(ref_lat, ref_lon, item.lat, item.lon)
+            xs.append(e)
+            ys.append(n)
+            idx.append(i)
+        home = self.mission.home
+        if home.lat != 0 or home.lon != 0:
+            ax.plot([0], [0], marker="*", color="C1", ms=13, label="home")
+        if xs:
+            ax.plot(xs, ys, "-", color="C7", lw=1.0, zorder=1)
+            for x, y, i in zip(xs, ys, idx):
+                if i == self.selected:
+                    ax.plot([x], [y], "o", color="C3", ms=8, zorder=3)
+                else:
+                    ax.plot([x], [y], "o", color="C0", ms=5, zorder=2)
+        ax.set_aspect("equal", adjustable="datalim")
+        ax.grid(True, alpha=0.3)
+        ax.set_xlabel("east m", fontsize=8)
+        ax.set_ylabel("north m", fontsize=8)
+        ax.set_title("plan (m about home)" if (home.lat != 0 or home.lon != 0)
+                     else "plan (m about the first waypoint)", fontsize=8)
+        ax.tick_params(labelsize=7)
+        self.canvas.draw_idle()
+
+    def _on_plot_click(self, event):
+        # Tapping the plot adds a waypoint there — Mission Planner's map click.
+        # Chạm biểu đồ thêm một waypoint tại đó — map click của Mission Planner.
+        if event.inaxes is not self.ax or event.button != 1 or event.xdata is None:
+            return
+        self.commit_row()
+        ref_lat, ref_lon = self._ref()
+        lat, lon = to_lat_lon(ref_lat, ref_lon, event.ydata, event.xdata)
+        # The keep-out veto of the phone apps (NavStore, PROTOCOL.md §10) has no
+        # PC database behind it — nothing to veto with here.
+        # Quyền phủ quyết vùng cấm của các app điện thoại (NavStore, PROTOCOL.md
+        # mục 10) không có cơ sở dữ liệu trên PC — ở đây không có gì để phủ quyết.
+        item = PlannerItem.waypoint(lat, lon, self.default_alt)
+        item.p2 = DEFAULT_WAYPOINT_RADIUS
+        self.mission.add(item)
+        self.selected = self.mission.size() - 1
+        self.refresh()
+
+    # ---------------------------------------------------------------- files
+    def load_mission(self):
+        path = filedialog.askopenfilename(
+            filetypes=[("Waypoints", "*.waypoints"), ("All files", "*")])
+        if not path:
+            return
+        try:
+            with open(path, encoding="utf-8") as f:
+                loaded = PlannerMission.parse(f.read())
+        except (OSError, ValueError) as e:
+            self.plan_status.set("Load failed: %s" % e)
+            return
+        self.replace_mission(loaded)
+        self.plan_status.set("Mission loaded - %d invalid line(s) skipped"
+                             % len(loaded.invalid_lines)
+                             if loaded.invalid_lines else "Mission loaded")
+
+    def save_mission(self):
+        self.commit_row()
+        self.commit_home()
+        path = filedialog.asksaveasfilename(defaultextension=".waypoints",
+                                            initialfile="mission.waypoints")
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.mission.format())
+            self.plan_status.set("Mission saved")
+        except OSError as e:
+            self.plan_status.set("Save failed: %s" % e)
+
+    def replace_mission(self, loaded):
+        """Swap in a freshly loaded/downloaded mission (its home comes with it).
+        Thay bằng nhiệm vụ vừa nạp/tải về (home của nó đi kèm)."""
+        self.mission = loaded
+        self.selected = 0 if loaded.size() else -1
+        self.home_lat.set("%.7f" % loaded.home.lat)
+        self.home_lon.set("%.7f" % loaded.home.lon)
+        self.refresh()
+
+    # ---------------------------------------------------------------- transfer
+    def ensure_origin(self):
+        """The mission items are WGS-84 degrees and the drone flies a
+        dead-reckoned local frame — the origin is the only bridge (§12). Send
+        the mission's home; without one the drone keeps its stored origin.
+        Các mục nhiệm vụ là độ WGS-84 còn drone bay theo khung cục bộ tự dẫn
+        đường — điểm gốc là cây cầu duy nhất (mục 12). Gửi home của nhiệm vụ;
+        không có thì drone giữ nguyên điểm gốc đã lưu."""
+        self.commit_home()
+        home = self.mission.home
+        if home.lat != 0 or home.lon != 0:
+            ok = self._run("origin",
+                           lambda: self.drone.send_nav_origin(home.lat, home.lon))
+            if ok is not None and not ok:
+                self.plan_status.set("Origin refused - the drone will use its "
+                                     "stored origin")
+        else:
+            self.plan_status.set("No home set - the drone will use its stored "
+                                 "origin")
+
+    def upload(self):
+        self.commit_row()
+        self.ensure_origin()
+        self.transfer.upload(self.mission.items)
+
+    def download(self):
+        self.commit_row()
+        self.transfer.download()
+
+    def start_mission(self):
+        self.commit_row()
+        self.ensure_origin()
+        self.transfer.start_mission()
+
+    # MissionTransfer listener ---------------------------------------------
+    def on_transfer_status(self, message):
+        self.plan_status.set(message)
+
+    def on_upload_finished(self, result):
+        # refresh() writes the status line too — the result goes last, as the
+        # Android toast lands over the refreshed grid.
+        # refresh() cũng ghi dòng trạng thái — kết quả phải ghi sau cùng, như
+        # toast Android hiện chồng lên lưới vừa làm mới.
+        self.refresh()
+        self.plan_status.set("Mission uploaded" if result == MISSION_ACCEPTED
+                             else "Upload failed: " + mission_result_name(result))
+
+    def on_download_finished(self, mission, result):
+        if mission is None or result != MISSION_ACCEPTED:
+            self.plan_status.set("Download failed: " + mission_result_name(result))
+            return
+        self.replace_mission(mission)
+        self.plan_status.set("Mission downloaded (%d items)" % mission.size())
+
+    def on_command_finished(self, cmd, ok):
+        if cmd == CMD_START:
+            self.plan_status.set("Mission started" if ok else "Start refused")
+        elif cmd == CMD_SET_CURRENT:
+            self.plan_status.set("Current item set" if ok else "Bad item number")
+
+    def on_current_item(self, seq):
+        self.plan_status.set("flying item %d of %d" % (seq + 1, self.mission.size()))
+
+    # ---------------------------------------------------------------- close
+    def close(self, force=False):
+        # A transfer in flight dies with this window (the Android leave guard).
+        # Phiên truyền đang chạy sẽ chết theo cửa sổ này (leave guard của Android).
+        if self.transfer.is_busy() and not force:
+            if not messagebox.askyesno("Plan", "Mission transfer is running - "
+                                       "close anyway?"):
+                return
+        self.closed = True
+        self.transfer.detach()
+        self.drone.clear_hook(PORT_FLIGHT, MISSION_CH)
+        self.top.destroy()
+        self.top = None
+
+
 class TunerGui:
     def __init__(self, root, drone, axis, window_s):
         self.root = root
@@ -212,6 +770,7 @@ class TunerGui:
         self.ml_stop = threading.Event()
         self.ml_queue = queue.Queue()
         self.model_win = None
+        self.plan_win = None
         self.ml_last = None                 # latest "trial" report, for the model window
         root.title(f"Drone Tuner — {axis}")
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -221,6 +780,7 @@ class TunerGui:
         self._build_link(side)
         self._build_params(side)
         self._build_controls(side)
+        self._build_plan(side)
         self._build_motor_test(side)
         self._build_autotune(side)
         self.stats = tk.StringVar(value="")
@@ -304,6 +864,18 @@ class TunerGui:
         self.pause_btn.grid(row=3, column=0, sticky=tk.W, pady=(4, 0))
         self.rec_btn = ttk.Button(box, text="Record CSV", command=self.toggle_record)
         self.rec_btn.grid(row=3, column=1, columnspan=2, pady=(4, 0), sticky=tk.W)
+
+    def _build_plan(self, parent):
+        # Mission plan — the apps' Plan page (Mission Planner's Flight Plan):
+        # mission grid, .waypoints files and the mission transfer (§12) live in
+        # their own window, like the model view.
+        # Kế hoạch bay — trang Plan của các app (Flight Plan của Mission Planner):
+        # lưới nhiệm vụ, tệp .waypoints và truyền nhiệm vụ (mục 12) nằm ở cửa sổ
+        # riêng, giống cửa sổ model.
+        box = ttk.LabelFrame(parent, text="Mission plan", padding=4)
+        box.pack(fill=tk.X, pady=(6, 0))
+        ttk.Button(box, text="Open plan window",
+                   command=self.show_plan).pack(anchor=tk.W)
 
     def _build_motor_test(self, parent):
         # Bench motor test (FC_MOTOR_TEST, PROTOCOL.md §5): one Run/Stop pair per
@@ -599,6 +1171,12 @@ class TunerGui:
         else:
             self.model_win.top.lift()
 
+    def show_plan(self):
+        if self.plan_win is None or self.plan_win.top is None:
+            self.plan_win = PlanWindow(self.root, self.drone)
+        else:
+            self.plan_win.top.lift()
+
     def poll_autotune(self):
         while True:
             try:
@@ -722,6 +1300,8 @@ class TunerGui:
                 self.drone.motor_test(0)
             except (TimeoutError, OSError, RuntimeError):
                 pass
+        if self.plan_win is not None and self.plan_win.top is not None:
+            self.plan_win.close(force=True)
         try:
             stop_log_blocks(self.drone)
         except (TimeoutError, OSError, RuntimeError):

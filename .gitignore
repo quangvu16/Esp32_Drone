@@ -39,3 +39,6 @@ zi5dtisj
 
 # Python bytecode
 __pycache__/
+
+# Python venv (tools/pid-tune setup per its README)
+.venv/

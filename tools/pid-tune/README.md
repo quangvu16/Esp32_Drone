@@ -77,6 +77,36 @@ Five stacked plots: angle (stabilizer), rate, the P/I/D terms as the firmware
 computed them, controller output, and motor m1 with dashed rails at the
 saturation limits 1990 / 1010.
 
+## Mission plan
+
+**Mission plan → Open plan window** opens the Mission Planner *Flight Plan*
+screen on the laptop — the Python twin of the Android app's Plan page
+(`gpsnav/PlannerActivity`) and the iOS Plan screen. Same mission grid, same
+`.waypoints` files, same Upload / Download / Start over the drone's Wi-Fi.
+
+- **Plan plot** — the plan in metres about home (PROTOCOL.md §12). Click to
+  add a waypoint there. The phone apps veto taps inside keep-out zones
+  (NavStore); the PC has no map database, so nothing is vetoed.
+- **Grid + row editor** — Command (the five flown commands or any MAV_CMD
+  number), P1–P4, Lat, Lng, Alt. Edits commit with **Set row** or when a box
+  loses focus, like Mission Planner's grid.
+- **Alt / Set alt / Add WP / Up / Down / Del** — the altitude new waypoints
+  get (Set alt also writes it to the selected row), and row order.
+- **Home lat / lon** — the launch origin. The phone apps take it from the GPS
+  fix; here you type it. It becomes the file's home row and the ORIGIN sent
+  before Upload or Start (the drone flies a dead-reckoned local frame — the
+  origin bridges the plan's degrees and that frame).
+- **Load / Save** — `.waypoints`, the QGC WPL 110 format Mission Planner
+  writes. `planner.py` ports the reader/writer quirks and all 171 MAV_CMD
+  names from Mission Planner's `MissionFile.cs` — including the blank-home
+  insertion, the command-99 rewrite and the exact number formats — so files
+  round-trip byte-for-byte with Mission Planner.
+- **Upload / Download / Start** — the onboard mission (Read / Write / Start
+  waypoints, PROTOCOL.md §12, port 7 channel 2). Before Upload or Start the
+  window sends the home as the ORIGIN. The transfer re-sends its last message
+  every 500 ms and gives up after 10 tries; a running transfer asks before
+  the window closes.
+
 ## The eleven methods
 
 | method | what it does | notes |
@@ -180,6 +210,16 @@ Sections: wire framing and struct budgets, the link against the fake firmware,
 telemetry decode and the cost model, the GP / Latin hypercube / MLP maths, all
 eleven optimisers, history seeding, and error paths (including that a CREATE
 with different variables over a live block is refused with `EXISTS`).
+
+The plan side has its own suite, `planner_test.py`: it pins the `.waypoints`
+codec against the Android `CodecCheck.java` driver's 32 checks (byte-exact
+round-trip and every MissionPlanner quirk), the `MISSION_*` wire layout, the
+upload/download/start handshake against a fake timer, and the local-frame
+conversions.
+
+```sh
+python planner_test.py
+```
 
 ## How this differs from the reference
 
